@@ -1,0 +1,159 @@
+# Smart AI Router - 主配置文件
+# 复制此文件为 config.yaml 并根据实际情况修改
+# 详细配置请参考 providers.yaml, model_groups.yaml, system.yaml 等文件
+
+# 配置文件加载顺序
+config_files:
+  # 系统级配置
+  system: "config/system.yaml"
+  # 提供商配置
+  providers: "config/providers.yaml"
+  # 模型组配置
+  model_groups: "config/model_groups.yaml"
+  # 价格策略配置
+  pricing_policies: "config/pricing_policies.yaml"
+
+# 快速配置（可覆盖其他配置文件）
+quick_config:
+  # 服务器配置
+  server:
+    host: "0.0.0.0"
+    port: 8000
+    workers: 1
+    log_level: "info"
+    reload: false
+
+  # 数据库配置  
+  database:
+    url: "sqlite:///./smart_router.db"
+    echo: false
+    pool_size: 10
+    max_overflow: 20
+    # 生产环境推荐使用PostgreSQL:
+    # url: "postgresql+asyncpg://user:password@localhost/smart_router"
+
+  # 快速启动配置（用于测试和开发）
+  # 生产环境请使用 model_groups.yaml 详细配置
+  enable_default_groups: true
+  default_model_groups:
+    - "auto:free"    # 免费模型组
+    - "auto:cheap"   # 经济模型组
+    - "auto:fast"    # 快速模型组
+    
+  # 快速 Provider 配置（用于测试）
+  # 生产环境请使用 providers.yaml 详细配置
+  enable_default_providers: true
+  default_providers:
+    - "groq"         # 免费快速
+    - "openrouter"   # 聚合服务
+    - "siliconflow"  # 国产友好
+
+  # 简化路由配置（详细配置在 system.yaml）
+  enable_smart_routing: true
+  default_strategy: "speed"     # cost, speed, priority, load_balance
+  enable_failover: true
+  max_retries: 3
+
+  # 简化监控配置（详细配置在 system.yaml）
+  enable_monitoring: true
+  enable_health_check: true
+  enable_cost_tracking: true
+  enable_performance_analysis: true
+
+  # 简化安全配置（详细配置在 system.yaml）
+  enable_auth: true
+  require_api_key: true
+  enable_cors: true
+
+  # 简化日志配置（详细配置在 system.yaml）
+  log_level: "INFO"
+  log_format: "json"
+  enable_file_logging: true
+
+  # 简化Web配置（详细配置在 system.yaml）
+  enable_web_ui: false
+  enable_admin_api: true
+
+  # 简化缓存配置（详细配置在 system.yaml）
+  enable_caching: true
+  cache_type: "memory"
+
+  # 简化API配置（详细配置在 system.yaml）
+  openai_compatible: true
+  enable_streaming: true
+  max_request_size: "10MB"
+  timeout_seconds: 300
+
+  # 开发配置
+  debug_mode: false
+  test_mode: false
+  mock_providers: false
+  
+# 初始化配置
+initialization:
+  # 启动时自动加载模型
+  auto_load_models: true
+  
+  # 自动创建默认模型组
+  create_default_groups: true
+  
+  # 自动配置默认提供商（需要环境变量中的API密钥）
+  auto_configure_providers: false
+
+# 环境变量映射
+environment:
+  # 必需的环境变量
+  required:
+    - "JWT_SECRET"               # JWT认证密钥
+    
+  # 可选的环境变量（如果提供将自动配置相应的Provider）
+  optional:
+    - "OPENAI_API_KEY"          # OpenAI API密钥
+    - "ANTHROPIC_API_KEY"       # Anthropic API密钥
+    - "GROQ_API_KEY"            # Groq API密钥
+    - "OPENROUTER_API_KEY"      # OpenRouter API密钥
+    - "SILICONFLOW_API_KEY"     # 硅基流动 API密钥
+    - "TUZI_API_KEY"            # 兔子API密钥
+    - "DATABASE_URL"            # 数据库连接
+    - "REDIS_URL"               # Redis连接
+    - "WEB_SECRET_KEY"          # Web界面密钥
+
+# 配置验证
+validation:
+  # 启动时检查配置完整性
+  validate_on_startup: true
+  
+  # 检查API密钥有效性
+  validate_api_keys: true
+  
+  # 验证模型组配置
+  validate_model_groups: true
+  
+  # 检查数据库连接
+  validate_database: true
+
+# 兼容性设置
+compatibility:
+  # OpenAI API兼容模式
+  openai_api_v1: true
+  
+  # 支持的API版本
+  supported_api_versions: ["v1"]
+  
+  # 向后兼容旧配置格式
+  legacy_config_support: true
+
+# 性能优化
+performance:
+  # 启用异步处理
+  enable_async: true
+  
+  # 连接池大小
+  connection_pool_size: 100
+  
+  # 请求队列大小
+  request_queue_size: 1000
+  
+  # 响应缓存
+  enable_response_cache: false
+  response_cache_ttl: 300

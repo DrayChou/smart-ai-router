@@ -1,0 +1,433 @@
+# Smart AI Router - Model Groups Configuration
+# 模型组配置文件，定义用户可使用的模型组合
+
+model_groups:
+  # 免费模型组 - 包含所有免费模型
+  auto:free:
+    display_name: "免费模型组"
+    description: "包含所有免费AI模型，按速度和可用性智能路由"
+    
+    # 筛选条件
+    filters:
+      max_cost_per_1k: 0.0        # 只要免费模型
+      min_context_length: 4000    # 最小上下文长度
+      required_capabilities: []   # 无特殊能力要求
+      exclude_models: []          # 排除特定模型
+      
+    # 多层排序策略
+    routing_strategy:
+      - field: "effective_cost"    # 考虑倍率后的实际成本
+        order: "asc"
+        weight: 1.0
+      - field: "speed_score"       # 响应速度评分
+        order: "desc" 
+        weight: 0.9
+      - field: "uptime_score"      # 可用性评分
+        order: "desc"
+        weight: 0.8
+      - field: "quota_remaining"   # 剩余配额比例
+        order: "desc"
+        weight: 0.7
+        
+    # 全局限制
+    budget_limits:
+      daily_budget: 0.0          # 免费组无预算限制
+      max_cost_per_request: 0.0  # 单次请求成本限制
+      
+    # 时间策略
+    time_policies:
+      peak_hours: "09:00-18:00"
+      peak_strategy: ["speed_score", "uptime_score"] 
+      off_peak_strategy: ["effective_cost", "speed_score"]
+      
+    # 负载均衡
+    load_balancing:
+      algorithm: "weighted_round_robin"
+      health_check_factor: true
+      
+    # 渠道配置
+    channels:
+      - provider: "groq"
+        model: "llama-3.1-8b-instant"
+        priority: 1
+        weight: 1.5              # 优先使用 Groq（速度快）
+        daily_limit: 1000
+        overrides:
+          speed_score: 0.95      # Groq 特别快
+          
+      - provider: "groq"
+        model: "llama-3.1-70b-versatile"
+        priority: 2
+        weight: 1.2
+        daily_limit: 500         # 大模型限额较少
+        overrides:
+          speed_score: 0.85
+          quality_score: 0.9
+          
+      - provider: "openrouter"
+        model: "meta-llama/llama-3.1-8b-instruct:free"
+        priority: 3
+        weight: 1.0
+        daily_limit: 1000
+        overrides:
+          speed_score: 0.7
+          
+      - provider: "openrouter"
+        model: "google/gemma-7b-it:free"
+        priority: 4
+        weight: 0.8
+        daily_limit: 800
+        overrides:
+          speed_score: 0.6
+          
+      - provider: "siliconflow"
+        model: "Qwen/Qwen2.5-7B-Instruct"
+        priority: 5
+        weight: 0.8
+        daily_limit: 800
+        overrides:
+          speed_score: 0.6
+          capabilities: ["chinese"]  # 中文优化
+
+  # 经济模型组 - 成本优先的付费模型
+  auto:cheap:
+    display_name: "经济模型组"
+    description: "成本优先的付费模型组合，追求最佳性价比"
+    
+    filters:
+      max_cost_per_1k: 5.0       # 最大成本限制
+      min_quality_score: 0.7     # 最低质量要求
+      
+    routing_strategy:
+      - field: "cost_efficiency"   # 性价比 = quality_score / effective_cost
+        order: "desc"
+        weight: 1.0
+      - field: "effective_cost"
+        order: "asc" 
+        weight: 0.8
+      - field: "quota_remaining"
+        order: "desc"
+        weight: 0.6
+        
+    budget_limits:
+      daily_budget: 20.0
+      max_cost_per_request: 2.0
+      
+    channels:
+      - provider: "api_tu_zi"      # 兔子API便宜
+        model: "gpt-4o-mini"
+        daily_limit: 5000
+        priority: 1
+        weight: 1.2
+        
+      - provider: "openrouter"     # OpenRouter便宜模型
+        model: "openai/gpt-3.5-turbo"
+        daily_limit: 3000
+        priority: 2
+        weight: 1.0
+        
+      - provider: "siliconflow"    # 国产便宜
+        model: "deepseek-ai/DeepSeek-V2.5"
+        daily_limit: 3000
+        priority: 3
+        weight: 1.0
+
+  # 高性能模型组 - 速度优先
+  auto:fast:
+    display_name: "快速模型组"
+    description: "速度优先的高性能模型组合，追求最快响应"
+    
+    filters:
+      max_latency_ms: 3000        # 最大延迟3秒
+      min_throughput_tps: 30      # 最小吞吐量
+      supports_streaming: true    # 必须支持流式输出
+      
+    routing_strategy:
+      - field: "speed_score"
+        order: "desc"
+        weight: 1.0
+      - field: "avg_latency"
+        order: "asc"
+        weight: 0.9
+      - field: "throughput_score"
+        order: "desc"
+        weight: 0.8
+      - field: "effective_cost"
+        order: "asc"
+        weight: 0.3   # 成本权重较低
+        
+    budget_limits:
+      daily_budget: 50.0
+      max_cost_per_request: 5.0
+      
+    channels:
+      - provider: "groq"           # Groq 最快
+        model: "llama-3.1-70b-versatile"
+        priority: 1
+        weight: 1.5
+        daily_limit: 800
+        
+      - provider: "openai"
+        model: "gpt-4o"
+        priority: 2
+        weight: 1.2
+        daily_limit: 1000
+        
+      - provider: "api_tu_zi"      # 便宜渠道的快速模型
+        model: "gpt-4o"
+        priority: 3
+        weight: 1.0
+        daily_limit: 800
+
+  # 智能模型组 - 质量优先
+  auto:smart:
+    display_name: "智能模型组"
+    description: "质量优先的高端模型组合，追求最佳效果"
+    
+    filters:
+      min_quality_score: 0.9      # 高质量模型
+      required_capabilities: 
+        - "reasoning"
+        - "code_generation"
+      min_context_length: 32000   # 长上下文
+      
+    routing_strategy:
+      - field: "quality_score"
+        order: "desc"
+        weight: 1.0
+      - field: "capability_match"  # 能力匹配度
+        order: "desc"
+        weight: 0.9
+      - field: "context_length"
+        order: "desc"
+        weight: 0.7
+      - field: "effective_cost"
+        order: "asc"
+        weight: 0.3   # 成本权重最低
+        
+    budget_limits:
+      daily_budget: 100.0
+      max_cost_per_request: 10.0
+      
+    channels:
+      - provider: "anthropic"
+        model: "claude-3-5-sonnet-20241022"
+        priority: 1
+        weight: 1.5
+        daily_limit: 1000
+        
+      - provider: "openai"
+        model: "gpt-4o"
+        priority: 1
+        weight: 1.4
+        daily_limit: 1000
+        
+      - provider: "api_tu_zi"      # 用便宜渠道的高端模型
+        model: "claude-3-5-sonnet-20241022"
+        priority: 2
+        weight: 1.2
+        daily_limit: 800
+
+  # 工具调用模型组
+  auto:tools:
+    display_name: "工具调用模型组"
+    description: "支持 function calling 的模型组合"
+    
+    filters:
+      required_capabilities:
+        - "function_calling"         # 必须支持工具调用
+        - "json_mode"               # 支持JSON输出模式
+      optional_capabilities:
+        - "code_generation"         # 可选代码生成能力
+      max_cost_per_1k: 15.0
+      min_context_length: 8000
+      
+    routing_strategy:
+      - field: "tools_capability_score"  # 工具调用能力评分
+        order: "desc"
+        weight: 1.0
+      - field: "json_accuracy_score"     # JSON输出准确性
+        order: "desc"
+        weight: 0.9
+      - field: "effective_cost"
+        order: "asc"
+        weight: 0.6
+        
+    budget_limits:
+      daily_budget: 30.0
+      max_cost_per_request: 3.0
+      
+    channels:
+      - provider: "openai"
+        model: "gpt-4o"
+        priority: 1
+        weight: 1.3
+        daily_limit: 1000
+        
+      - provider: "anthropic"
+        model: "claude-3-5-sonnet-20241022"
+        priority: 1
+        weight: 1.3
+        daily_limit: 800
+        
+      - provider: "groq"
+        model: "llama-3.1-70b-versatile"
+        priority: 2
+        weight: 1.0
+        daily_limit: 500
+
+  # 多模态模型组
+  auto:vision:
+    display_name: "多模态模型组"
+    description: "支持图像识别和分析的模型组合"
+    
+    filters:
+      required_capabilities:
+        - "vision"                  # 必须支持视觉
+        - "multimodal"             # 多模态能力
+      image_formats:              # 支持的图片格式
+        - "jpeg"
+        - "png" 
+        - "webp"
+      max_image_size: 20971520    # 最大图片大小 20MB
+      max_cost_per_1k: 30.0       # 多模态通常较贵
+      
+    routing_strategy:
+      - field: "vision_capability_score"
+        order: "desc" 
+        weight: 1.0
+      - field: "image_processing_speed"
+        order: "desc"
+        weight: 0.8
+      - field: "multimodal_accuracy"
+        order: "desc"
+        weight: 0.9
+      - field: "effective_cost"
+        order: "asc"
+        weight: 0.4
+        
+    budget_limits:
+      daily_budget: 80.0
+      max_cost_per_request: 8.0
+      
+    channels:
+      - provider: "openai"
+        model: "gpt-4o"
+        priority: 1
+        weight: 1.4
+        daily_limit: 800
+        
+      - provider: "anthropic"
+        model: "claude-3-5-sonnet-20241022"
+        priority: 1
+        weight: 1.3
+        daily_limit: 600
+        
+      - provider: "openai"
+        model: "gpt-4-turbo"
+        priority: 2
+        weight: 1.0
+        daily_limit: 500
+
+  # 代码助手模型组
+  auto:code:
+    display_name: "代码助手模型组"
+    description: "专门用于代码生成和分析的模型组合"
+    
+    filters:
+      required_capabilities:
+        - "code_generation"
+        - "code_analysis" 
+      programming_languages:     # 支持的编程语言
+        - "python"
+        - "javascript"
+        - "java"
+        - "go"
+        - "rust"
+      exclude_capabilities:
+        - "vision"                # 纯代码任务不需要视觉
+      min_context_length: 16000   # 代码需要较长上下文
+      
+    routing_strategy:
+      - field: "coding_capability_score"
+        order: "desc"
+        weight: 1.0
+      - field: "code_completion_accuracy"
+        order: "desc"
+        weight: 0.9
+      - field: "context_length"
+        order: "desc"
+        weight: 0.8
+      - field: "effective_cost"
+        order: "asc"
+        weight: 0.5
+        
+    budget_limits:
+      daily_budget: 40.0
+      max_cost_per_request: 4.0
+      
+    channels:
+      - provider: "anthropic"
+        model: "claude-3-5-sonnet-20241022"
+        priority: 1
+        weight: 1.5             # Claude 代码能力很强
+        daily_limit: 1000
+        
+      - provider: "openai"
+        model: "gpt-4o"
+        priority: 2
+        weight: 1.3
+        daily_limit: 800
+        
+      - provider: "siliconflow"
+        model: "Qwen2.5-Coder-32B-Instruct"
+        priority: 3
+        weight: 1.0
+        daily_limit: 1200
+
+  # 中文优化模型组
+  auto:chinese:
+    display_name: "中文模型组"
+    description: "中文优化的模型组合，更好的中文理解和生成"
+    
+    filters:
+      required_capabilities:
+        - "chinese_optimized"
+      optional_capabilities:
+        - "function_calling"
+        - "code_generation"
+      max_cost_per_1k: 10.0
+      
+    routing_strategy:
+      - field: "chinese_capability_score"
+        order: "desc"
+        weight: 1.0
+      - field: "effective_cost"
+        order: "asc"
+        weight: 0.8
+      - field: "speed_score"
+        order: "desc"
+        weight: 0.7
+        
+    budget_limits:
+      daily_budget: 30.0
+      max_cost_per_request: 3.0
+      
+    channels:
+      - provider: "siliconflow"
+        model: "Qwen2.5-72B-Instruct"
+        priority: 1
+        weight: 1.4
+        daily_limit: 1500
+        
+      - provider: "siliconflow"
+        model: "deepseek-ai/DeepSeek-V2.5"
+        priority: 2
+        weight: 1.2
+        daily_limit: 1200
+        
+      - provider: "openrouter"
+        model: "qwen/qwen-2.5-72b-instruct"
+        priority: 3
+        weight: 1.0
+        daily_limit: 800

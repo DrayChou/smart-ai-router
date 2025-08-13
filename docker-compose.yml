@@ -1,0 +1,47 @@
+# Smart AI Router - Docker Compose 配置
+version: '3.8'
+
+services:
+  smart-ai-router:
+    build: .
+    container_name: smart-ai-router
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - LOG_LEVEL=INFO
+      - DEBUG=false
+    volumes:
+      - ./config:/app/config:ro
+      - ./logs:/app/logs
+      - ./smart_router.db:/app/smart_router.db
+      - ./.env:/app/.env:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - smart-ai-router
+
+  # 可选: PostgreSQL 数据库
+  # postgres:
+  #   image: postgres:15-alpine
+  #   container_name: smart-ai-router-db
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_DB: smart_router
+  #     POSTGRES_USER: smart_router
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-smart_router_password}
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   networks:
+  #     - smart-ai-router
+
+networks:
+  smart-ai-router:
+    driver: bridge
+
+# volumes:
+#   postgres_data:

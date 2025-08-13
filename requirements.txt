@@ -1,0 +1,42 @@
+# Smart AI Router - 核心依赖
+# Web框架
+fastapi==0.104.1
+uvicorn[standard]==0.24.0.post1
+
+# HTTP客户端
+httpx==0.25.2
+aiofiles==23.2.1
+
+# 数据验证和序列化
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# 数据库
+sqlalchemy==2.0.23
+aiosqlite==0.19.0
+alembic==1.13.1
+
+# 配置和工具
+pyyaml==6.0.1
+python-dotenv==1.0.0
+python-multipart==0.0.6
+
+# 认证和安全
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# 日志和监控
+structlog==23.2.0
+python-json-logger==2.0.7
+
+# 开发工具
+pytest==7.4.3
+pytest-asyncio==0.21.1
+black==23.11.0
+isort==5.12.0
+mypy==1.7.1
+pre-commit==3.6.0
+
+# 可选依赖 (Web界面)
+# jinja2==3.1.2
+# websockets==12.0

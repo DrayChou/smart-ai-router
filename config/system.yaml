@@ -1,0 +1,306 @@
+# Smart AI Router - System Configuration
+# 系统级配置文件，包含定时任务、监控、安全等设置
+
+# 服务器配置
+server:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 1
+  log_level: "info"
+  reload: false
+
+# 数据库配置  
+database:
+  url: "sqlite:///./smart_router.db"
+  echo: false
+  pool_size: 10
+  max_overflow: 20
+  # 生产环境推荐使用PostgreSQL:
+  # url: "postgresql+asyncpg://user:password@localhost/smart_router"
+
+# 定时任务配置
+scheduler:
+  enabled: true
+  timezone: "UTC"
+  
+  jobs:
+    # 模型发现任务
+    model_discovery:
+      cron: "0 */2 * * *"         # 每2小时
+      job_class: "ModelDiscoveryJob"
+      timeout: 300
+      retry_count: 3
+      enabled: true
+      
+    # 价格更新任务
+    pricing_update:
+      cron: "0 */6 * * *"         # 每6小时
+      job_class: "PricingUpdateJob"
+      timeout: 600
+      retry_count: 2
+      enabled: true
+      
+    # 健康检查任务
+    health_check:
+      cron: "*/5 * * * *"         # 每5分钟
+      job_class: "ProviderHealthCheckJob"
+      timeout: 30
+      retry_count: 1
+      enabled: true
+      
+    # 配额重置任务
+    quota_reset:
+      cron: "0 0 * * *"           # 每日重置
+      job_class: "DailyQuotaResetJob"
+      timeout: 60
+      enabled: true
+      
+    # 性能分析任务
+    performance_analysis:
+      cron: "0 */1 * * *"         # 每小时分析性能
+      job_class: "PerformanceAnalysisJob"
+      timeout: 180
+      enabled: true
+      
+    # 数据清理任务
+    data_cleanup:
+      cron: "0 2 * * *"           # 每日凌晨2点清理
+      job_class: "DataCleanupJob"
+      timeout: 300
+      enabled: true
+
+# 监控配置
+monitoring:
+  enabled: true
+  
+  # 收集的指标
+  metrics:
+    request_latency: true         # 请求延迟
+    success_rate: true           # 成功率
+    cost_tracking: true          # 成本追踪
+    token_usage: true            # Token 使用量
+    error_classification: true    # 错误分类统计
+    provider_health: true        # 提供商健康状态
+    quota_usage: true            # 配额使用情况
+    
+  # 告警配置
+  alerts:
+    high_error_rate:
+      threshold: 0.1             # 10% 错误率
+      window: 300               # 5分钟窗口
+      action: "disable_channel"  # 自动禁用渠道
+      notification: true
+      
+    quota_warning:
+      threshold: 0.8            # 80% 配额使用
+      action: "send_notification"
+      notification: true
+      
+    cost_alert:
+      daily_budget_threshold: 0.9  # 90% 预算
+      action: "throttle_requests"
+      notification: true
+      
+    latency_alert:
+      threshold: 5000           # 5秒延迟
+      window: 600              # 10分钟窗口
+      action: "lower_priority"
+      
+    provider_down:
+      consecutive_failures: 5   # 连续5次失败
+      action: "disable_provider"
+      notification: true
+
+# 缓存策略
+caching:
+  enabled: true
+  type: "memory"                      # memory, redis
+  
+  # 各类数据的缓存TTL
+  ttl:
+    model_list: 7200          # 模型列表缓存2小时
+    pricing: 21600            # 价格缓存6小时
+    capability: 86400         # 能力信息缓存1天
+    provider_health: 300      # 健康状态缓存5分钟
+    routing_decision: 60      # 路由决策缓存1分钟
+    
+  # 内存缓存配置
+  memory:
+    max_size: 1000                     # 最大缓存条目数
+    
+  # Redis配置 (当type为redis时)
+  redis:
+    url: "${REDIS_URL:redis://localhost:6379/0}"
+    max_connections: 10
+    retry_on_timeout: true
+
+# 模型信息自动发现
+model_discovery:
+  enabled: true
+  
+  # 启动时加载
+  startup_load: true          # 启动时加载所有模型
+  
+  # 自动刷新
+  auto_refresh: true          # 自动刷新
+  refresh_interval: 3600      # 每小时刷新
+  price_refresh_interval: 1800 # 价格更频繁刷新（30分钟）
+  
+  # 并发控制
+  max_concurrent_requests: 5  # 最大并发请求数
+  request_timeout: 30         # 请求超时时间
+  
+  # 重试策略
+  retry_policy:
+    max_retries: 3
+    backoff_strategy: "exponential"
+    base_delay: 1
+
+# 负载均衡配置
+load_balancing:
+  algorithm: "weighted_round_robin"  # weighted_round_robin, least_connections, random
+  health_check_factor: true          # 考虑健康状态
+  latency_factor: true              # 考虑延迟
+  quota_factor: true                # 考虑配额使用情况
+  
+  # 权重调整
+  dynamic_weights: true             # 动态调整权重
+  weight_adjustment_interval: 300   # 5分钟调整一次权重
+
+# 故障处理配置
+fault_tolerance:
+  # 熔断器配置
+  circuit_breaker:
+    failure_threshold: 5           # 5次失败后熔断
+    recovery_timeout: 300          # 5分钟后尝试恢复
+    success_threshold: 2           # 2次成功后恢复
+    
+  # 重试策略
+  retry_policy:
+    max_retries: 3
+    backoff_strategy: "exponential"
+    base_delay: 1
+    max_delay: 30
+    retryable_errors: 
+      - "timeout"
+      - "rate_limit"
+      - "server_error"
+      - "connection_error"
+      
+  # 故障转移
+  failover:
+    enable_automatic: true        # 自动故障转移
+    max_failover_attempts: 5      # 最大转移尝试次数
+    failover_delay: 1             # 转移延迟(秒)
+
+# 路由引擎配置
+routing:
+  # 路由策略配置
+  strategies:
+    cost:        # 成本优先策略
+      weight_cost: 0.8
+      weight_speed: 0.1
+      weight_priority: 0.1
+    speed:       # 速度优先策略
+      weight_cost: 0.1
+      weight_speed: 0.8
+      weight_priority: 0.1
+    priority:    # 优先级策略
+      weight_cost: 0.2
+      weight_speed: 0.3
+      weight_priority: 0.5
+    load_balance: # 负载均衡策略
+      weight_cost: 0.33
+      weight_speed: 0.33
+      weight_priority: 0.34
+      
+  # 每日限额管理
+  quota_management:
+    reset_time: "00:00"          # 每日重置时间 (UTC)
+    warning_threshold: 0.8       # 80%时告警
+    auto_disable_on_exceed: true # 超出限额自动禁用渠道
+    grace_period: 300            # 宽限期（秒）
+
+# 流式响应配置
+streaming:
+  enabled: true
+  chunk_size: 1024               # 数据块大小
+  flush_interval: 50             # 刷新间隔(ms)
+  connection_timeout: 30         # 连接超时
+  max_concurrent_streams: 100    # 最大并发流数量
+
+# 安全配置
+security:
+  # CORS 配置
+  cors_origins:
+    - "http://localhost:3000"
+    - "https://yourdomain.com"
+  cors_methods: ["GET", "POST", "PUT", "DELETE"]
+  cors_headers: ["*"]
+  
+  # JWT 配置
+  jwt_secret: "${JWT_SECRET}"         # 从环境变量读取
+  jwt_algorithm: "HS256"
+  jwt_expire_hours: 24
+  
+  # API key 配置
+  require_api_key: true               # 是否要求API key认证
+  key_prefix: "sk-smart-router-"      # API key前缀
+  
+  # 请求限制
+  rate_limiting:
+    enabled: true
+    default_limits:
+      requests_per_minute: 60
+      requests_per_hour: 1000
+      requests_per_day: 10000
+      
+  # IP 白名单
+  ip_whitelist: []                    # 空表示不限制
+  
+  # 请求日志
+  request_logging: true
+  log_request_body: false             # 是否记录请求体
+  log_response_body: false            # 是否记录响应体
+
+# 日志配置
+logging:
+  level: "INFO"
+  format: "json"                      # 日志格式: json, text
+  file: "./logs/smart-router.log"
+  max_size: "100MB"
+  backup_count: 5
+  
+  # 各模块日志级别
+  modules:
+    core.router: "DEBUG"
+    core.providers: "INFO"
+    core.scheduler: "INFO"
+    api: "INFO"
+
+# API配置
+api:
+  # OpenAI兼容API配置
+  openai_compatible: true
+  max_request_size: 10485760          # 10MB
+  timeout_seconds: 300                # 5分钟超时
+  
+  # 并发控制
+  max_concurrent_requests: 1000       # 最大并发请求数
+  queue_size: 5000                   # 请求队列大小
+
+# Web管理界面配置 (可选)
+web:
+  enabled: false                      # 是否启用Web界面
+  secret_key: "${WEB_SECRET_KEY}"     # 会话密钥
+  session_timeout: 3600               # 会话超时(秒)
+  admin_username: "${WEB_ADMIN_USER}"
+  admin_password_hash: "${WEB_ADMIN_PASSWORD_HASH}"
+
+# 开发配置
+development:
+  debug: false
+  auto_reload: false
+  profiling: false
+  mock_providers: false               # 是否使用模拟提供商(测试用)
+  test_mode: false                   # 测试模式
