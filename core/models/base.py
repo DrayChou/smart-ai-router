@@ -3,8 +3,8 @@ Base model configuration
 基础模型配置
 """
 
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import create_engine
+from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 # 创建基础模型类
@@ -18,19 +18,15 @@ SessionLocal = None
 def init_database(database_url: str = "sqlite:///./smart_router.db"):
     """初始化数据库连接"""
     global engine, SessionLocal
-    
+
     engine = create_engine(
         database_url,
         echo=False,  # 在开发环境设置为True以查看SQL
         pool_pre_ping=True,
     )
-    
-    SessionLocal = sessionmaker(
-        autocommit=False,
-        autoflush=False,
-        bind=engine
-    )
-    
+
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
     return engine
 
 

@@ -3,11 +3,7 @@ Management API endpoints for dynamic configuration
 动态配置管理API端点
 """
 
-from fastapi import APIRouter, HTTPException, Depends
-from typing import List, Optional
-
-from ..core.manager import ChannelManager, ModelGroupManager, ApiKeyManager
-from ..core.models import Channel, VirtualModelGroup, ApiKey
+from fastapi import APIRouter
 
 router = APIRouter(prefix="/management", tags=["management"])
 
