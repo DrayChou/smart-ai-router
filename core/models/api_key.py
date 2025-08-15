@@ -18,7 +18,7 @@ from sqlalchemy.sql import func
 from .base import Base
 
 
-class ApiKey(Base):
+class APIKey(Base):
     """API密钥表 - Provider的API密钥"""
 
     __tablename__ = "api_keys"
@@ -47,10 +47,10 @@ class ApiKey(Base):
     request_logs = relationship("RequestLog", back_populates="api_key")
 
     def __repr__(self):
-        return f"<ApiKey(name='{self.key_name}', channel_id={self.channel_id})>"
+        return f"<APIKey(name='{self.key_name}', channel_id={self.channel_id})>"
 
 
-class RouterApiKey(Base):
+class RouterAPIKey(Base):
     """路由器API密钥表 - 客户端访问密钥"""
 
     __tablename__ = "router_api_keys"
@@ -79,4 +79,4 @@ class RouterApiKey(Base):
     request_logs = relationship("RequestLog", back_populates="client_api_key")
 
     def __repr__(self):
-        return f"<RouterApiKey(name='{self.key_name}', role='{self.role}')>"
+        return f"<RouterAPIKey(name='{self.key_name}', role='{self.role}')>"

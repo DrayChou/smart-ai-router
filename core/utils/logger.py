@@ -49,7 +49,6 @@ def setup_logging(config: Dict[str, Any] = None) -> None:
         processors=processors,
         wrapper_class=structlog.stdlib.BoundLogger,
         logger_factory=structlog.stdlib.LoggerFactory(),
-        cache_ctor_key=True,
     )
 
     # 配置标准 logging

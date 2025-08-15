@@ -50,11 +50,12 @@ logs/
 *.sqlite3
 smart_router.db
 
-# Configuration (keep examples)
-config/config.yaml
+# Configuration files with sensitive data (keep templates only)
+config/router_config.yaml
 .env
 
 # Cache
+cache/
 .cache/
 .pytest_cache/
 .coverage
@@ -128,6 +129,26 @@ alembic.ini
 web/static/build/
 web/static/dist/
 
-# 
+# Development and testing files
 .lh/
 .claude/
+test_*.py
+imported_channels.json
+import_oneapi_data.py
+
+# Documentation (runtime generated)
+BACKGROUND_TASKS.md
+PRICING_SYSTEM.md
+
+# User's actual config files (contain API keys)
+config/*_backup.yaml
+
+# Runtime state files  
+runtime_state.json
+channel_stats.json
+cost_tracking.json
+
+# API key files
+api_keys.json
+credentials.json
+secrets.json

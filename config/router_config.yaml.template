@@ -1,0 +1,323 @@
+# Smart AI Router 配置文件模板
+# 复制此文件为 router_config.yaml 并填入您的API密钥
+
+# ============================================
+# 系统配置
+# ============================================
+system:
+  name: "Smart AI Router"
+  version: "0.1.0"
+  description: "个人AI智能路由系统"
+  storage_mode: "yaml"  # yaml, json 或 sqlite
+
+# ============================================
+# 服务器配置
+# ============================================
+server:
+  host: "127.0.0.1"
+  port: 8000
+  debug: false
+  cors_origins: ["*"]
+  request_timeout: 300
+  max_request_size: 10485760
+
+# ============================================
+# Provider 配置
+# ============================================
+providers:
+  # Burn Hair API (OpenAI兼容代理 - 便宜好用)
+  burn_hair:
+    name: "burn_hair"
+    display_name: "Burn Hair"
+    adapter_class: "OpenAIAdapter"
+    base_url: "https://burn.hair"
+    auth_type: "bearer"
+    rate_limit: 60
+    capabilities: ["text", "function_calling", "code_generation"]
+    
+  # Groq (超快推理速度)
+  groq:
+    name: "groq"
+    display_name: "Groq"
+    adapter_class: "OpenAIAdapter"
+    base_url: "https://api.groq.com/openai"
+    auth_type: "bearer"
+    rate_limit: 30
+    capabilities: ["text", "function_calling", "code_generation"]
+    
+  # SiliconFlow (硅基流动 - 国内服务商)
+  siliconflow:
+    name: "siliconflow"
+    display_name: "SiliconFlow"
+    adapter_class: "OpenAIAdapter"
+    base_url: "https://api.siliconflow.cn"
+    auth_type: "bearer"
+    rate_limit: 60
+    capabilities: ["text", "function_calling", "code_generation", "vision"]
+    
+  # OpenAI 官方
+  openai:
+    name: "openai"
+    display_name: "OpenAI"
+    adapter_class: "OpenAIAdapter"
+    base_url: "https://api.openai.com"
+    auth_type: "bearer"
+    rate_limit: 60
+    capabilities: ["text", "function_calling", "code_generation", "vision"]
+
+# ============================================
+# 渠道配置 (请填入您的真实API密钥)
+# ============================================
+channels:
+  # Burn Hair 渠道 (推荐 - 性价比高)
+  - id: "burn_hair_gpt4o_mini"
+    name: "Burn Hair GPT-4O Mini"
+    provider: "burn_hair"
+    model_name: "gpt-4o-mini"
+    api_key: "YOUR_BURN_HAIR_API_KEY_HERE"  # 替换为真实API密钥
+    enabled: false  # 改为 true 启用
+    priority: 1
+    weight: 100
+    daily_limit: 1000
+    cost_per_token:
+      input: 0.00000015
+      output: 0.0000006
+    capabilities: ["text", "function_calling", "code_generation"]
+    
+  - id: "burn_hair_gpt4o"
+    name: "Burn Hair GPT-4O"
+    provider: "burn_hair"
+    model_name: "gpt-4o"
+    api_key: "YOUR_BURN_HAIR_API_KEY_HERE"  # 替换为真实API密钥
+    enabled: false  # 改为 true 启用
+    priority: 2
+    weight: 80
+    daily_limit: 500
+    cost_per_token:
+      input: 0.000002
+      output: 0.000006
+    capabilities: ["text", "function_calling", "code_generation", "vision"]
+    
+  # Groq 渠道 (推荐 - 速度最快)
+  - id: "groq_llama3_8b"
+    name: "Groq Llama3.1 8B"
+    provider: "groq"
+    model_name: "llama-3.1-8b-instant"
+    api_key: "YOUR_GROQ_API_KEY_HERE"  # 替换为真实API密钥
+    enabled: false  # 改为 true 启用
+    priority: 1
+    weight: 120
+    daily_limit: 2000
+    cost_per_token:
+      input: 0.0000001
+      output: 0.0000001
+    capabilities: ["text", "function_calling", "code_generation"]
+    
+  - id: "groq_llama3_70b"
+    name: "Groq Llama3.1 70B"
+    provider: "groq"
+    model_name: "llama-3.1-70b-versatile"
+    api_key: "YOUR_GROQ_API_KEY_HERE"  # 替换为真实API密钥
+    enabled: false  # 改为 true 启用
+    priority: 2
+    weight: 90
+    daily_limit: 1000
+    cost_per_token:
+      input: 0.0000006
+      output: 0.0000006
+    capabilities: ["text", "function_calling", "code_generation"]
+    
+  # SiliconFlow 渠道 (国内访问友好)
+  - id: "siliconflow_qwen"
+    name: "SiliconFlow Qwen2.5"
+    provider: "siliconflow"
+    model_name: "Qwen/Qwen2.5-72B-Instruct"
+    api_key: "YOUR_SILICONFLOW_API_KEY_HERE"  # 替换为真实API密钥
+    enabled: false  # 改为 true 启用
+    priority: 1
+    weight: 100
+    daily_limit: 1000
+    cost_per_token:
+      input: 0.0000001
+      output: 0.0000001
+    capabilities: ["text", "function_calling", "code_generation"]
+    
+  # OpenAI 官方渠道 (质量最高但较贵)
+  - id: "openai_gpt4o_mini"
+    name: "OpenAI GPT-4O Mini"
+    provider: "openai"
+    model_name: "gpt-4o-mini"
+    api_key: "YOUR_OPENAI_API_KEY_HERE"  # 替换为真实API密钥
+    enabled: false  # 改为 true 启用
+    priority: 3
+    weight: 60
+    daily_limit: 500
+    cost_per_token:
+      input: 0.00000015
+      output: 0.0000006
+    capabilities: ["text", "function_calling", "code_generation", "vision"]
+
+# ============================================
+# 虚拟模型组配置
+# ============================================
+model_groups:
+  # 免费/便宜模型组 (优先选择成本最低的渠道)
+  auto:free:
+    name: "auto:free"
+    display_name: "Auto Free (最便宜)"
+    description: "自动选择最便宜的可用模型"
+    routing_strategy: "cost_optimized"
+    budget_controls:
+      daily_budget: 5.0
+      max_cost_per_request: 0.1
+    channels:
+      - channel_id: "groq_llama3_8b"
+        priority: 1
+        weight: 100
+      - channel_id: "siliconflow_qwen"
+        priority: 2
+        weight: 90
+      - channel_id: "burn_hair_gpt4o_mini"
+        priority: 3
+        weight: 80
+        
+  # 快速模型组 (优先选择速度最快的渠道)  
+  auto:fast:
+    name: "auto:fast"
+    display_name: "Auto Fast (最快速)"
+    description: "自动选择速度最快的可用模型"
+    routing_strategy: "speed_optimized"
+    budget_controls:
+      daily_budget: 10.0
+      max_cost_per_request: 0.2
+    channels:
+      - channel_id: "groq_llama3_8b"
+        priority: 1
+        weight: 100
+        speed_score: 95
+      - channel_id: "groq_llama3_70b"
+        priority: 2
+        weight: 90
+        speed_score: 90
+      - channel_id: "burn_hair_gpt4o_mini"
+        priority: 3
+        weight: 80
+        speed_score: 70
+        
+  # 平衡模型组 (平衡成本、速度、质量)
+  auto:balanced:
+    name: "auto:balanced"
+    display_name: "Auto Balanced (平衡)"
+    description: "平衡成本、速度和质量的智能路由"
+    routing_strategy: "multi_layer"
+    budget_controls:
+      daily_budget: 20.0
+      max_cost_per_request: 0.5
+    routing_weights:
+      cost: 0.3
+      speed: 0.3
+      quality: 0.3
+      reliability: 0.1
+    channels:
+      - channel_id: "burn_hair_gpt4o_mini"
+        priority: 1
+        weight: 100
+        speed_score: 70
+        quality_score: 85
+      - channel_id: "groq_llama3_70b"
+        priority: 2
+        weight: 90
+        speed_score: 90
+        quality_score: 80
+      - channel_id: "siliconflow_qwen"
+        priority: 3
+        weight: 85
+        speed_score: 75
+        quality_score: 82
+        
+  # 高质量模型组 (优先选择质量最高的模型)
+  auto:premium:
+    name: "auto:premium"
+    display_name: "Auto Premium (高质量)"
+    description: "自动选择质量最高的可用模型"
+    routing_strategy: "quality_optimized"
+    budget_controls:
+      daily_budget: 50.0
+      max_cost_per_request: 2.0
+    channels:
+      - channel_id: "burn_hair_gpt4o"
+        priority: 1
+        weight: 100
+        quality_score: 95
+      - channel_id: "openai_gpt4o_mini"
+        priority: 2
+        weight: 90
+        quality_score: 90
+      - channel_id: "groq_llama3_70b"
+        priority: 3
+        weight: 80
+        quality_score: 80
+
+# ============================================
+# 路由配置
+# ============================================
+routing:
+  default_strategy: "multi_layer"
+  enable_fallback: true
+  max_retry_attempts: 3
+  health_check_interval: 300
+  error_cooldown_period: 60
+  
+  # 错误分类和处理策略
+  error_handling:
+    permanent_errors:
+      - "quota_exceeded"
+      - "invalid_api_key"
+      - "insufficient_credits"
+    temporary_errors:
+      - "rate_limit_exceeded"
+      - "timeout"
+      - "server_error"
+    cooldown_periods:
+      rate_limit_exceeded: 60
+      timeout: 30
+      server_error: 120
+
+# ============================================
+# 缓存配置
+# ============================================
+caching:
+  enable_response_cache: false
+  cache_ttl: 3600
+  max_cache_size: 1000
+
+# ============================================
+# 监控配置
+# ============================================
+monitoring:
+  enable_metrics: true
+  enable_health_checks: true
+  log_level: "INFO"
+  request_logging: true
+  performance_tracking: true
+
+# ============================================
+# 成本控制
+# ============================================
+cost_control:
+  global_daily_budget: 100.0
+  alert_threshold: 0.8
+  auto_disable_on_budget_exceeded: true
+  currency: "USD"
+  
+# ============================================
+# 使用说明
+# ============================================
+# 1. 复制此文件为 config/router_config.yaml
+# 2. 将所有 "YOUR_*_API_KEY_HERE" 替换为真实API密钥
+# 3. 将需要启用的渠道 enabled 改为 true
+# 4. 运行: python main.py
+# 5. 访问: http://127.0.0.1:8000/docs 查看API文档
+# 6. 测试: curl -X POST http://127.0.0.1:8000/v1/chat/completions \
+#          -H "Content-Type: application/json" \
+#          -d '{"model":"auto:fast","messages":[{"role":"user","content":"Hello!"}]}'

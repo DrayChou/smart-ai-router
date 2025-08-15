@@ -59,7 +59,7 @@ class Channel(Base):
 
     # 关系
     provider = relationship("Provider", back_populates="channels")
-    api_keys = relationship("ApiKey", back_populates="channel")
+    api_keys = relationship("APIKey", back_populates="channel")
     model_group_channels = relationship("ModelGroupChannel", back_populates="channel")
     request_logs = relationship("RequestLog", back_populates="channel")
     channel_stats = relationship("ChannelStats", back_populates="channel")
