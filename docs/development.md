@@ -49,18 +49,18 @@ copy config\example.yaml config\config.yaml
 ### 5. 启动应用
 ```bash
 # 开发模式
-uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+uv run uvicorn main:app --host 0.0.0.0 --port 7601 --reload
 
 # 或者直接运行
 uv run python main.py
 ```
 
 ### 6. 访问应用
-- 🏠 主页: http://localhost:8000
-- 📚 API文档: http://localhost:8000/docs
-- 🔍 健康检查: http://localhost:8000/health
-- 💬 聊天接口: http://localhost:8000/v1/chat/completions
-- 🎛️ 管理接口: http://localhost:8000/admin
+- 🏠 主页: http://localhost:7601
+- 📚 API文档: http://localhost:7601/docs
+- 🔍 健康检查: http://localhost:7601/health
+- 💬 聊天接口: http://localhost:7601/v1/chat/completions
+- 🎛️ 管理接口: http://localhost:7601/admin
 
 ## 📋 下一步开发任务
 

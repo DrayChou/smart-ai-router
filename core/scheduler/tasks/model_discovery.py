@@ -248,9 +248,9 @@ class ModelDiscoveryTask:
         
         return discovered_models
     
-    def merge_with_config(self, original_config: Dict[str, Any], discovered_models: Dict[str, Dict]) -> Dict[str, Any]:
-        """将发现的模型与原始配置合并"""
-        merged = original_config.copy()
+    def merge_with_config(self, original_config_data: Dict[str, Any], discovered_models: Dict[str, Dict]) -> Dict[str, Any]:
+        """将发现的模型与原始配置数据合并"""
+        merged = original_config_data.copy()
         
         # 更新渠道信息
         if 'channels' in merged:
@@ -283,7 +283,7 @@ class ModelDiscoveryTask:
                 channel_id: {
                     'model_count': info['model_count'],
                     'status': info['status'],
-                    'provider': info['provider']
+                    'provider': info.get('provider', 'unknown') # 确保provider存在
                 }
                 for channel_id, info in discovered_models.items()
             }
@@ -291,7 +291,7 @@ class ModelDiscoveryTask:
         
         return merged
     
-    async def run_discovery_task(self, channels: List[Dict[str, Any]], original_config: Dict[str, Any]):
+    async def run_discovery_task(self, channels: List[Dict[str, Any]], original_config_data: Dict[str, Any]):
         """运行完整的模型发现任务"""
         logger.info("启动模型发现任务")
         
@@ -303,7 +303,7 @@ class ModelDiscoveryTask:
             self.cached_models.update(discovered_models)
             
             # 合并配置
-            self.merged_config = self.merge_with_config(original_config, discovered_models)
+            self.merged_config = self.merge_with_config(original_config_data, discovered_models)
             
             # 保存缓存
             self._save_cache()

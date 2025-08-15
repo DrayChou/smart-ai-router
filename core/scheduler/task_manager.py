@@ -10,6 +10,8 @@ import logging
 from .scheduler import get_scheduler, add_task, start_scheduler, stop_scheduler, get_task_status
 from .tasks.model_discovery import run_model_discovery, get_model_discovery_task
 from .tasks.pricing_discovery import run_pricing_discovery, get_pricing_discovery_task
+from .tasks.service_health_check import run_health_check_task, ServiceHealthChecker
+from ..utils.api_key_validator import run_api_key_validation_task
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +60,21 @@ class TaskManager:
             )
             logger.info(f"已添加定价发现任务，间隔 {interval/3600}h")
         
-        # 2. 健康检查任务
+        # 2. API密钥验证任务
+        api_key_config = task_config.get('api_key_validation', {})
+        if api_key_config.get('enabled', True):
+            interval = api_key_config.get('interval_hours', 6) * 3600  # 转换为秒
+            run_immediately = api_key_config.get('run_on_startup', True)
+            
+            add_task(
+                name='api_key_validation',
+                func=self._run_api_key_validation_task,
+                interval_seconds=interval,
+                run_immediately=run_immediately
+            )
+            logger.info(f"已添加API密钥验证任务，间隔 {interval/3600}h")
+        
+        # 3. 健康检查任务
         health_check_config = task_config.get('health_check', {})
         if health_check_config.get('enabled', True):
             interval = health_check_config.get('interval_minutes', 30) * 60  # 转换为秒
@@ -71,7 +87,7 @@ class TaskManager:
             )
             logger.info(f"已添加健康检查任务，间隔 {interval/60}min")
         
-        # 3. 缓存清理任务
+        # 4. 缓存清理任务
         cache_cleanup_config = task_config.get('cache_cleanup', {})
         if cache_cleanup_config.get('enabled', True):
             interval = cache_cleanup_config.get('interval_hours', 24) * 3600
@@ -84,7 +100,7 @@ class TaskManager:
             )
             logger.info(f"已添加缓存清理任务，间隔 {interval/3600}h")
         
-        # 4. 统计报告任务
+        # 5. 统计报告任务
         stats_config = task_config.get('stats_report', {})
         if stats_config.get('enabled', False):  # 默认禁用
             interval = stats_config.get('interval_hours', 12) * 3600
@@ -105,27 +121,20 @@ class TaskManager:
         logger.info("开始执行模型发现任务")
         
         try:
-            if not self.config_loader:
-                logger.error("配置加载器未设置")
-                return {'success': False, 'error': '配置加载器未设置'}
+            if not self.config_loader or not self.config_loader.config_data:
+                logger.error("配置加载器或配置数据未设置")
+                return {'success': False, 'error': '配置加载器或配置数据未设置'}
             
-            # 获取当前配置
-            channels = self.config_loader.get_enabled_channels()
-            config = {
-                'channels': [ch.__dict__ if hasattr(ch, '__dict__') else ch for ch in channels],
-                'providers': self.config_loader.providers,
-                'model_groups': self.config_loader.model_groups
-            }
+            # 直接从 config_data 获取纯字典，避免序列化问题
+            channels_data = self.config_loader.config_data.get('channels', [])
+            config_data = self.config_loader.config_data
             
             # 运行模型发现
-            result = await run_model_discovery(config['channels'], config)
+            result = await run_model_discovery(channels_data, config_data)
             
             # 如果成功，更新配置加载器的缓存
             if result.get('success'):
                 discovery_task = get_model_discovery_task()
-                merged_config = discovery_task.get_merged_config()
-                
-                # 这里可以通知配置加载器更新缓存
                 if hasattr(self.config_loader, 'update_model_cache'):
                     self.config_loader.update_model_cache(discovery_task.cached_models)
             
@@ -133,7 +142,7 @@ class TaskManager:
             return result
             
         except Exception as e:
-            logger.error(f"模型发现任务异常: {e}")
+            logger.error(f"模型发现任务异常: {e}", exc_info=True)
             return {'success': False, 'error': str(e)}
     
     async def _run_pricing_discovery_task(self):
@@ -148,7 +157,30 @@ class TaskManager:
             return result
             
         except Exception as e:
-            logger.error(f"定价发现任务异常: {e}")
+            logger.error(f"定价发现任务异常: {e}", exc_info=True)
+            return {'success': False, 'error': str(e)}
+    
+    async def _run_api_key_validation_task(self):
+        """运行API密钥验证任务"""
+        logger.info("开始执行API密钥验证任务")
+        
+        try:
+            if not self.config_loader or not self.config_loader.config_data:
+                return {'success': False, 'error': '配置加载器或配置数据未设置'}
+            
+            # 直接从 config_data 获取纯字典
+            channels_data = self.config_loader.config_data.get('channels', [])
+            
+            # 运行API密钥验证
+            result = await run_api_key_validation_task(channels_data)
+            
+            stats = result.get('stats', {})
+            logger.info(f"API密钥验证完成: {stats.get('valid_keys', 0)}/{stats.get('total_keys', 0)} 密钥有效")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"API密钥验证任务异常: {e}", exc_info=True)
             return {'success': False, 'error': str(e)}
     
     async def _run_health_check_task(self):
@@ -156,35 +188,25 @@ class TaskManager:
         logger.info("开始执行健康检查任务")
         
         try:
-            if not self.config_loader:
-                return {'success': False, 'error': '配置加载器未设置'}
+            if not self.config_loader or not self.config_loader.config_data:
+                return {'success': False, 'error': '配置加载器或配置数据未设置'}
             
-            # 这里可以实现健康检查逻辑
-            # 例如：检查各渠道的响应时间、可用性等
+            # 直接从 config_data 获取纯字典
+            channels_data = self.config_loader.config_data.get('channels', [])
             
-            healthy_channels = 0
-            total_channels = 0
+            # 获取已发现的模型数据（用于选择测试模型）
+            discovered_models = get_model_discovery_task().cached_models
             
-            channels = self.config_loader.get_enabled_channels()
-            total_channels = len(channels)
+            # 运行健康检查
+            result = await run_health_check_task(channels_data, discovered_models)
             
-            # 简单的健康检查（这里可以扩展为实际的ping测试）
-            for channel in channels:
-                if channel.get('enabled', True):
-                    healthy_channels += 1
+            stats = result.get('stats', {})
+            logger.info(f"健康检查完成: {stats.get('healthy_channels', 0)}/{stats.get('total_channels', 0)} 渠道健康")
             
-            result = {
-                'success': True,
-                'healthy_channels': healthy_channels,
-                'total_channels': total_channels,
-                'health_rate': healthy_channels / max(total_channels, 1)
-            }
-            
-            logger.info(f"健康检查完成: {healthy_channels}/{total_channels} 渠道健康")
             return result
             
         except Exception as e:
-            logger.error(f"健康检查任务异常: {e}")
+            logger.error(f"健康检查任务异常: {e}", exc_info=True)
             return {'success': False, 'error': str(e)}
     
     async def _run_cache_cleanup_task(self):

@@ -133,12 +133,23 @@ web/static/dist/
 .lh/
 .claude/
 test_*.py
+debug_*.py
+analyze_*.py
+demo_*.py
+simple_*.py
+fix_*.py
+run_*.py
+sync_*.py
 imported_channels.json
 import_oneapi_data.py
 
 # Documentation (runtime generated)
 BACKGROUND_TASKS.md
 PRICING_SYSTEM.md
+CONFIGURATION.md
+CODE_QUALITY_REPORT.md
+GEMINI.md
+docs/project_review_and_fixes.md
 
 # User's actual config files (contain API keys)
 config/*_backup.yaml
@@ -152,3 +163,5 @@ cost_tracking.json
 api_keys.json
 credentials.json
 secrets.json
+
+config/*.yaml

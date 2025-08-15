@@ -241,7 +241,7 @@ class ConfigLoader:
         """获取服务器配置"""
         return self.config_data.get("server", {
             "host": "127.0.0.1",
-            "port": 8000,
+            "port": 7601,
             "debug": False
         })
     

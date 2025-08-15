@@ -28,7 +28,7 @@ cp config/example.yaml config/config.yaml
 # vi .env  # 添加 JWT_SECRET 等必要配置
 
 # 5. 启动开发服务器
-uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+uv run uvicorn main:app --host 0.0.0.0 --port 7601 --reload
 ```
 
 ## Docker 部署
@@ -41,7 +41,7 @@ docker build -t smart-ai-router .
 # 运行容器
 docker run -d \
   --name smart-ai-router \
-  -p 8000:8000 \
+  -p 7601:7601 \
   -e JWT_SECRET=your-secret-here \
   -v $(pwd)/config:/app/config \
   -v $(pwd)/logs:/app/logs \
@@ -101,7 +101,7 @@ After=network.target
 Type=simple
 User=www-data
 WorkingDirectory=/opt/smart-ai-router
-ExecStart=/opt/smart-ai-router/.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
+ExecStart=/opt/smart-ai-router/.venv/bin/uvicorn main:app --host 0.0.0.0 --port 7601
 Restart=always
 
 [Install]
@@ -116,7 +116,7 @@ server {
     server_name your-domain.com;
 
     location / {
-        proxy_pass http://127.0.0.1:8000;
+        proxy_pass http://127.0.0.1:7601;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -154,7 +154,7 @@ spec:
       - name: smart-ai-router
         image: smart-ai-router:latest
         ports:
-        - containerPort: 8000
+        - containerPort: 7601
         env:
         - name: JWT_SECRET
           valueFrom:
@@ -181,7 +181,7 @@ spec:
   ports:
   - protocol: TCP
     port: 80
-    targetPort: 8000
+    targetPort: 7601
   type: LoadBalancer
 ```
 

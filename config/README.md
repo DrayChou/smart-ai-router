@@ -104,12 +104,12 @@ channels:
 
 ### 健康检查
 ```bash
-curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:7601/health
 ```
 
 ### 聊天测试
 ```bash
-curl -X POST http://127.0.0.1:8000/v1/chat/completions \
+curl -X POST http://127.0.0.1:7601/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "auto:fast",
@@ -119,7 +119,7 @@ curl -X POST http://127.0.0.1:8000/v1/chat/completions \
 
 ### 可用模型列表
 ```bash
-curl http://127.0.0.1:8000/v1/models
+curl http://127.0.0.1:7601/v1/models
 ```
 
 ## ⚠️ 注意事项
@@ -131,7 +131,7 @@ curl http://127.0.0.1:8000/v1/models
 
 ## 🔗 相关链接
 
-- **API文档**: http://127.0.0.1:8000/docs (启动服务后访问)
+- **API文档**: http://127.0.0.1:7601/docs (启动服务后访问)
 - **项目文档**: ../README.md
 - **配置指南**: ../CONFIGURATION.md
 - **开发进度**: ../TODO.md

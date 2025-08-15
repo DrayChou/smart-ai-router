@@ -28,7 +28,7 @@ copy config\example.yaml config\config.yaml
 ### Development Server
 ```bash
 # Development mode with auto-reload
-uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+uv run uvicorn main:app --host 0.0.0.0 --port 7601 --reload
 
 # Direct run (production mode)
 uv run python main.py
@@ -82,13 +82,14 @@ docker build -t smart-ai-router .
 - **智能故障处理**: 错误分类、熔断器、自动冷却恢复
 
 ### Key Directories
-- `core/models/` - SQLAlchemy数据模型 (providers, channels, model_groups等)
-- `core/router/` - 智能路由引擎，支持多层排序策略和能力筛选
-- `core/providers/` - Provider适配器 (OpenAI、Anthropic、Groq等)
-- `core/manager/` - 渠道、密钥、模型组管理器
-- `core/scheduler/` - 定时任务系统 (模型发现、价格更新、健康检查)
+- `core/config_models.py` - Pydantic数据模型 (providers, channels等)
+- `core/json_router.py` - 智能路由引擎，支持标签化和多层排序策略
+- `core/yaml_config.py` - 基于Pydantic的YAML配置加载器
+- `core/scheduler/` - 定时任务系统 (模型发现、价格更新、健康检查、API密钥验证)
+- `core/utils/` - 工具模块 (API密钥验证、日志等)
 - `api/` - FastAPI路由接口
-- `config/` - 配置文件目录 (providers.yaml, model_groups.yaml等)
+- `config/` - 配置文件目录
+- `cache/` - 缓存目录 (模型发现、API密钥验证结果等)
 
 ### Data Storage Architecture
 - **Database Tables**: providers, channels, api_keys, virtual_model_groups, model_group_channels, request_logs, channel_stats
@@ -106,22 +107,71 @@ docker build -t smart-ai-router .
 - **Dynamic Config**: 数据库管理的渠道、密钥、成本映射
 - **Management Interface**: Web界面或API进行动态配置管理
 
+## 🏷️ 智能标签系统 (Tag-Based Routing)
+
+### 核心概念
+Smart AI Router 现在使用**基于模型名称的自动标签化系统**，完全替代了传统的 Model Groups 概念。
+
+### 标签提取机制
+系统会自动从模型名称中提取标签，使用多种分隔符进行拆分：`:`, `/`, `@`, `-`, `_`
+
+**示例**:
+```
+qwen/qwen3-30b-a3b:free -> ["qwen", "qwen3", "30b", "a3b", "free"]
+openai/gpt-4o-mini -> ["openai", "gpt", "4o", "mini"]  
+anthropic/claude-3-haiku:free -> ["anthropic", "claude", "3", "haiku", "free"]
+moonshot-v1-128k -> ["moonshot", "v1", "128k"]
+```
+
+### 标签查询方式
+
+#### 1. 单标签查询
+```bash
+curl -X POST http://localhost:7601/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "tag:gpt",
+    "messages": [{"role": "user", "content": "Hello"}]
+  }'
+```
+
+#### 2. 多标签组合查询
+```bash
+curl -X POST http://localhost:7601/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "tag:qwen,free",
+    "messages": [{"role": "user", "content": "Hello"}]
+  }'
+```
+
+### 标签优势
+- **自动化**: 无需手动配置标签，从模型名称自动提取
+- **灵活性**: 支持任意标签组合查询
+- **可扩展**: 新模型自动获得相应标签
+- **智能匹配**: 系统自动找到包含所有指定标签的模型
+
+### 常见标签示例
+- **提供商标签**: `gpt`, `claude`, `qwen`, `gemini`, `llama`
+- **模型规格**: `mini`, `turbo`, `pro`, `max`, `4o`, `3.5`
+- **定价标签**: `free`, `pro`, `premium`
+- **功能标签**: `chat`, `instruct`, `vision`, `code`
+
 ### API Endpoints
 - **Chat API**: `/v1/chat/completions` (OpenAI-compatible)
-- **Models API**: `/v1/models` (list virtual models)
+- **Models API**: `/v1/models` (list all available models and tags)
 - **Health Check**: `/health`
 - **Admin Interface**: `/admin/*`
 - **Documentation**: `/docs` (FastAPI auto-generated)
 
 ## Development Patterns
 
-### Model Group Configuration
-Model groups are defined in `config/model_groups.yaml` with:
-- **Multi-layer routing strategy**: 支持多因子组合排序 (effective_cost, speed_score, quality_score等)
-- **Capability filtering**: 能力筛选 (function_calling, vision, code_generation等)
-- **Budget controls**: 预算限制 (daily_budget, max_cost_per_request)
-- **Time policies**: 时间策略 (高峰/非高峰时段的不同路由策略)
-- **Channel configurations**: 渠道配置 (provider, model, priority, weight, daily_limit)
+### 标签化路由配置
+标签系统无需额外配置文件，完全基于模型发现的结果：
+- **自动标签提取**: 从已发现的模型名称中自动提取标签
+- **多层路由策略**: 支持多因子组合排序 (cost_score, speed_score, quality_score, reliability_score)
+- **智能匹配**: 根据标签组合自动找到合适的渠道
+- **实时更新**: 新发现的模型会自动更新可用标签列表
 
 ### Error Handling Philosophy
 - **Permanent errors**: Immediately disable channel (quota_exceeded, invalid_api_key)
@@ -173,19 +223,19 @@ Model groups are defined in `config/model_groups.yaml` with:
 
 Current implementation status:
 - ✅ Project structure and FastAPI setup
-- ✅ 完整的分层配置架构 (providers.yaml, model_groups.yaml, system.yaml, pricing_policies.yaml)
-- ✅ 增强的数据库架构设计 (支持Model Group概念和多层路由)
-- ✅ 预定义的Model Group示例 (auto:free, auto:fast, auto:smart等)
-- ✅ Provider配置完善 (OpenAI、Anthropic、Groq、硅基流动、OpenRouter等)
-- ✅ 动态价格策略系统设计
-- ✅ Docker配置
-- ⏳ Database models and migrations (priority)
-- ⏳ Channel and API key management system (priority)
-- ⏳ Multi-layer routing engine implementation
-- ⏳ Provider adapters with capability detection
-- ⏳ Dynamic pricing and cost calculation
-- ⏳ Scheduled tasks and monitoring system
-- ⏳ Web management interface for dynamic configuration
+- ✅ 基于Pydantic的配置系统架构
+- ✅ **智能标签化路由系统** (Tag-Based Routing)
+- ✅ 模型发现和缓存系统
+- ✅ **API密钥验证和自动失效检测系统**
+- ✅ 定时任务系统 (模型发现、API密钥验证、健康检查等)
+- ✅ 多层路由引擎 (成本、速度、质量、可靠性评分)
+- ✅ Provider适配器架构
+- ✅ 实时健康监控和统计
+- ✅ Docker配置和部署支持
+- ✅ 完整的错误处理和故障转移机制
+- ⏳ Web管理界面 (用于动态配置管理)
+- ⏳ 高级成本控制和预算管理
+- ⏳ 数据库集成 (当前使用文件系统)
 
 ## Testing Philosophy
 
