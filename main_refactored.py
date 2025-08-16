@@ -235,7 +235,7 @@ def main() -> None:
         print(f"🔧 Architecture: Modular, Type-Safe, High-Performance\n")
 
         uvicorn.run(
-            "main:create_app",
+            "main_refactored:create_app",
             factory=True,
             host=host,
             port=port,
