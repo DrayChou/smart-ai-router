@@ -231,9 +231,17 @@ def create_app() -> FastAPI:
             logger.info(f"🔄 CHANNEL ATTEMPTS: Will try {len(candidate_channels)} channels in ranked order")
             last_error = None
             
+            # 智能渠道黑名单：记录已失败的渠道，避免重复尝试
+            failed_channels = set()
+            
             for attempt_num, routing_score in enumerate(candidate_channels, 1):
                 channel = routing_score.channel
                 provider = config.get_provider(channel.provider)
+
+                # 检查渠道是否已被拉黑
+                if channel.id in failed_channels:
+                    logger.info(f"⚫ SKIP #{attempt_num}: Channel '{channel.name}' (ID: {channel.id}) is blacklisted due to previous failures")
+                    continue
 
                 if not provider:
                     logger.warning(f"❌ ATTEMPT #{attempt_num}: Provider '{channel.provider}' for channel '{channel.name}' not found, skipping")
@@ -252,14 +260,14 @@ def create_app() -> FastAPI:
                     if request.stream:
                         logger.info(f"🌊 STREAMING: Starting streaming response for channel '{channel.name}'")
                         
-                        # 为流式请求添加调试头信息
+                        # 为流式请求添加调试头信息 (移除中文字符以避免编码错误)
                         stream_debug_headers = {
                             "X-Router-Channel": f"{channel.name} (ID: {channel.id})",
                             "X-Router-Provider": provider.name if hasattr(provider, 'name') else channel.provider,
                             "X-Router-Model": routing_score.matched_model or channel.model_name,
                             "X-Router-Score": f"{routing_score.total_score:.3f}",
                             "X-Router-Attempts": str(attempt_num),
-                            "X-Router-Score-Breakdown": routing_score.reason,
+                            "X-Router-Score-Breakdown": f"cost:{routing_score.cost_score:.2f} speed:{routing_score.speed_score:.2f} quality:{routing_score.quality_score:.2f} reliability:{routing_score.reliability_score:.2f}",
                             "X-Router-Type": "streaming"
                         }
                         
@@ -282,7 +290,7 @@ def create_app() -> FastAPI:
                     logger.info(f"✅ RESPONSE: Model used -> {response_json.get('model', 'unknown')}")
                     logger.info(f"✅ RESPONSE: Usage -> {response_json.get('usage', {})}")
                     
-                    # 添加路由调试头信息
+                    # 添加路由调试头信息 (移除中文字符以避免编码错误)
                     debug_headers = {
                         "X-Router-Channel": f"{channel.name} (ID: {channel.id})",
                         "X-Router-Provider": provider.name if hasattr(provider, 'name') else channel.provider,
@@ -290,7 +298,7 @@ def create_app() -> FastAPI:
                         "X-Router-Score": f"{routing_score.total_score:.3f}",
                         "X-Router-Attempts": str(attempt_num),
                         "X-Router-Latency": f"{latency:.3f}s",
-                        "X-Router-Score-Breakdown": routing_score.reason
+                        "X-Router-Score-Breakdown": f"cost:{routing_score.cost_score:.2f} speed:{routing_score.speed_score:.2f} quality:{routing_score.quality_score:.2f} reliability:{routing_score.reliability_score:.2f}"
                     }
                     
                     return JSONResponse(content=response_json, headers=debug_headers)
@@ -301,6 +309,12 @@ def create_app() -> FastAPI:
                     logger.warning(f"❌ ERROR DETAILS: {error_text[:200]}...")
                     last_error = e
                     router.update_channel_health(channel.id, False)
+                    
+                    # 智能拉黑：对于认证错误等永久性错误，拉黑整个渠道
+                    if e.response.status_code in [401, 403]:  # Unauthorized, Forbidden
+                        failed_channels.add(channel.id)
+                        logger.warning(f"🚫 CHANNEL BLACKLISTED: Channel '{channel.name}' (ID: {channel.id}) blacklisted due to HTTP {e.response.status_code}")
+                        logger.info(f"⚡ SKIP OPTIMIZATION: Will skip all remaining models from channel '{channel.name}'")
                     
                     # 继续下一个渠道
                     if attempt_num < len(candidate_channels):

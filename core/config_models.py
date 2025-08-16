@@ -24,10 +24,16 @@ class Channel(BaseModel):
     enabled: bool = True
     priority: int = 1
     weight: float = 1.0
-    tags: List[str] = []
     daily_limit: int = 1000
+    capabilities: List[str] = []
     
-    # performance and pricing are optional dictionaries
+    # Channel-level tags that apply to all models in this channel
+    tags: List[str] = Field(default_factory=list)
+    
+    # Cost per token
+    cost_per_token: Optional[Dict[str, float]] = Field(default_factory=dict)
+    
+    # performance and pricing are optional dictionaries  
     performance: Dict[str, float] = Field(default_factory=dict)
     pricing: Dict[str, Any] = Field(default_factory=dict)
 
@@ -43,6 +49,8 @@ class TaskConfig(BaseModel):
     interval_hours: Optional[int] = None
     interval_minutes: Optional[int] = None
     run_on_startup: bool = False
+    max_concurrent_validations: Optional[int] = None
+    max_concurrent_checks: Optional[int] = None
 
 class Tasks(BaseModel):
     model_discovery: TaskConfig = Field(default_factory=TaskConfig)
@@ -55,6 +63,8 @@ class Server(BaseModel):
     port: int = 7601
     debug: bool = False
     cors_origins: List[str] = ["*"]
+    request_timeout: int = 300
+    max_request_size: int = 10485760
 
 class System(BaseModel):
     name: str = "Smart AI Router"

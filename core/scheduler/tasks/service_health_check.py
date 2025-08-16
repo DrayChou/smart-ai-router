@@ -276,7 +276,8 @@ class ServiceHealthChecker:
                 
             # 为每个渠道选择测试模型
             channel_id = channel.get('id', 'unknown')
-            available_models = discovered_models.get(channel_id, []) if discovered_models else []
+            channel_discovery = discovered_models.get(channel_id, {}) if discovered_models else {}
+            available_models = channel_discovery.get('models', []) if isinstance(channel_discovery, dict) else []
             
             # 如果没有发现的模型，使用渠道配置的模型
             if not available_models and channel.get('model_name'):

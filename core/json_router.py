@@ -124,31 +124,23 @@ class JSONRouter:
                 logger.info(f"🏷️  TAG ROUTING: Multi-tag query found {len(candidates)} candidate channels")
                 return candidates
             else:
-                # 单标签查询
+                # 单标签查询 - 直接从模型发现缓存中查找
                 tag = tag_query.strip().lower()
                 logger.info(f"🏷️  TAG ROUTING: Processing single tag query '{request.model}' -> tag: '{tag}'")
                 
-                # 首先尝试从配置的标签中查找
-                config_channels = self.config_loader.get_channels_by_tag(tag)
-                if config_channels:
-                    logger.info(f"🏷️  TAG ROUTING: Found {len(config_channels)} channels from CONFIG tags for '{tag}'")
-                    # 对于配置标签，使用渠道的默认模型
-                    return [ChannelCandidate(channel=ch, matched_model=None) for ch in config_channels]
-                
-                # 如果配置中没有，尝试从自动标签中查找
-                logger.info(f"🏷️  TAG ROUTING: No CONFIG tags found, searching AUTO-EXTRACTED tags for '{tag}'")
                 candidates = self._get_candidate_channels_by_auto_tags([tag])
                 if not candidates:
                     logger.error(f"❌ TAG NOT FOUND: No models found matching tag '{tag}'")
                     raise TagNotFoundError([tag])
-                logger.info(f"🏷️  TAG ROUTING: Auto-tag search found {len(candidates)} candidate channels for '{tag}'")
+                logger.info(f"🏷️  TAG ROUTING: Found {len(candidates)} candidate channels for tag '{tag}'")
                 return candidates
         
-        # 物理模型查询
+        # 非tag:前缀的模型名称 - 首先尝试物理模型，然后尝试自动标签化
         candidate_channels = []
         all_enabled_channels = self.config_loader.get_enabled_channels()
         model_cache = self.config_loader.get_model_cache()
 
+        # 1. 首先尝试作为物理模型查找
         for channel in all_enabled_channels:
             if channel.id in model_cache:
                 discovered_info = model_cache[channel.id]
@@ -163,9 +155,27 @@ class JSONRouter:
             logger.info(f"Found {len(candidate_channels)} candidate channels for physical model '{request.model}'")
             return candidate_channels
 
-        # 如果没有找到，尝试从配置中查找，返回 ChannelCandidate
+        # 2. 如果作为物理模型没找到，尝试自动标签化
+        logger.info(f"🔄 AUTO TAGGING: No physical model found for '{request.model}', trying automatic tag extraction")
+        auto_tags = self._extract_tags_from_model_name(request.model)
+        if auto_tags:
+            logger.info(f"🏷️  AUTO TAGGING: Extracted tags {auto_tags} from model name '{request.model}'")
+            candidates = self._get_candidate_channels_by_auto_tags(auto_tags)
+            if candidates:
+                logger.info(f"🏷️  AUTO TAGGING: Found {len(candidates)} candidate channels using auto-extracted tags")
+                return candidates
+            else:
+                logger.warning(f"🏷️  AUTO TAGGING: No channels found for auto-extracted tags {auto_tags}")
+        
+        # 3. 最后尝试从配置中查找
         config_channels = self.config_loader.get_channels_by_model(request.model)
-        return [ChannelCandidate(channel=ch, matched_model=request.model) for ch in config_channels]
+        if config_channels:
+            logger.info(f"Found {len(config_channels)} channels in configuration for model '{request.model}'")
+            return [ChannelCandidate(channel=ch, matched_model=request.model) for ch in config_channels]
+        
+        # 如果都没找到，返回空列表
+        logger.warning(f"❌ NO MATCH: No channels found for model '{request.model}' (tried physical, auto-tag, and config)")
+        return []
     
     def _filter_channels(self, channels: List[ChannelCandidate], request: RoutingRequest) -> List[ChannelCandidate]:
         """过滤渠道"""
@@ -202,25 +212,22 @@ class JSONRouter:
             channel = candidate.channel
             cost_score = self._calculate_cost_score(channel, request)
             speed_score = self._calculate_speed_score(channel)
-            quality_score = self._calculate_quality_score(channel)
+            quality_score = self._calculate_quality_score(channel, candidate.matched_model)
             reliability_score = self._calculate_reliability_score(channel)
             
             total_score = self._calculate_total_score(
                 strategy, cost_score, speed_score, quality_score, reliability_score
             )
             
-            logger.info(f"📊 CHANNEL SCORE: '{channel.name}' (ID: {channel.id}) -> "
-                       f"Total: {total_score:.3f} | "
-                       f"Cost: {cost_score:.2f} | "
-                       f"Speed: {speed_score:.2f} | "
-                       f"Quality: {quality_score:.2f} | "
-                       f"Reliability: {reliability_score:.2f}")
+            # 为了减少日志冗余，只显示模型名称和总分
+            model_display = candidate.matched_model or channel.model_name
+            logger.info(f"📊 SCORE: '{channel.name}' -> '{model_display}' = {total_score:.3f} (Q:{quality_score:.2f})")
             
             scored_channels.append(RoutingScore(
                 channel=channel, total_score=total_score, cost_score=cost_score,
                 speed_score=speed_score, quality_score=quality_score,
                 reliability_score=reliability_score, 
-                reason=f"成本:{cost_score:.2f} 速度:{speed_score:.2f} 质量:{quality_score:.2f} 可靠性:{reliability_score:.2f}",
+                reason=f"cost:{cost_score:.2f} speed:{speed_score:.2f} quality:{quality_score:.2f} reliability:{reliability_score:.2f}",
                 matched_model=candidate.matched_model
             ))
         
@@ -286,17 +293,30 @@ class JSONRouter:
     
     # 内置模型质量排名 (分数越高越好, 满分100)
     MODEL_QUALITY_RANKING = {
+        # OpenAI 系列
         "gpt-4o": 98, "gpt-4-turbo": 95, "gpt-4": 90, "gpt-4o-mini": 85, "gpt-3.5-turbo": 70,
+        # Anthropic 系列
         "claude-3-5-sonnet": 99, "claude-3-opus": 97, "claude-3-sonnet": 92, "claude-3-haiku": 80,
+        # Meta Llama 系列
         "llama-3.1-70b": 93, "llama-3.1-8b": 82, "llama-3-70b": 90, "llama-3-8b": 80,
+        # Qwen 系列
         "qwen2.5-72b-instruct": 91, "qwen2-72b-instruct": 90, "qwen2-7b-instruct": 78,
+        "qwen3-coder": 88, "qwen3-30b": 85, "qwen3-14b": 82, "qwen3-8b": 80, "qwen3-4b": 75, 
+        "qwen3-1.7b": 65, "qwen3-0.6b": 60,
+        # DeepSeek 系列
+        "deepseek-r1": 89, "deepseek-v3": 87, "deepseek-coder": 85,
+        # Moonshot 系列
         "moonshot-v1-128k": 88, "moonshot-v1-32k": 87, "moonshot-v1-8k": 86,
+        # 01.AI 系列
         "yi-large": 89, "yi-lightning": 75,
+        # Google 系列
+        "gemma-3-12b": 78, "gemma-3-9b": 75, "gemma-3-270m": 55,
     }
 
-    def _calculate_quality_score(self, channel: Channel) -> float:
+    def _calculate_quality_score(self, channel: Channel, matched_model: Optional[str] = None) -> float:
         """根据内置排名动态计算质量评分"""
-        model_name = channel.model_name.lower()
+        # 优先使用匹配的模型，如果没有则使用渠道默认模型
+        model_name = (matched_model or channel.model_name).lower()
         simple_model_name = model_name.split('/')[-1]
         quality_score = self.MODEL_QUALITY_RANKING.get(simple_model_name)
         
@@ -305,6 +325,16 @@ class JSONRouter:
                 if key in model_name:
                     quality_score = score
                     break
+        
+        # 给本地模型一些质量分数调整
+        if any(keyword in model_name for keyword in ['qwen3', 'qwen2.5']):
+            base_score = quality_score or 75
+            # 根据模型大小调整分数
+            if '0.6b' in model_name or '1.7b' in model_name:
+                base_score = max(60, base_score - 15)  # 小模型降分
+            elif '4b' in model_name:
+                base_score = max(70, base_score - 10)  # 中模型适当降分
+            quality_score = base_score
         
         return (quality_score or 70) / 100.0
 
@@ -366,6 +396,30 @@ class JSONRouter:
                 total_chars += len(content)
         return max(1, total_chars // 4)
     
+    def _is_suitable_for_chat(self, model_name: str) -> bool:
+        """检查模型是否适合chat对话任务"""
+        if not model_name:
+            return False
+            
+        model_lower = model_name.lower()
+        
+        # 过滤embedding模型
+        embedding_keywords = ['embedding', 'embed', 'text-embedding']
+        if any(keyword in model_lower for keyword in embedding_keywords):
+            return False
+            
+        # 过滤纯vision模型
+        vision_only_keywords = ['vision-only', 'image-only']
+        if any(keyword in model_lower for keyword in vision_only_keywords):
+            return False
+            
+        # 过滤工具类模型
+        tool_keywords = ['tokenizer', 'classifier', 'detector']
+        if any(keyword in model_lower for keyword in tool_keywords):
+            return False
+            
+        return True
+
     def _extract_tags_from_model_name(self, model_name: str) -> List[str]:
         """从模型名称中提取标签（带缓存）
         
@@ -397,7 +451,7 @@ class JSONRouter:
         return tags
 
     def _get_candidate_channels_by_auto_tags(self, tags: List[str]) -> List[ChannelCandidate]:
-        """根据自动提取的标签获取候选渠道（优化版本）"""
+        """根据自动提取的标签获取候选渠道（支持渐进式回退）"""
         if not tags:
             return []
         
@@ -408,16 +462,33 @@ class JSONRouter:
         
         logger.info(f"🔍 TAG MATCHING: Searching for channels with tags: {normalized_tags}")
         
-        candidate_channels = []
         model_cache = self.config_loader.get_model_cache()
-        
         if not model_cache:
             logger.warning("🔍 TAG MATCHING: Model cache is empty, cannot perform tag routing")
             return []
         
         logger.info(f"🔍 TAG MATCHING: Searching through {len(model_cache)} cached channels")
         
-        matched_models = []  # 记录匹配的模型用于日志
+        # 严格匹配：只返回同时包含所有标签的模型，不进行任何回退
+        exact_candidates = self._find_channels_with_all_tags(normalized_tags, model_cache)
+        
+        if exact_candidates:
+            logger.info(f"🎯 STRICT MATCH: Found {len(exact_candidates)} channels with ALL required tags {normalized_tags}")
+            return exact_candidates
+        
+        logger.warning(f"❌ NO MATCH: No channels found with ALL required tags {normalized_tags}")
+        return []
+    
+    def _find_channels_with_all_tags(self, tags: List[str], model_cache: dict) -> List[ChannelCandidate]:
+        """查找包含所有指定标签的渠道和模型组合
+        
+        标签匹配规则：
+        1. 首先检查渠道级别的标签 (channel.tags)
+        2. 如果渠道标签匹配，该渠道下所有模型都被视为匹配
+        3. 否则检查从模型名称提取的标签
+        """
+        candidate_channels = []
+        matched_models = []
         
         # 遍历所有有效渠道
         for channel in self.config_loader.get_enabled_channels():
@@ -434,26 +505,39 @@ class JSONRouter:
             
             logger.debug(f"🔍 TAG MATCHING: Checking channel {channel.id} ({channel.name}) with {len(models)} models")
             
-            # 检查这个渠道的任何模型是否包含所有请求的标签
+            # 统一的标签合并匹配：渠道标签 + 模型标签
+            channel_tags = getattr(channel, 'tags', []) or []
+            channel_matches = 0
+            
             for model_name in models:
                 if not model_name:
                     continue
                     
+                # 从模型名称提取标签
                 model_tags = self._extract_tags_from_model_name(model_name)
-                # 如果所有请求的标签都在模型标签中，这个渠道就是候选
-                if all(tag in model_tags for tag in normalized_tags):
-                    # 创建 ChannelCandidate 对象，记录匹配的模型
-                    candidate_channels.append(ChannelCandidate(
-                        channel=channel,
-                        matched_model=model_name
-                    ))
-                    matched_models.append(model_name)
-                    logger.info(f"✅ TAG MATCH: Channel '{channel.name}' (ID: {channel.id}) matches via model '{model_name}' -> tags: {model_tags}")
-                    break  # 找到一个匹配的模型就够了
+                
+                # 合并渠道标签和模型标签
+                combined_tags = list(set(channel_tags + model_tags))
+                
+                # 验证所有查询标签都在合并后的标签中
+                if all(tag in combined_tags for tag in tags):
+                    # 过滤掉不适合chat的模型类型
+                    if self._is_suitable_for_chat(model_name):
+                        candidate_channels.append(ChannelCandidate(
+                            channel=channel,
+                            matched_model=model_name
+                        ))
+                        matched_models.append(model_name)
+                        channel_matches += 1
+                        logger.debug(f"✅ MERGED TAG MATCH: Channel '{channel.name}' model '{model_name}' -> tags: {combined_tags}")
+                    else:
+                        logger.debug(f"⚠️ FILTERED: Model '{model_name}' not suitable for chat (appears to be embedding/vision model)")
+            
+            if channel_matches > 0:
+                logger.info(f"🎯 CHANNEL SUMMARY: Found {channel_matches} matching models in channel '{channel.name}' via merged channel+model tags")
         
-        logger.info(f"🎯 TAG MATCHING RESULT: Found {len(candidate_channels)} matching channels for tags {normalized_tags}")
         if matched_models:
-            logger.info(f"🎯 MATCHED MODELS: {matched_models[:5]}{'...' if len(matched_models) > 5 else ''}")
+            logger.info(f"🎯 TOTAL MATCHED MODELS: {len(matched_models)} models found: {matched_models[:5]}{'...' if len(matched_models) > 5 else ''}")
         
         return candidate_channels
 

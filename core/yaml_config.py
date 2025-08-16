@@ -25,7 +25,7 @@ class YAMLConfigLoader:
     """基于Pydantic的YAML配置加载器"""
     
     def __init__(self, config_path: Optional[str] = None):
-        self.config_path = config_path or self._get_default_path("working_config.yaml")
+        self.config_path = config_path or self._get_default_path("router_config.yaml")
         
         # 运行时状态
         self.runtime_state: RuntimeState = RuntimeState()
@@ -209,6 +209,10 @@ class YAMLConfigLoader:
             rate_limit=60,
             capabilities=["text", "function_calling"]
         )
+
+    def get_enabled_channels(self) -> List[Channel]:
+        """获取所有启用的渠道"""
+        return [ch for ch in self.config.channels if ch.enabled]
 
     @property
     def config_data(self) -> Dict[str, Any]:
