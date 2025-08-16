@@ -7,9 +7,12 @@ Smart AI Router - 统一入口 (YAML模式)
 from core.scheduler.task_manager import initialize_background_tasks, stop_background_tasks
 from core.json_router import JSONRouter, RoutingRequest, TagNotFoundError
 from core.yaml_config import get_yaml_config_loader
+from core.utils.http_client_pool import get_http_pool, close_global_pool
+from core.utils.smart_cache import close_global_cache
 import time
 import json
 import httpx
+import asyncio
 from typing import List, Dict, Any, Union
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -148,8 +151,16 @@ def create_app() -> FastAPI:
         try:
             await stop_background_tasks()
             logger.info("Background tasks stopped.")
+            
+            # 关闭全局HTTP连接池
+            await close_global_pool()
+            logger.info("HTTP connection pool closed.")
+            
+            # 关闭全局智能缓存
+            await close_global_cache()
+            logger.info("Smart cache closed.")
         except Exception as e:
-            logger.error(f"Failed to stop background tasks: {e}")
+            logger.error(f"Failed to stop background tasks or close pools: {e}")
 
     @app.get("/")
     async def root():
@@ -227,10 +238,40 @@ def create_app() -> FastAPI:
                     headers=no_channels_headers
                 )
 
-            # 2. 循环尝试渠道，实现故障转移
-            logger.info(f"🔄 CHANNEL ATTEMPTS: Will try {len(candidate_channels)} channels in ranked order")
-            last_error = None
+            # 2. 智能渠道选择：如果有多个渠道，先并发快速检查可用性
+            logger.info(f"🔄 CHANNEL SELECTION: Processing {len(candidate_channels)} channels with intelligent routing")
             
+            # 如果有多个渠道，先并发检查前3个渠道的可用性
+            if len(candidate_channels) > 1:
+                logger.info(f"⚡ FAST CHECK: Pre-checking availability of top {min(3, len(candidate_channels))} channels")
+                
+                # 并发检查前3个渠道
+                check_tasks = []
+                for i, routing_score in enumerate(candidate_channels[:3]):
+                    channel = routing_score.channel
+                    provider = config.get_provider(channel.provider)
+                    if provider:
+                        url, headers, _ = _prepare_channel_api_request(channel, provider, request, routing_score.matched_model)
+                        check_tasks.append((i, channel, _fast_channel_check(url, headers)))
+                
+                # 执行并发检查
+                if check_tasks:
+                    check_results = await asyncio.gather(*[task[2] for task in check_tasks], return_exceptions=True)
+                    
+                    # 找出第一个可用的渠道
+                    for i, (original_index, channel, result) in enumerate(check_tasks):
+                        if i < len(check_results) and not isinstance(check_results[i], Exception):
+                            is_available, status_code, message = check_results[i]
+                            if is_available:
+                                logger.info(f"⚡ FAST CHECK: Channel '{channel.name}' is available (HTTP {status_code}), prioritizing")
+                                # 把这个渠道移到首位
+                                priority_channel = candidate_channels.pop(original_index)
+                                candidate_channels.insert(0, priority_channel)
+                                break
+                            else:
+                                logger.info(f"⚡ FAST CHECK: Channel '{channel.name}' unavailable ({status_code}: {message})")
+            
+            last_error = None
             # 智能渠道黑名单：记录已失败的渠道，避免重复尝试
             failed_channels = set()
             
@@ -278,8 +319,8 @@ def create_app() -> FastAPI:
                             headers=stream_debug_headers
                         )
 
-                    # 非流式请求
-                    logger.info(f"⏳ REQUEST: Waiting for response from channel '{channel.name}'")
+                    # 非流式请求 - 使用优化的快速失败检测
+                    logger.info(f"⏳ REQUEST: Sending optimized request to channel '{channel.name}'")
                     response_json = await _call_channel_api(url, headers, request_data)
 
                     # 成功，更新健康度并返回
@@ -411,53 +452,113 @@ def create_app() -> FastAPI:
         return url, headers, request_data
 
     async def _stream_channel_api(url: str, headers: dict, request_data: dict, channel_id: str):
-        timeout = httpx.Timeout(300.0)
+        """优化的流式API调用，使用连接池和预检机制"""
         chunk_count = 0
         stream_start_time = time.time()
         
-        logger.info(f"🌊 STREAM START: Initiating streaming request to channel '{channel_id}'")
+        logger.info(f"🌊 STREAM START: Initiating optimized streaming request to channel '{channel_id}'")
         logger.info(f"🌊 STREAM URL: {url}")
         
         try:
-            async with httpx.AsyncClient(timeout=timeout) as client:
-                async with client.stream("POST", url, json=request_data, headers=headers) as response:
-                    # 关键修复：在抛出异常前，先异步读取响应体
-                    if response.status_code != 200:
-                        error_body = await response.aread()
-                        logger.error(f"🌊 STREAM ERROR: Channel '{channel_id}' returned status {response.status_code}")
-                        response.raise_for_status()  # 这会触发下面的 except 块
-
-                    logger.info(f"🌊 STREAM CONNECTED: Successfully connected to channel '{channel_id}', starting data flow")
+            # 使用连接池进行流式请求
+            http_pool = get_http_pool()
+            
+            async with http_pool.stream("POST", url, json=request_data, headers=headers) as response:
+                # 优化：快速检查状态码，避免等待完整错误响应
+                if response.status_code != 200:
+                    # 读取少量错误信息就足够了
+                    error_body = await response.aread(max_bytes=1024)
+                    logger.error(f"🌊 STREAM ERROR: Channel '{channel_id}' returned status {response.status_code}")
                     
-                    async for chunk in response.aiter_bytes():
-                        if chunk:
-                            chunk_count += 1
-                            if chunk_count % 10 == 0:  # 每10个chunk记录一次
-                                logger.debug(f"🌊 STREAMING: Received {chunk_count} chunks from channel '{channel_id}'")
-                        yield chunk
+                    # 快速失败，不继续读取完整响应
+                    error_text = error_body.decode('utf-8', errors='ignore')[:200]
+                    logger.error(f"🌊 STREAM ERROR DETAILS: {error_text}")
+                    router.update_channel_health(channel_id, False)
+                    
+                    # 向客户端返回错误信息
+                    yield f"data: {json.dumps({'error': {'message': f'Upstream API error: {error_text}', 'code': response.status_code}})}\n\n"
+                    return
+
+                logger.info(f"🌊 STREAM CONNECTED: Successfully connected to channel '{channel_id}', starting optimized data flow")
+                
+                # 优化的流式读取
+                async for chunk in response.aiter_bytes(chunk_size=8192):  # 优化chunk大小
+                    if chunk:
+                        chunk_count += 1
+                        if chunk_count % 20 == 0:  # 减少日志频率
+                            logger.debug(f"🌊 STREAMING: Received {chunk_count} chunks from channel '{channel_id}'")
+                    yield chunk
                         
             # 成功后更新健康度
             stream_duration = time.time() - stream_start_time
             router.update_channel_health(channel_id, True, stream_duration)
-            logger.info(f"🌊 STREAM COMPLETE: Channel '{channel_id}' completed streaming {chunk_count} chunks in {stream_duration:.3f}s")
+            logger.info(f"🌊 STREAM COMPLETE: Channel '{channel_id}' completed optimized streaming {chunk_count} chunks in {stream_duration:.3f}s")
             
         except httpx.HTTPStatusError as e:
             error_text = e.response.text if hasattr(e.response, 'text') else str(e)
             logger.error(f"🌊 STREAM FAILED: Channel '{channel_id}' HTTP error {e.response.status_code}: {error_text[:200]}...")
             router.update_channel_health(channel_id, False)
-            # 注意：在流中无法进行故障转移，只能向客户端报告错误
             yield f"data: {json.dumps({'error': {'message': f'Upstream API error: {error_text}', 'code': e.response.status_code}})}\n\n"
             
         except Exception as e:
             logger.error(f"🌊 STREAM EXCEPTION: Streaming request for channel '{channel_id}' failed: {e}", exc_info=True)
             router.update_channel_health(channel_id, False)
-            yield f"data: {json.dumps({'error': {'message': str(e), 'code': 500}})}"
+            yield f"data: {json.dumps({'error': {'message': str(e), 'code': 500}})}\n\n"
 
+    async def _fast_channel_check(url: str, headers: dict) -> tuple[bool, int, str]:
+        """快速检查渠道是否可用（使用连接池和缓存）"""
+        from core.utils.smart_cache import cache_get, cache_set
+        
+        # 生成缓存键
+        cache_key = f"{url}:{hash(str(headers))}"
+        
+        # 检查缓存的可用性结果
+        cached_result = await cache_get("channel_availability", cache_key)
+        if cached_result:
+            logger.debug(f"使用缓存的渠道可用性结果: {url}")
+            return cached_result['available'], cached_result['status_code'], cached_result['message']
+        
+        try:
+            http_pool = get_http_pool()
+            
+            # 发送小数据量测试
+            test_data = {
+                "model": "test-availability",
+                "messages": [{"role": "user", "content": "test"}],
+                "max_tokens": 1
+            }
+            
+            # 使用连接池的流式请求
+            async with http_pool.stream('POST', url, json=test_data, headers=headers) as response:
+                # 只检查状态码，不读取内容
+                if response.status_code in [200, 400, 404, 422]:  # 这些都表明服务在线
+                    result = {'available': True, 'status_code': response.status_code, 'message': "OK"}
+                    await cache_set("channel_availability", cache_key, result)
+                    return True, response.status_code, "OK"
+                else:
+                    result = {'available': False, 'status_code': response.status_code, 'message': "Service error"}
+                    await cache_set("channel_availability", cache_key, result)
+                    return False, response.status_code, "Service error"
+        except Exception as e:
+            result = {'available': False, 'status_code': 0, 'message': str(e)}
+            await cache_set("channel_availability", cache_key, result)
+            return False, 0, str(e)
+    
     async def _call_channel_api(url: str, headers: dict, request_data: dict):
-        timeout = httpx.Timeout(300.0)
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.post(url, json=request_data, headers=headers)
-            response.raise_for_status()
+        """优化的API调用，使用连接池和快速失败检测"""
+        http_pool = get_http_pool()
+        
+        # 使用连接池的流式请求来快速检查HTTP状态码
+        async with http_pool.stream('POST', url, json=request_data, headers=headers) as response:
+            # 先检查状态码，如果不是200就立即失败
+            if response.status_code != 200:
+                # 读取错误信息（最多读1KB就够了）
+                error_content = await response.aread(max_bytes=1024)
+                response._content = error_content  # 设置内容以便后续错误处理可以访问
+                response.raise_for_status()
+            
+            # 状态码正常，读取完整响应
+            content = await response.aread()
             return response.json()
 
 
