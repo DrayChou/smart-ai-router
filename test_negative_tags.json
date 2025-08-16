@@ -1,0 +1,10 @@
+{
+  "model": "tag:free,qwen3,!local",
+  "messages": [
+    {
+      "role": "user", 
+      "content": "你好"
+    }
+  ],
+  "max_tokens": 50
+}
