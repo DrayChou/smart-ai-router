@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 模型发现任务 - 自动获取各渠道的模型列表并缓存
+集成智能缓存机制，优化模型发现频率和性能
 """
 
 import asyncio
@@ -12,6 +13,7 @@ from typing import Dict, List, Optional, Any
 from urllib.parse import urljoin, urlparse
 import httpx
 import logging
+from core.utils.smart_cache import get_smart_cache, cache_get, cache_set, cache_get_or_set
 
 logger = logging.getLogger(__name__)
 
@@ -94,12 +96,40 @@ class ModelDiscoveryTask:
         else:
             return f"{base_url}/models"
     
+    def _get_fallback_models_from_config(self, channel: Dict[str, Any]) -> List[str]:
+        """从配置文件获取渠道的模型列表作为回退"""
+        try:
+            # 从配置的模型列表中获取
+            configured_models = channel.get('configured_models', [])
+            logger.info(f"渠道 {channel.get('id')} 回退检查: configured_models={configured_models}, model_name={channel.get('model_name')}")
+            
+            if configured_models:
+                logger.info(f"使用配置的模型列表作为回退: {channel.get('id')} 获得 {len(configured_models)} 个模型")
+                return configured_models
+            
+            # 如果没有配置模型列表，但有model_name，则返回单个模型
+            model_name = channel.get('model_name')
+            if model_name and model_name != 'auto':
+                logger.info(f"使用单个模型作为回退: {channel.get('id')} 模型 {model_name}")
+                return [model_name]
+            
+            logger.warning(f"渠道 {channel.get('id')} 没有可用的回退模型配置")
+            return []
+            
+        except Exception as e:
+            logger.warning(f"从配置获取模型回退失败: {e}")
+            return []
+    
     async def _fetch_models_from_channel(self, channel: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """从单个渠道获取模型列表"""
         channel_id = channel.get('id')
         provider = channel.get('provider')
         base_url = channel.get('base_url')
         api_key = channel.get('api_key')
+        
+        # 调试日志：检查渠道配置
+        if channel_id in ['oneapi_13', 'oneapi_33', 'oneapi_55']:
+            logger.info(f"调试渠道 {channel_id}: configured_models={channel.get('configured_models')}, keys={list(channel.keys())}")
         
         if not all([base_url, api_key]):
             logger.warning(f"渠道 {channel_id} 缺少必要信息，跳过")
@@ -163,32 +193,62 @@ class ModelDiscoveryTask:
                     return result
                     
                 else:
-                    logger.error(f"获取 {channel_id} 模型失败: {response.status_code} - {response.text}")
-                    return {
-                        'channel_id': channel_id,
-                        'provider': provider,
-                        'base_url': base_url,
-                        'models_url': models_url,
-                        'models': [],
-                        'model_count': 0,
-                        'last_updated': datetime.now().isoformat(),
-                        'status': 'error',
-                        'error': f"HTTP {response.status_code}: {response.text[:200]}"
-                    }
+                    logger.warning(f"获取 {channel_id} 模型失败: {response.status_code} - {response.text[:100]}")
+                    # 尝试从配置文件回退
+                    fallback_models = self._get_fallback_models_from_config(channel)
+                    if fallback_models:
+                        return {
+                            'channel_id': channel_id,
+                            'provider': provider,
+                            'base_url': base_url,
+                            'models_url': models_url,
+                            'models': fallback_models,
+                            'model_count': len(fallback_models),
+                            'last_updated': datetime.now().isoformat(),
+                            'status': 'success_fallback',
+                            'note': f'Fallback to configured models due to HTTP {response.status_code}'
+                        }
+                    else:
+                        return {
+                            'channel_id': channel_id,
+                            'provider': provider,
+                            'base_url': base_url,
+                            'models_url': models_url,
+                            'models': [],
+                            'model_count': 0,
+                            'last_updated': datetime.now().isoformat(),
+                            'status': 'error',
+                            'error': f"HTTP {response.status_code}: {response.text[:200]}"
+                        }
                     
         except Exception as e:
-            logger.error(f"获取 {channel_id} 模型时发生异常: {e}")
-            return {
-                'channel_id': channel_id,
-                'provider': provider,
-                'base_url': base_url,
-                'models_url': models_url,
-                'models': [],
-                'model_count': 0,
-                'last_updated': datetime.now().isoformat(),
-                'status': 'error',
-                'error': str(e)
-            }
+            logger.warning(f"获取 {channel_id} 模型时发生异常: {e}")
+            # 尝试从配置文件回退
+            fallback_models = self._get_fallback_models_from_config(channel)
+            if fallback_models:
+                return {
+                    'channel_id': channel_id,
+                    'provider': provider,
+                    'base_url': base_url,
+                    'models_url': models_url,
+                    'models': fallback_models,
+                    'model_count': len(fallback_models),
+                    'last_updated': datetime.now().isoformat(),
+                    'status': 'success_fallback',
+                    'note': f'Fallback to configured models due to exception: {str(e)}'
+                }
+            else:
+                return {
+                    'channel_id': channel_id,
+                    'provider': provider,
+                    'base_url': base_url,
+                    'models_url': models_url,
+                    'models': [],
+                    'model_count': 0,
+                    'last_updated': datetime.now().isoformat(),
+                    'status': 'error',
+                    'error': str(e)
+                }
     
     async def discover_models(self, channels: List[Dict[str, Any]]) -> Dict[str, Dict]:
         """发现所有渠道的模型"""
