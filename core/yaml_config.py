@@ -113,6 +113,11 @@ class YAMLConfigLoader:
     def get_model_cache(self) -> Dict[str, Dict]:
         """获取模型缓存"""
         return self.model_cache
+    
+    def update_model_cache(self, new_cache: Dict[str, Dict]):
+        """更新模型缓存"""
+        self.model_cache = new_cache
+        logger.info(f"Updated model cache with {len(new_cache)} channels")
 
     def update_channel_health(self, channel_id: str, success: bool, latency: Optional[float] = None):
         """更新渠道健康状态"""

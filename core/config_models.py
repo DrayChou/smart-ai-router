@@ -30,6 +30,9 @@ class Channel(BaseModel):
     # Channel-level tags that apply to all models in this channel
     tags: List[str] = Field(default_factory=list)
     
+    # Configured models list for fallback when /models API fails
+    configured_models: Optional[List[str]] = Field(default=None)
+    
     # Cost per token
     cost_per_token: Optional[Dict[str, float]] = Field(default_factory=dict)
     

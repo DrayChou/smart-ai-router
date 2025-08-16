@@ -113,26 +113,45 @@ class JSONRouter:
         if request.model.startswith("tag:"):
             tag_query = request.model.split(":", 1)[1]
             
-            # 支持多标签查询，用逗号分隔：tag:qwen,free
+            # 支持多标签查询，用逗号分隔：tag:qwen,free,!local
             if "," in tag_query:
-                tags = [tag.strip().lower() for tag in tag_query.split(",")]
-                logger.info(f"🏷️  TAG ROUTING: Processing multi-tag query '{request.model}' -> tags: {tags}")
-                candidates = self._get_candidate_channels_by_auto_tags(tags)
+                tag_parts = [tag.strip() for tag in tag_query.split(",")]
+                positive_tags = []
+                negative_tags = []
+                
+                for tag_part in tag_parts:
+                    if tag_part.startswith("!"):
+                        # 负标签：!local
+                        negative_tags.append(tag_part[1:].lower())
+                    else:
+                        # 正标签：free, qwen3
+                        positive_tags.append(tag_part.lower())
+                
+                logger.info(f"🏷️  TAG ROUTING: Processing multi-tag query '{request.model}' -> positive: {positive_tags}, negative: {negative_tags}")
+                candidates = self._get_candidate_channels_by_auto_tags(positive_tags, negative_tags)
                 if not candidates:
-                    logger.error(f"❌ TAG NOT FOUND: No models found matching all tags {tags}")
-                    raise TagNotFoundError(tags)
+                    logger.error(f"❌ TAG NOT FOUND: No models found matching tags {positive_tags} excluding {negative_tags}")
+                    raise TagNotFoundError(positive_tags + [f"!{tag}" for tag in negative_tags])
                 logger.info(f"🏷️  TAG ROUTING: Multi-tag query found {len(candidates)} candidate channels")
                 return candidates
             else:
-                # 单标签查询 - 直接从模型发现缓存中查找
-                tag = tag_query.strip().lower()
-                logger.info(f"🏷️  TAG ROUTING: Processing single tag query '{request.model}' -> tag: '{tag}'")
+                # 单标签查询 - 支持负标签：tag:!local
+                tag_part = tag_query.strip()
+                if tag_part.startswith("!"):
+                    # 负标签单独查询：tag:!local (匹配所有不包含local的模型)
+                    negative_tag = tag_part[1:].lower()
+                    logger.info(f"🏷️  TAG ROUTING: Processing negative tag query '{request.model}' -> excluding: '{negative_tag}'")
+                    candidates = self._get_candidate_channels_by_auto_tags([], [negative_tag])
+                else:
+                    # 正常单标签查询
+                    tag = tag_part.lower()
+                    logger.info(f"🏷️  TAG ROUTING: Processing single tag query '{request.model}' -> tag: '{tag}'")
+                    candidates = self._get_candidate_channels_by_auto_tags([tag], [])
                 
-                candidates = self._get_candidate_channels_by_auto_tags([tag])
                 if not candidates:
-                    logger.error(f"❌ TAG NOT FOUND: No models found matching tag '{tag}'")
-                    raise TagNotFoundError([tag])
-                logger.info(f"🏷️  TAG ROUTING: Found {len(candidates)} candidate channels for tag '{tag}'")
+                    logger.error(f"❌ TAG NOT FOUND: No models found for query '{request.model}'")
+                    raise TagNotFoundError([tag_query])
+                logger.info(f"🏷️  TAG ROUTING: Found {len(candidates)} candidate channels")
                 return candidates
         
         # 非tag:前缀的模型名称 - 首先尝试物理模型，然后尝试自动标签化
@@ -450,17 +469,25 @@ class JSONRouter:
         self._tag_cache[model_name] = tags
         return tags
 
-    def _get_candidate_channels_by_auto_tags(self, tags: List[str]) -> List[ChannelCandidate]:
-        """根据自动提取的标签获取候选渠道（支持渐进式回退）"""
-        if not tags:
+    def _get_candidate_channels_by_auto_tags(self, positive_tags: List[str], negative_tags: List[str] = None) -> List[ChannelCandidate]:
+        """根据正负标签获取候选渠道（严格匹配）
+        
+        Args:
+            positive_tags: 必须包含的标签列表
+            negative_tags: 必须排除的标签列表
+        """
+        if negative_tags is None:
+            negative_tags = []
+            
+        # 如果没有任何标签条件，返回空（避免返回所有模型）
+        if not positive_tags and not negative_tags:
             return []
         
         # 标准化标签
-        normalized_tags = [tag.lower().strip() for tag in tags if tag and isinstance(tag, str)]
-        if not normalized_tags:
-            return []
+        normalized_positive = [tag.lower().strip() for tag in positive_tags if tag and isinstance(tag, str)]
+        normalized_negative = [tag.lower().strip() for tag in negative_tags if tag and isinstance(tag, str)]
         
-        logger.info(f"🔍 TAG MATCHING: Searching for channels with tags: {normalized_tags}")
+        logger.info(f"🔍 TAG MATCHING: Searching for channels with positive tags: {normalized_positive}, excluding: {normalized_negative}")
         
         model_cache = self.config_loader.get_model_cache()
         if not model_cache:
@@ -469,14 +496,19 @@ class JSONRouter:
         
         logger.info(f"🔍 TAG MATCHING: Searching through {len(model_cache)} cached channels")
         
-        # 严格匹配：只返回同时包含所有标签的模型，不进行任何回退
-        exact_candidates = self._find_channels_with_all_tags(normalized_tags, model_cache)
+        # 严格匹配：支持正负标签的严格匹配
+        if not normalized_negative:
+            # 如果没有负标签，使用原有的方法
+            exact_candidates = self._find_channels_with_all_tags(normalized_positive, model_cache)
+        else:
+            # 有负标签，使用新的正负标签匹配方法
+            exact_candidates = self._find_channels_with_positive_negative_tags(normalized_positive, normalized_negative, model_cache)
         
         if exact_candidates:
-            logger.info(f"🎯 STRICT MATCH: Found {len(exact_candidates)} channels with ALL required tags {normalized_tags}")
+            logger.info(f"🎯 STRICT MATCH: Found {len(exact_candidates)} channels matching positive: {normalized_positive}, excluding: {normalized_negative}")
             return exact_candidates
         
-        logger.warning(f"❌ NO MATCH: No channels found with ALL required tags {normalized_tags}")
+        logger.warning(f"❌ NO MATCH: No channels found matching positive: {normalized_positive}, excluding: {normalized_negative}")
         return []
     
     def _find_channels_with_all_tags(self, tags: List[str], model_cache: dict) -> List[ChannelCandidate]:
@@ -535,6 +567,86 @@ class JSONRouter:
             
             if channel_matches > 0:
                 logger.info(f"🎯 CHANNEL SUMMARY: Found {channel_matches} matching models in channel '{channel.name}' via merged channel+model tags")
+        
+        if matched_models:
+            logger.info(f"🎯 TOTAL MATCHED MODELS: {len(matched_models)} models found: {matched_models[:5]}{'...' if len(matched_models) > 5 else ''}")
+        
+        return candidate_channels
+
+    def _find_channels_with_positive_negative_tags(self, positive_tags: List[str], negative_tags: List[str], model_cache: dict) -> List[ChannelCandidate]:
+        """查找匹配正标签但排除负标签的渠道和模型组合
+        
+        Args:
+            positive_tags: 必须包含的标签列表
+            negative_tags: 必须排除的标签列表
+            model_cache: 模型缓存
+            
+        Returns:
+            符合条件的候选渠道列表
+        """
+        candidate_channels = []
+        matched_models = []
+        
+        # 遍历所有有效渠道
+        for channel in self.config_loader.get_enabled_channels():
+            if channel.id not in model_cache:
+                continue
+                
+            discovered_info = model_cache[channel.id]
+            if not isinstance(discovered_info, dict):
+                continue
+                
+            models = discovered_info.get("models", [])
+            if not models:
+                continue
+            
+            logger.debug(f"🔍 POSITIVE/NEGATIVE TAG MATCHING: Checking channel {channel.id} ({channel.name}) with {len(models)} models")
+            
+            # 统一的标签合并匹配：渠道标签 + 模型标签
+            channel_tags = getattr(channel, 'tags', []) or []
+            channel_matches = 0
+            
+            for model_name in models:
+                if not model_name:
+                    continue
+                    
+                # 从模型名称提取标签
+                model_tags = self._extract_tags_from_model_name(model_name)
+                
+                # 合并渠道标签和模型标签
+                combined_tags = list(set(channel_tags + model_tags))
+                
+                # 检查正标签：所有正标签都必须在合并后的标签中
+                positive_match = True
+                if positive_tags:
+                    positive_match = all(tag in combined_tags for tag in positive_tags)
+                
+                # 检查负标签：任何负标签都不能在合并后的标签中
+                negative_match = True
+                if negative_tags:
+                    negative_match = not any(tag in combined_tags for tag in negative_tags)
+                
+                # 只有同时满足正标签和负标签条件的模型才被选中
+                if positive_match and negative_match:
+                    # 过滤掉不适合chat的模型类型
+                    if self._is_suitable_for_chat(model_name):
+                        candidate_channels.append(ChannelCandidate(
+                            channel=channel,
+                            matched_model=model_name
+                        ))
+                        matched_models.append(model_name)
+                        channel_matches += 1
+                        logger.debug(f"✅ POSITIVE/NEGATIVE TAG MATCH: Channel '{channel.name}' model '{model_name}' -> tags: {combined_tags}")
+                    else:
+                        logger.debug(f"⚠️ FILTERED: Model '{model_name}' not suitable for chat (appears to be embedding/vision model)")
+                else:
+                    if not positive_match:
+                        logger.debug(f"❌ POSITIVE MISMATCH: Model '{model_name}' missing required tags from {positive_tags}")
+                    if not negative_match:
+                        logger.debug(f"❌ NEGATIVE MISMATCH: Model '{model_name}' contains excluded tags from {negative_tags}")
+            
+            if channel_matches > 0:
+                logger.info(f"🎯 CHANNEL SUMMARY: Found {channel_matches} matching models in channel '{channel.name}' via positive/negative tag filtering")
         
         if matched_models:
             logger.info(f"🎯 TOTAL MATCHED MODELS: {len(matched_models)} models found: {matched_models[:5]}{'...' if len(matched_models) > 5 else ''}")
