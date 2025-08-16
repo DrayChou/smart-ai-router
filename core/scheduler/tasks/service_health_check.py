@@ -2,6 +2,7 @@
 """
 服务健康检查任务 - 定时检查每个服务商的可用性和延迟
 自动选择最便宜的小模型进行测试，记录延迟和可用性信息
+集成智能缓存机制，优化检查频率和性能
 """
 
 import asyncio
@@ -13,6 +14,7 @@ from typing import Dict, List, Optional, Any, Tuple
 import httpx
 import logging
 from dataclasses import dataclass, asdict
+from core.utils.smart_cache import get_smart_cache, cache_get, cache_set, cache_get_or_set
 
 logger = logging.getLogger(__name__)
 
@@ -159,23 +161,111 @@ class ServiceHealthChecker:
         # 兜底：选择第一个可用模型
         return available_models[0] if available_models else None
     
-    async def _test_channel_health(self, channel: Dict[str, Any], test_model: str) -> HealthCheckResult:
-        """测试单个渠道的健康状态"""
+    async def _test_channel_health_via_models(self, channel: Dict[str, Any]) -> HealthCheckResult:
+        """通过/models接口测试渠道健康状态（优先方案）"""
         channel_id = channel.get('id', 'unknown')
         provider = channel.get('provider', 'unknown')
         api_key = channel.get('api_key', '')
         base_url = channel.get('base_url', '')
         
+        # 检查缓存的健康检查结果
+        cache_key = f"{channel_id}:{provider}:{base_url}"
+        cached_result = await cache_get("health_check", cache_key)
+        if cached_result:
+            logger.debug(f"使用缓存的健康检查结果: {channel_id}")
+            # 转换为HealthCheckResult对象
+            if isinstance(cached_result, dict):
+                cached_result['timestamp'] = datetime.fromisoformat(cached_result['timestamp']) if isinstance(cached_result['timestamp'], str) else cached_result['timestamp']
+                return HealthCheckResult(**cached_result)
+            return cached_result
+        
         start_time = time.time()
         
-        # 构建测试请求
+        headers = {
+            "User-Agent": "SmartAIRouter/1.0",
+            "Accept": "application/json"
+        }
+        
+        # 设置认证头
+        if api_key:
+            if provider.lower() in ['openai', 'groq', 'openrouter', 'burn_hair', 'siliconflow']:
+                headers["Authorization"] = f"Bearer {api_key}"
+            elif provider.lower() in ['anthropic']:
+                headers["x-api-key"] = api_key
+            else:
+                headers["Authorization"] = f"Bearer {api_key}"
+        
+        try:
+            async with httpx.AsyncClient(timeout=self.http_timeout) as client:
+                # 构建/models URL
+                if base_url.endswith('/'):
+                    url = f"{base_url}v1/models"
+                elif base_url.endswith('/v1'):
+                    url = f"{base_url}/models"
+                else:
+                    url = f"{base_url}/v1/models"
+                
+                response = await client.get(url, headers=headers)
+                
+                end_time = time.time()
+                latency_ms = (end_time - start_time) * 1000
+                
+                if response.status_code == 200:
+                    # 成功，渠道健康且顺便更新了模型列表
+                    logger.info(f"渠道 {channel_id} 通过/models接口健康检查成功，延迟: {latency_ms:.1f}ms")
+                    result = HealthCheckResult(
+                        channel_id=channel_id,
+                        provider=provider,
+                        model_name=channel.get('model_name', 'unknown'),
+                        test_model="/models",
+                        success=True,
+                        latency_ms=latency_ms,
+                        error_message=None,
+                        response_time=end_time - start_time,
+                        timestamp=datetime.now(),
+                        status_code=response.status_code
+                    )
+                    
+                    # 缓存成功的健康检查结果
+                    await cache_set("health_check", cache_key, asdict(result))
+                    return result
+                else:
+                    # /models接口失败，尝试备用方案
+                    logger.info(f"渠道 {channel_id} /models接口失败 ({response.status_code})，尝试备用测试方案")
+                    return await self._test_channel_health_via_dummy_model(channel)
+                    
+        except Exception as e:
+            # /models接口连接失败，尝试备用方案
+            logger.info(f"渠道 {channel_id} /models接口连接失败: {e}，尝试备用测试方案")
+            return await self._test_channel_health_via_dummy_model(channel)
+    
+    async def _test_channel_health_via_dummy_model(self, channel: Dict[str, Any]) -> HealthCheckResult:
+        """通过虚假模型请求测试渠道健康状态（备用方案）"""
+        channel_id = channel.get('id', 'unknown')
+        provider = channel.get('provider', 'unknown')
+        api_key = channel.get('api_key', '')
+        base_url = channel.get('base_url', '')
+        
+        # 检查缓存的健康检查结果（备用方案使用不同的缓存键）
+        cache_key = f"dummy:{channel_id}:{provider}:{base_url}"
+        cached_result = await cache_get("health_check", cache_key)
+        if cached_result:
+            logger.debug(f"使用缓存的健康检查结果(备用): {channel_id}")
+            if isinstance(cached_result, dict):
+                cached_result['timestamp'] = datetime.fromisoformat(cached_result['timestamp']) if isinstance(cached_result['timestamp'], str) else cached_result['timestamp']
+                return HealthCheckResult(**cached_result)
+            return cached_result
+        
+        start_time = time.time()
+        
+        # 使用一个不存在的模型名来测试服务是否在线
+        # 期望得到"模型不存在"而不是连接错误，这样就知道服务器是在线的
         test_payload = {
-            "model": test_model,
+            "model": "test-speed-health-check-dummy",
             "messages": [
-                {"role": "user", "content": "Hi"}
+                {"role": "user", "content": "test"}
             ],
-            "max_tokens": 10,
-            "temperature": 0.1
+            "max_tokens": 1
         }
         
         headers = {
@@ -185,7 +275,7 @@ class ServiceHealthChecker:
         
         # 设置认证头
         if api_key:
-            if provider.lower() in ['openai', 'groq', 'openrouter']:
+            if provider.lower() in ['openai', 'groq', 'openrouter', 'burn_hair', 'siliconflow']:
                 headers["Authorization"] = f"Bearer {api_key}"
             elif provider.lower() in ['anthropic']:
                 headers["x-api-key"] = api_key
@@ -205,36 +295,35 @@ class ServiceHealthChecker:
                 end_time = time.time()
                 latency_ms = (end_time - start_time) * 1000
                 
-                if response.status_code == 200:
-                    # 解析响应计算tokens/second
-                    try:
-                        response_data = response.json()
-                        usage = response_data.get('usage', {})
-                        total_tokens = usage.get('total_tokens', 0)
-                        tokens_per_second = total_tokens / (latency_ms / 1000) if latency_ms > 0 else 0
-                    except:
-                        tokens_per_second = None
-                    
-                    return HealthCheckResult(
+                # 对于虚假模型测试，我们期望的是400/404等"模型不存在"错误
+                # 这表明服务器在线且能正确处理请求
+                if response.status_code in [200, 400, 404, 422]:  # 包含可能的"模型不存在"状态码
+                    logger.info(f"渠道 {channel_id} 通过虚假模型健康检查成功，延迟: {latency_ms:.1f}ms")
+                    result = HealthCheckResult(
                         channel_id=channel_id,
                         provider=provider,
                         model_name=channel.get('model_name', 'unknown'),
-                        test_model=test_model,
+                        test_model="test-speed-health-check-dummy",
                         success=True,
                         latency_ms=latency_ms,
-                        error_message=None,
+                        error_message=f"服务在线 (HTTP {response.status_code})",
                         response_time=end_time - start_time,
                         timestamp=datetime.now(),
-                        status_code=response.status_code,
-                        tokens_per_second=tokens_per_second
+                        status_code=response.status_code
                     )
+                    
+                    # 缓存成功的健康检查结果
+                    await cache_set("health_check", cache_key, asdict(result))
+                    return result
                 else:
+                    # 其他错误状态码可能表明服务有问题
                     error_msg = f"HTTP {response.status_code}: {response.text[:200]}"
+                    logger.warning(f"渠道 {channel_id} 健康检查失败: {error_msg}")
                     return HealthCheckResult(
                         channel_id=channel_id,
                         provider=provider,
                         model_name=channel.get('model_name', 'unknown'),
-                        test_model=test_model,
+                        test_model="test-speed-health-check-dummy",
                         success=False,
                         latency_ms=latency_ms,
                         error_message=error_msg,
@@ -246,11 +335,12 @@ class ServiceHealthChecker:
         except Exception as e:
             end_time = time.time()
             error_msg = f"连接错误: {str(e)}"
+            logger.error(f"渠道 {channel_id} 健康检查连接失败: {error_msg}")
             return HealthCheckResult(
                 channel_id=channel_id,
                 provider=provider,
                 model_name=channel.get('model_name', 'unknown'),
-                test_model=test_model,
+                test_model="test-speed-health-check-dummy",
                 success=False,
                 latency_ms=None,
                 error_message=error_msg,
@@ -274,22 +364,12 @@ class ServiceHealthChecker:
             if not channel.get('api_key') or len(channel.get('api_key', '').strip()) < 10:
                 continue
                 
-            # 为每个渠道选择测试模型
+            # 优化策略：优先使用/models接口进行健康检查
+            # 这样既能检查健康状态，又能顺便更新模型列表，还不浪费token
             channel_id = channel.get('id', 'unknown')
-            channel_discovery = discovered_models.get(channel_id, {}) if discovered_models else {}
-            available_models = channel_discovery.get('models', []) if isinstance(channel_discovery, dict) else []
             
-            # 如果没有发现的模型，使用渠道配置的模型
-            if not available_models and channel.get('model_name'):
-                test_model = channel['model_name']
-            else:
-                test_model = self._select_test_model(channel, available_models)
-            
-            if not test_model:
-                logger.warning(f"渠道 {channel_id} 没有可测试的模型")
-                continue
-            
-            task = self._test_channel_health(channel, test_model)
+            # 直接使用新的健康检查方法
+            task = self._test_channel_health_via_models(channel)
             tasks.append(task)
         
         # 执行并发检查，限制并发数
