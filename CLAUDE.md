@@ -182,18 +182,21 @@ curl -X POST http://localhost:7601/v1/chat/completions \
 - **Temporary errors**: Apply cooldown period (rate_limit_exceeded, timeout)
 - **Smart recovery**: Automatic re-enabling after cooldown periods
 
-### Cost Optimization Features
+### Cost Optimization Features (Phase 7 - ✅ Completed)
 - **智能模型分析**: 自动提取模型参数数量(270m-670b)和上下文长度(2k-2m)，基于三层优先级智能评分
-- **可配置排序策略**: 支持cost_first、balanced、speed_optimized、quality_optimized四种路由策略
-- **模型过滤器**: 支持最小参数量、最小上下文长度、排除embedding模型等过滤条件
+- **多层路由策略**: 支持 `cost_first`, `free_first`, `local_first`, `balanced`, `speed_optimized`, `quality_optimized` 六种策略
+- **免费优先路由**: ✅ 严格的免费模型验证，优先使用真正免费的渠道，支持 `tag:free` 精确匹配
+- **本地优先模式**: ✅ 智能识别本地模型，优先使用 Ollama/LMStudio，减少云端API调用
+- **实时成本追踪**: ✅ 会话级别成本统计，每次请求显示实际成本和累计消费
+- **成本感知路由**: ✅ 动态策略切换API，一键切换不同成本优化策略
+- **管理接口增强**: ✅ 独立admin token认证，成本优化建议，策略管理接口
+- **标签匹配优化**: ✅ Case-insensitive标签匹配，支持SiliconFlow等大写模型名
 - **渠道分离缓存**: 每个渠道独立缓存模型分析结果，便于调试和管理
 
-### Planned Cost Optimization (Phase 7)
-- **免费资源最大化**: 免费优先路由策略、配额监控、API密钥轮换机制
-- **本地模型优先**: 本地优先模式、能力检测、集群负载均衡
-- **智能成本控制**: 实时成本追踪、Token预估、成本感知路由
-- **使用体验优化**: 成本透明化、使用建议、个性化配置助手
-- **预期收益**: 预计可节省70-90%的API费用，最大化利用免费额度和本地资源
+### Recently Discovered Issues (Phase 8 Planning)
+- **🚨 渠道级别定价问题**: 不同API Key用户级别可能有不同定价，当前按渠道缓存存在风险
+- **🔧 SiliconFlow定价集成**: 完成基础适配器，需进一步优化HTML解析准确性
+- **🛡️ 认证系统优化**: 已实现基础独立认证，可扩展权限分级和审计功能
 
 ## Database & Dependencies
 
@@ -246,11 +249,19 @@ Current implementation status (Phase 1-6 完成):
 - ✅ Docker配置和部署支持
 - ✅ 完整的错误处理和故障转移机制
 
-Planned for Phase 7 (个人使用成本优化):
-- 🎯 **免费资源最大化**: 免费优先路由策略、配额监控、API密钥轮换
-- 🎯 **本地模型优先**: 本地优先模式、能力检测、集群负载均衡
-- 🎯 **智能成本控制**: 实时成本追踪、Token预估、成本感知路由
-- 🎯 **使用体验优化**: 成本透明化、使用建议、个性化配置
+✅ **Phase 7 已完成** (个人使用成本优化):
+- ✅ **免费资源最大化**: 免费优先路由策略、严格免费验证、tag:free精确匹配
+- ✅ **本地模型优先**: 本地优先模式、智能本地识别、Ollama/LMStudio支持  
+- ✅ **智能成本控制**: 实时成本追踪、成本感知路由、动态策略切换API
+- ✅ **使用体验优化**: 成本透明化、admin接口增强、完善启动信息
+- ✅ **标签匹配优化**: Case-insensitive匹配、SiliconFlow大写模型支持
+- ✅ **SiliconFlow集成**: 定价适配器、HTML解析、真实定价数据
+- ✅ **认证系统增强**: 独立admin token、API token可选、安全分层
+
+📋 **Phase 8 规划** (架构稳定性增强):
+- 🚨 **渠道级别定价问题**: API Key级别的独立缓存架构 (高优先级)
+- 🔧 **定价集成完善**: 多渠道定价统一、缓存策略优化
+- 🛡️ **权限系统扩展**: 角色分级、审计日志、Token轮换
 
 Future considerations:
 - 📱 Web管理界面 (用于动态配置管理)
