@@ -25,9 +25,15 @@ server:
 # API认证配置
 # ============================================
 auth:
-  enabled: false  # 是否启用API Token验证
+  enabled: false  # 是否启用API Token验证（可选，不设置则无需认证）
   # api_token: "your-secret-token-here"  # 取消注释并设置你的Token
   # 如果不配置api_token，系统会自动生成一个随机Token
+  
+  # 管理API独立认证配置
+  admin:
+    enabled: true  # 是否启用Admin Token验证
+    # admin_token: "your-admin-secret-token-here"  # 管理接口专用Token
+    # 如果不配置admin_token，系统会自动生成一个随机Admin Token
 
 # ============================================
 # Provider 配置
@@ -170,7 +176,7 @@ channels:
 # 路由配置
 # ============================================
 routing:
-  default_strategy: "cost_first"  # 优先策略: cost_first, balanced, speed_optimized, quality_optimized
+  default_strategy: "cost_first"  # 优先策略: cost_first, free_first, local_first, balanced, speed_optimized, quality_optimized
   enable_fallback: true
   max_retry_attempts: 3
   health_check_interval: 300
@@ -198,6 +204,36 @@ routing:
         order: "desc"
       - field: "speed_score"
         weight: 0.15
+        order: "desc"
+    
+    # 免费优先策略 (最大化免费资源使用)
+    free_first:
+      - field: "free_score"       # 免费模型优先级评分
+        weight: 0.5
+        order: "desc"
+      - field: "cost_score"       # 成本评分
+        weight: 0.3
+        order: "desc"
+      - field: "speed_score"      # 速度评分
+        weight: 0.15
+        order: "desc"
+      - field: "reliability_score"  # 可靠性评分
+        weight: 0.05
+        order: "desc"
+    
+    # 本地优先策略 (最大化本地模型使用)
+    local_first:
+      - field: "local_score"      # 本地模型优先级评分
+        weight: 0.6
+        order: "desc"
+      - field: "speed_score"      # 速度评分
+        weight: 0.25
+        order: "desc"
+      - field: "cost_score"       # 成本评分
+        weight: 0.1
+        order: "desc"
+      - field: "reliability_score"  # 可靠性评分
+        weight: 0.05
         order: "desc"
     
     # 平衡策略
@@ -312,6 +348,12 @@ tasks:
     interval_minutes: 30           # 每30分钟运行一次
     run_on_startup: false         # 启动时不运行
     max_concurrent_checks: 10     # 最大并发检查数
+    
+  # SiliconFlow定价抓取任务 - 从官网抓取最新定价信息
+  siliconflow_pricing:
+    enabled: true
+    interval_hours: 24             # 每24小时运行一次
+    run_on_startup: true          # 启动时立即运行
     
   # 缓存清理任务 - 清理过期的缓存文件
   cache_cleanup:

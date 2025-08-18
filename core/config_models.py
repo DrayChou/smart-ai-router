@@ -69,9 +69,15 @@ class Server(BaseModel):
     request_timeout: int = 300
     max_request_size: int = 10485760
 
+class AdminAuth(BaseModel):
+    """管理API独立认证配置"""
+    enabled: bool = True
+    admin_token: Optional[str] = None
+
 class Auth(BaseModel):
     enabled: bool = False
     api_token: Optional[str] = None
+    admin: AdminAuth = Field(default_factory=AdminAuth)
 
 class System(BaseModel):
     name: str = "Smart AI Router"
