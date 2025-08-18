@@ -6,10 +6,11 @@
 
 🏷️ **智能标签系统** - 基于模型名称的自动标签化路由，支持 `tag:free,qwen3,!local` 等正负标签组合查询  
 🚫 **负标签过滤** - 支持 `!tagname` 语法排除特定标签，如 `tag:gpt,!free` 查询付费GPT模型  
-🚀 **智能路由引擎** - 基于成本、速度、质量、可靠性的四维评分策略，38个渠道智能选择  
+🚀 **智能路由引擎** - 基于成本、参数数量、上下文长度、速度的四维评分策略，智能模型排序选择  
+🧠 **智能模型分析** - 自动提取模型参数数量(200m-670b)和上下文长度(2k-2m)，支持可配置过滤策略  
 💰 **成本优化** - 自动选择最便宜的可用渠道，支持本地模型零成本  
 ⚡ **智能故障转移** - 401错误渠道黑名单机制，多渠道自动切换，18个渠道支持API回退  
-🎯 **模型类型过滤** - 自动过滤embedding模型，避免chat请求错误  
+🎯 **模型类型过滤** - 自动过滤embedding模型，支持最小参数量和上下文长度过滤  
 🔑 **API密钥验证** - 自动检测失效密钥，智能管理渠道状态  
 🔧 **零配置启动** - 基于Pydantic的YAML配置文件，One-API数据库自动集成  
 🌏 **多Provider支持** - OpenAI, Groq, SiliconFlow, Burn Hair, 豆包, 智谱, DeepSeek, 本地Ollama/LMStudio等  
@@ -243,9 +244,72 @@ curl -X POST http://127.0.0.1:7601/v1/chat/completions \
 - **负标签过滤**: 支持 `!tagname` 语法精确排除不需要的模型
 - **模型过滤**: 自动过滤embedding模型，避免chat请求错误  
 - **API回退机制**: 18个渠道支持 `/models` 失败时回退到配置模型
-- **质量评分**: 基于模型规格的差异化质量评分 (0.6B-235B)
-- **智能排序**: 优先选择高质量模型，支持成本/速度/质量多维度排序
+- **智能模型分析**: 自动提取模型参数数量(270m-670b)和上下文长度(2k-2m)，智能评分排序
+- **可配置排序策略**: 支持cost_first、balanced、speed_optimized、quality_optimized四种策略
+- **模型过滤器**: 支持最小参数量、最小上下文长度、排除embedding模型等过滤条件
+- **渠道分离缓存**: 每个渠道独立缓存模型分析结果，便于调试和管理
 - **大规模支持**: 38个渠道，3400+模型统一路由
+
+## 🧠 智能模型分析与排序
+
+### 模型参数提取
+系统采用三层优先级自动提取模型关键信息：
+
+1. **API响应优先** - 如果provider的`/models`接口返回`context_length`字段，直接使用（如OpenRouter）
+2. **知识库映射** - 基于680+已知模型的详细参数映射表进行匹配
+3. **名称解析** - 从模型名称中提取参数信息（如"7b", "32k"等）
+
+支持提取的信息：
+- **参数数量**: 270m, 600m, 1.7b, 4b, 7b, 8b, 12b, 70b, 670b等  
+- **上下文长度**: 2k, 4k, 8k, 16k, 32k, 64k, 128k, 200k, 1m, 2m等
+- **自适应性**: 自动适配各provider的API响应格式
+
+### 智能评分算法
+四维评分机制，可配置权重：
+1. **成本评分** (cost_score): 基于输入/输出token价格
+2. **参数评分** (parameter_score): 基于模型参数数量的对数式评分
+3. **上下文评分** (context_score): 基于上下文长度的智能评分
+4. **速度评分** (speed_score): 基于历史性能测试结果
+
+### 可配置排序策略
+```yaml
+routing:
+  default_strategy: "cost_first"  # 成本优先(推荐)
+  
+  # 模型过滤器
+  model_filters:
+    min_context_length: 8192      # 最小8k上下文
+    min_parameter_count: 0        # 不限参数数量
+    exclude_embedding_models: true # 排除embedding模型
+  
+  # 排序策略配置
+  sorting_strategies:
+    cost_first:           # 成本优先策略
+      - field: "cost_score"
+        weight: 0.4       # 成本权重40%
+      - field: "parameter_score"  
+        weight: 0.25      # 参数权重25%
+      - field: "context_score"
+        weight: 0.2       # 上下文权重20%
+      - field: "speed_score"
+        weight: 0.15      # 速度权重15%
+```
+
+### 渠道分离缓存
+每个渠道独立存储模型分析结果：
+```bash
+cache/channels/
+├── groq_llama3_8b.json          # Groq渠道模型缓存
+├── lmstudio_local.json          # LMStudio本地缓存  
+├── siliconflow_qwen.json        # SiliconFlow缓存
+└── burn_hair_gpt4o.json         # Burn Hair缓存
+```
+
+每个缓存文件包含：
+- 模型基础信息和状态
+- 参数数量和上下文长度分析
+- 原始API响应数据
+- 分析元数据和时间戳
 
 ## 📋 配置模式
 
@@ -309,7 +373,7 @@ smart-ai-router/
 │   └── README.md                    # 配置说明
 ├── core/                            # 核心代码
 │   ├── config_models.py            # Pydantic配置模型
-│   ├── json_router.py              # 智能路由引擎（支持负标签）
+│   ├── json_router.py              # 智能路由引擎（支持负标签+智能排序）
 │   ├── yaml_config.py              # YAML配置加载器
 │   ├── scheduler/                   # 定时任务系统
 │   │   ├── tasks/
@@ -318,10 +382,16 @@ smart-ai-router/
 │   │   │   └── service_health_check.py # 健康检查
 │   │   └── task_manager.py         # 任务管理器
 │   └── utils/                      # 工具模块
+│       ├── model_analyzer.py       # 模型参数和上下文分析器
+│       └── channel_cache_manager.py # 渠道分离缓存管理器
 ├── cache/                          # 缓存目录
-│   ├── discovered_models.json     # 模型发现缓存
+│   ├── channels/                   # 渠道分离缓存
+│   │   ├── groq_llama3_8b.json    # 各渠道独立模型缓存
+│   │   └── lmstudio_local.json    # 包含参数和上下文分析
+│   ├── discovered_models.json     # 模型发现缓存(旧格式)
 │   └── api_key_validation.json    # 密钥验证缓存
 ├── import_oneapi_channels.py       # One-API数据库导入工具
+├── migrate_cache.py                # 缓存迁移脚本（旧格式→新格式）
 ├── main.py                         # 统一入口
 └── README.md                       # 项目说明
 ```

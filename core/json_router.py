@@ -9,6 +9,8 @@ import logging
 
 from .yaml_config import YAMLConfigLoader, get_yaml_config_loader
 from .config_models import Channel
+from .utils.model_analyzer import get_model_analyzer
+from .utils.channel_cache_manager import get_channel_cache_manager
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +65,10 @@ class JSONRouter:
         self._tag_cache: Dict[str, List[str]] = {}
         self._available_tags_cache: Optional[set] = None
         self._available_models_cache: Optional[List[str]] = None
+        
+        # 模型分析器和缓存管理器
+        self.model_analyzer = get_model_analyzer()
+        self.cache_manager = get_channel_cache_manager()
         
     def route_request(self, request: RoutingRequest) -> List[RoutingScore]:
         """
@@ -199,6 +205,16 @@ class JSONRouter:
     def _filter_channels(self, channels: List[ChannelCandidate], request: RoutingRequest) -> List[ChannelCandidate]:
         """过滤渠道"""
         filtered = []
+        
+        # 获取路由配置中的过滤条件
+        routing_config = self.config.routing if hasattr(self.config, 'routing') else {}
+        model_filters = routing_config.get('model_filters', {})
+        
+        min_context_length = model_filters.get('min_context_length', 0)
+        min_parameter_count = model_filters.get('min_parameter_count', 0)
+        exclude_embedding = model_filters.get('exclude_embedding_models', True)
+        exclude_vision_only = model_filters.get('exclude_vision_only_models', True)
+        
         for candidate in channels:
             channel = candidate.channel
             if not channel.enabled or not channel.api_key:
@@ -207,6 +223,37 @@ class JSONRouter:
             health_score = self.config_loader.runtime_state.health_scores.get(channel.id, 1.0)
             if health_score < 0.3:
                 continue
+            
+            # 模型规格过滤
+            if candidate.matched_model and (min_context_length > 0 or min_parameter_count > 0 or exclude_embedding or exclude_vision_only):
+                model_name = candidate.matched_model
+                
+                # 检查是否为embedding模型
+                if exclude_embedding and self._is_embedding_model(model_name):
+                    logger.debug(f"Filtered out embedding model: {model_name}")
+                    continue
+                
+                # 检查是否为纯视觉模型
+                if exclude_vision_only and self._is_vision_only_model(model_name):
+                    logger.debug(f"Filtered out vision-only model: {model_name}")
+                    continue
+                
+                # 获取模型规格
+                model_specs = self._get_model_specs(channel.id, model_name)
+                
+                # 上下文长度过滤
+                if min_context_length > 0:
+                    context_length = model_specs.get('context_length', 0) if model_specs else 0
+                    if context_length < min_context_length:
+                        logger.debug(f"Filtered out model {model_name}: context {context_length} < {min_context_length}")
+                        continue
+                
+                # 参数数量过滤
+                if min_parameter_count > 0:
+                    param_count = model_specs.get('parameter_count', 0) if model_specs else 0
+                    if param_count < min_parameter_count:
+                        logger.debug(f"Filtered out model {model_name}: params {param_count}M < {min_parameter_count}M")
+                        continue
             
             # TODO: Add capability filtering when needed
             # if request.required_capabilities:
@@ -233,9 +280,12 @@ class JSONRouter:
             speed_score = self._calculate_speed_score(channel)
             quality_score = self._calculate_quality_score(channel, candidate.matched_model)
             reliability_score = self._calculate_reliability_score(channel)
+            parameter_score = self._calculate_parameter_score(channel, candidate.matched_model)
+            context_score = self._calculate_context_score(channel, candidate.matched_model)
             
             total_score = self._calculate_total_score(
-                strategy, cost_score, speed_score, quality_score, reliability_score
+                strategy, cost_score, speed_score, quality_score, reliability_score, 
+                parameter_score, context_score
             )
             
             # 为了减少日志冗余，只显示模型名称和总分
@@ -260,33 +310,49 @@ class JSONRouter:
     
     def _get_routing_strategy(self, model: str) -> List[Dict[str, Any]]:
         """获取并解析路由策略，始终返回规则列表"""
-        strategy_name = self.config.routing.default_strategy
+        routing_config = self.config.routing if hasattr(self.config, 'routing') else {}
+        strategy_name = routing_config.get('default_strategy', 'balanced')
+        
+        # 尝试从配置中获取自定义策略
+        custom_strategies = routing_config.get('sorting_strategies', {})
+        if strategy_name in custom_strategies:
+            return custom_strategies[strategy_name]
 
+        # 回退到预定义策略
         predefined_strategies = {
+            "cost_first": [
+                {"field": "cost_score", "order": "desc", "weight": 0.4},
+                {"field": "parameter_score", "order": "desc", "weight": 0.25},
+                {"field": "context_score", "order": "desc", "weight": 0.2},
+                {"field": "speed_score", "order": "desc", "weight": 0.15}
+            ],
             "cost_optimized": [
                 {"field": "cost_score", "order": "desc", "weight": 0.7},
                 {"field": "reliability_score", "order": "desc", "weight": 0.2},
                 {"field": "speed_score", "order": "desc", "weight": 0.1}
             ],
             "speed_optimized": [
-                {"field": "speed_score", "order": "desc", "weight": 0.6},
-                {"field": "reliability_score", "order": "desc", "weight": 0.2},
-                {"field": "cost_score", "order": "desc", "weight": 0.2}
+                {"field": "speed_score", "order": "desc", "weight": 0.4},
+                {"field": "cost_score", "order": "desc", "weight": 0.3},
+                {"field": "parameter_score", "order": "desc", "weight": 0.2},
+                {"field": "context_score", "order": "desc", "weight": 0.1}
             ],
             "quality_optimized": [
-                {"field": "quality_score", "order": "desc", "weight": 0.6},
-                {"field": "reliability_score", "order": "desc", "weight": 0.2},
-                {"field": "cost_score", "order": "desc", "weight": 0.2}
+                {"field": "parameter_score", "order": "desc", "weight": 0.4},
+                {"field": "context_score", "order": "desc", "weight": 0.3},
+                {"field": "quality_score", "order": "desc", "weight": 0.2},
+                {"field": "cost_score", "order": "desc", "weight": 0.1}
             ],
             "balanced": [
                 {"field": "cost_score", "order": "desc", "weight": 0.3},
-                {"field": "speed_score", "order": "desc", "weight": 0.3},
-                {"field": "quality_score", "order": "desc", "weight": 0.2},
-                {"field": "reliability_score", "order": "desc", "weight": 0.2}
+                {"field": "parameter_score", "order": "desc", "weight": 0.25},
+                {"field": "context_score", "order": "desc", "weight": 0.2},
+                {"field": "speed_score", "order": "desc", "weight": 0.15},
+                {"field": "reliability_score", "order": "desc", "weight": 0.1}
             ]
         }
         
-        return predefined_strategies.get(strategy_name, predefined_strategies["balanced"])
+        return predefined_strategies.get(strategy_name, predefined_strategies["cost_first"])
 
     def _calculate_cost_score(self, channel: Channel, request: RoutingRequest) -> float:
         """计算成本评分(0-1，越低成本越高分)"""
@@ -333,29 +399,185 @@ class JSONRouter:
     }
 
     def _calculate_quality_score(self, channel: Channel, matched_model: Optional[str] = None) -> float:
-        """根据内置排名动态计算质量评分"""
+        """根据内置排名和模型规格动态计算质量评分"""
         # 优先使用匹配的模型，如果没有则使用渠道默认模型
-        model_name = (matched_model or channel.model_name).lower()
-        simple_model_name = model_name.split('/')[-1]
-        quality_score = self.MODEL_QUALITY_RANKING.get(simple_model_name)
+        model_name = matched_model or channel.model_name
+        model_name_lower = model_name.lower()
+        simple_model_name = model_name_lower.split('/')[-1]
         
-        if quality_score is None:
+        # 1. 基础质量评分（从内置排名）
+        base_quality_score = self.MODEL_QUALITY_RANKING.get(simple_model_name)
+        
+        if base_quality_score is None:
             for key, score in self.MODEL_QUALITY_RANKING.items():
-                if key in model_name:
-                    quality_score = score
+                if key in model_name_lower:
+                    base_quality_score = score
                     break
         
-        # 给本地模型一些质量分数调整
-        if any(keyword in model_name for keyword in ['qwen3', 'qwen2.5']):
-            base_score = quality_score or 75
-            # 根据模型大小调整分数
-            if '0.6b' in model_name or '1.7b' in model_name:
-                base_score = max(60, base_score - 15)  # 小模型降分
-            elif '4b' in model_name:
-                base_score = max(70, base_score - 10)  # 中模型适当降分
-            quality_score = base_score
+        # 2. 获取模型规格信息
+        model_specs = None
+        try:
+            # 从渠道缓存中获取模型详细信息
+            channel_cache = self.cache_manager.load_channel_models(channel.id)
+            if channel_cache and 'models' in channel_cache:
+                model_specs = channel_cache['models'].get(model_name)
+        except Exception as e:
+            logger.debug(f"Failed to load model specs for {model_name}: {e}")
         
-        return (quality_score or 70) / 100.0
+        # 如果缓存中没有，使用分析器分析模型名称
+        if not model_specs:
+            analyzed_specs = self.model_analyzer.analyze_model(model_name)
+            model_specs = {
+                'parameter_count': analyzed_specs.parameter_count,
+                'context_length': analyzed_specs.context_length
+            }
+        
+        # 3. 根据参数数量调整评分
+        param_multiplier = 1.0
+        if model_specs and 'parameter_count' in model_specs:
+            param_count = model_specs['parameter_count']
+            if param_count:
+                # 参数数量评分曲线（越大越好，但有边际递减效应）
+                if param_count >= 100000:      # 100B+
+                    param_multiplier = 1.3
+                elif param_count >= 70000:     # 70B+
+                    param_multiplier = 1.25
+                elif param_count >= 30000:     # 30B+
+                    param_multiplier = 1.2
+                elif param_count >= 8000:      # 8B+
+                    param_multiplier = 1.1
+                elif param_count >= 4000:      # 4B+
+                    param_multiplier = 1.05
+                elif param_count >= 1000:      # 1B+
+                    param_multiplier = 1.0
+                elif param_count >= 500:       # 500M+
+                    param_multiplier = 0.9
+                else:                          # <500M
+                    param_multiplier = 0.8
+                
+                logger.debug(f"Model {model_name}: {param_count}M params -> multiplier {param_multiplier}")
+        
+        # 4. 根据上下文长度调整评分
+        context_bonus = 0.0
+        if model_specs and 'context_length' in model_specs:
+            context_length = model_specs['context_length']
+            if context_length:
+                # 上下文长度奖励（更长的上下文在同等条件下更好）
+                if context_length >= 200000:     # 200k+
+                    context_bonus = 15
+                elif context_length >= 128000:   # 128k+
+                    context_bonus = 10
+                elif context_length >= 32000:    # 32k+
+                    context_bonus = 5
+                elif context_length >= 16000:    # 16k+
+                    context_bonus = 2
+                
+                logger.debug(f"Model {model_name}: {context_length} context -> bonus {context_bonus}")
+        
+        # 5. 计算最终评分
+        final_score = (base_quality_score or 70) * param_multiplier + context_bonus
+        
+        # 6. 归一化到0-1范围，最高分设为120分
+        normalized_score = min(1.0, final_score / 120.0)
+        
+        logger.debug(f"Quality scoring for {model_name}: base={base_quality_score}, "
+                    f"param_mult={param_multiplier}, context_bonus={context_bonus}, "
+                    f"final={final_score}, normalized={normalized_score:.3f}")
+        
+        return normalized_score
+    
+    def _calculate_parameter_score(self, channel: Channel, matched_model: Optional[str] = None) -> float:
+        """计算参数数量评分"""
+        model_name = matched_model or channel.model_name
+        model_specs = self._get_model_specs(channel.id, model_name)
+        
+        if not model_specs or not model_specs.get('parameter_count'):
+            return 0.5  # 默认中等评分
+        
+        param_count = model_specs['parameter_count']
+        
+        # 参数数量评分曲线（对数式递增，有边际递减效应）
+        if param_count >= 500000:      # 500B+
+            score = 1.0
+        elif param_count >= 100000:    # 100B+
+            score = 0.95
+        elif param_count >= 70000:     # 70B+
+            score = 0.9
+        elif param_count >= 30000:     # 30B+
+            score = 0.85
+        elif param_count >= 8000:      # 8B+
+            score = 0.8
+        elif param_count >= 4000:      # 4B+
+            score = 0.75
+        elif param_count >= 1000:      # 1B+
+            score = 0.7
+        elif param_count >= 500:       # 500M+
+            score = 0.6
+        else:                          # <500M
+            score = 0.4
+        
+        logger.debug(f"Parameter score for {model_name}: {param_count}M -> {score}")
+        return score
+    
+    def _calculate_context_score(self, channel: Channel, matched_model: Optional[str] = None) -> float:
+        """计算上下文长度评分"""
+        model_name = matched_model or channel.model_name
+        model_specs = self._get_model_specs(channel.id, model_name)
+        
+        if not model_specs or not model_specs.get('context_length'):
+            return 0.5  # 默认中等评分
+        
+        context_length = model_specs['context_length']
+        
+        # 上下文长度评分曲线
+        if context_length >= 1000000:    # 1M+
+            score = 1.0
+        elif context_length >= 200000:   # 200k+
+            score = 0.95
+        elif context_length >= 128000:   # 128k+
+            score = 0.9
+        elif context_length >= 32000:    # 32k+
+            score = 0.8
+        elif context_length >= 16000:    # 16k+
+            score = 0.7
+        elif context_length >= 8000:     # 8k+
+            score = 0.6
+        elif context_length >= 4000:     # 4k+
+            score = 0.5
+        else:                            # <4k
+            score = 0.3
+        
+        logger.debug(f"Context score for {model_name}: {context_length} -> {score}")
+        return score
+    
+    def _get_model_specs(self, channel_id: str, model_name: str) -> Optional[Dict[str, Any]]:
+        """获取模型规格信息"""
+        try:
+            # 从渠道缓存中获取
+            channel_cache = self.cache_manager.load_channel_models(channel_id)
+            if channel_cache and 'models' in channel_cache:
+                return channel_cache['models'].get(model_name)
+        except Exception as e:
+            logger.debug(f"Failed to load model specs for {model_name}: {e}")
+        
+        # 回退到分析器分析
+        analyzed_specs = self.model_analyzer.analyze_model(model_name)
+        return {
+            'parameter_count': analyzed_specs.parameter_count,
+            'context_length': analyzed_specs.context_length
+        }
+    
+    def _is_embedding_model(self, model_name: str) -> bool:
+        """检查是否为embedding模型"""
+        name_lower = model_name.lower()
+        embedding_keywords = ['embedding', 'embed', 'text-embedding', 'bge-', 'gte-', 'e5-']
+        return any(keyword in name_lower for keyword in embedding_keywords)
+    
+    def _is_vision_only_model(self, model_name: str) -> bool:
+        """检查是否为纯视觉模型"""
+        name_lower = model_name.lower()
+        vision_keywords = ['vision-only', 'image-only', 'ocr-only']
+        return any(keyword in name_lower for keyword in vision_keywords)
 
     def _calculate_speed_score(self, channel: Channel) -> float:
         """根据平均延迟动态计算速度评分"""
@@ -374,12 +596,14 @@ class JSONRouter:
     
     def _calculate_total_score(self, strategy: List[Dict[str, Any]], 
                              cost_score: float, speed_score: float, 
-                             quality_score: float, reliability_score: float) -> float:
+                             quality_score: float, reliability_score: float,
+                             parameter_score: float = 0.5, context_score: float = 0.5) -> float:
         """根据策略计算总评分"""
         total_score = 0.0
         score_map = {
             "cost_score": cost_score, "speed_score": speed_score,
-            "quality_score": quality_score, "reliability_score": reliability_score
+            "quality_score": quality_score, "reliability_score": reliability_score,
+            "parameter_score": parameter_score, "context_score": context_score
         }
         
         total_weight = sum(rule.get("weight", 0.0) for rule in strategy)

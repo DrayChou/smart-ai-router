@@ -162,11 +162,83 @@ channels:
 # 路由配置
 # ============================================
 routing:
-  default_strategy: "balanced"
+  default_strategy: "cost_first"  # 优先策略: cost_first, balanced, speed_optimized, quality_optimized
   enable_fallback: true
   max_retry_attempts: 3
   health_check_interval: 300
   error_cooldown_period: 60
+  
+  # 模型筛选条件
+  model_filters:
+    min_context_length: 8192      # 最小上下文长度（tokens），设为0禁用过滤
+    min_parameter_count: 0        # 最小参数数量（百万），设为0禁用过滤
+    exclude_embedding_models: true  # 排除embedding模型
+    exclude_vision_only_models: true  # 排除纯视觉模型
+  
+  # 自定义排序策略配置
+  sorting_strategies:
+    # 成本优先策略 (推荐默认)
+    cost_first:
+      - field: "cost_score"
+        weight: 0.4
+        order: "desc"
+      - field: "parameter_score"  # 参数数量评分
+        weight: 0.25
+        order: "desc"
+      - field: "context_score"    # 上下文长度评分
+        weight: 0.2
+        order: "desc"
+      - field: "speed_score"
+        weight: 0.15
+        order: "desc"
+    
+    # 平衡策略
+    balanced:
+      - field: "cost_score"
+        weight: 0.3
+        order: "desc"
+      - field: "parameter_score"
+        weight: 0.25
+        order: "desc"
+      - field: "context_score"
+        weight: 0.2
+        order: "desc"
+      - field: "speed_score"
+        weight: 0.15
+        order: "desc"
+      - field: "reliability_score"
+        weight: 0.1
+        order: "desc"
+    
+    # 速度优先策略
+    speed_optimized:
+      - field: "speed_score"
+        weight: 0.4
+        order: "desc"
+      - field: "cost_score"
+        weight: 0.3
+        order: "desc"
+      - field: "parameter_score"
+        weight: 0.2
+        order: "desc"
+      - field: "context_score"
+        weight: 0.1
+        order: "desc"
+    
+    # 质量优先策略
+    quality_optimized:
+      - field: "parameter_score"
+        weight: 0.4
+        order: "desc"
+      - field: "context_score"
+        weight: 0.3
+        order: "desc"
+      - field: "quality_score"
+        weight: 0.2
+        order: "desc"
+      - field: "cost_score"
+        weight: 0.1
+        order: "desc"
   
   # 错误分类和处理策略
   error_handling:
