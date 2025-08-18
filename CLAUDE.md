@@ -57,11 +57,14 @@ uv run pytest -m integration
 
 ### Docker Development
 ```bash
-# Build and run with Docker Compose
+# Build and run with Docker Compose (推荐)
 docker-compose up -d
 
 # View logs
 docker-compose logs -f
+
+# Stop service
+docker-compose down
 
 # Build standalone image
 docker build -t smart-ai-router .

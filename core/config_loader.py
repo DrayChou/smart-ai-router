@@ -240,7 +240,7 @@ class ConfigLoader:
     def get_server_config(self) -> Dict[str, Any]:
         """获取服务器配置"""
         return self.config_data.get("server", {
-            "host": "127.0.0.1",
+            "host": "0.0.0.0",
             "port": 7601,
             "debug": False
         })

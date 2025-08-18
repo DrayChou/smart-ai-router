@@ -63,6 +63,8 @@ channels:
 ```
 
 ### 3. 启动服务
+
+#### 本地启动
 ```bash
 # 默认启动 (YAML模式)
 python main.py
@@ -73,6 +75,24 @@ python main.py --port 8080
 # 调试模式
 python main.py --debug
 ```
+
+#### Docker部署（推荐）
+```bash
+# 使用Docker Compose启动
+docker-compose up -d
+
+# 查看日志
+docker-compose logs -f
+
+# 停止服务
+docker-compose down
+```
+
+Docker部署会自动：
+- 创建必要的目录结构
+- 配置环境变量
+- 设置健康检查
+- 管理数据持久化
 
 ### 4. 测试API
 ```bash

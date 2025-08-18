@@ -224,7 +224,7 @@ def main() -> None:
 
     try:
         config = get_yaml_config_loader().get_server_config()
-        host = args.host or config.get("host", "127.0.0.1")
+        host = args.host or config.get("host", "0.0.0.0")
         port = args.port or config.get("port", 7601)
         debug = args.debug or config.get("debug", False)
 

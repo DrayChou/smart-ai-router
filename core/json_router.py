@@ -453,8 +453,8 @@ class JSONRouter:
         
         import re
         
-        # 使用多种分隔符进行拆分: :, /, @, -, _
-        separators = r'[/:@\-_]'
+        # 使用多种分隔符进行拆分: :, /, @, -, _, ,
+        separators = r'[/:@\-_,]'
         parts = re.split(separators, model_name.lower())
         
         # 清理和过滤标签

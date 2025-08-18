@@ -14,7 +14,7 @@ system:
 # 服务器配置
 # ============================================
 server:
-  host: "127.0.0.1"
+  host: "0.0.0.0"
   port: 7601
   debug: false
   cors_origins: ["*"]
@@ -251,7 +251,7 @@ tasks:
 # 2. 将所有 "YOUR_*_API_KEY_HERE" 替换为真实API密钥
 # 3. 将需要启用的渠道 enabled 改为 true
 # 4. 运行: python main.py
-# 5. 访问: http://127.0.0.1:7601/docs 查看API文档
-# 6. 测试: curl -X POST http://127.0.0.1:7601/v1/chat/completions \
+# 5. 访问: http://localhost:7601/docs 查看API文档
+# 6. 测试: curl -X POST http://localhost:7601/v1/chat/completions \
 #          -H "Content-Type: application/json" \
 #          -d '{"model":"auto:fast","messages":[{"role":"user","content":"Hello!"}]}'

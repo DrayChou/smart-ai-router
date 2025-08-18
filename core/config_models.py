@@ -62,7 +62,7 @@ class Tasks(BaseModel):
     api_key_validation: TaskConfig = Field(default_factory=TaskConfig)
 
 class Server(BaseModel):
-    host: str = "127.0.0.1"
+    host: str = "0.0.0.0"
     port: int = 7601
     debug: bool = False
     cors_origins: List[str] = ["*"]
