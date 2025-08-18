@@ -11,6 +11,7 @@ from .yaml_config import YAMLConfigLoader, get_yaml_config_loader
 from .config_models import Channel
 from .utils.model_analyzer import get_model_analyzer
 from .utils.channel_cache_manager import get_channel_cache_manager
+from .utils.request_cache import get_request_cache, RequestFingerprint
 
 logger = logging.getLogger(__name__)
 
@@ -70,11 +71,76 @@ class JSONRouter:
         self.model_analyzer = get_model_analyzer()
         self.cache_manager = get_channel_cache_manager()
         
-    def route_request(self, request: RoutingRequest) -> List[RoutingScore]:
+    async def route_request(self, request: RoutingRequest) -> List[RoutingScore]:
         """
         路由请求，返回按评分排序的候选渠道列表。
+        
+        支持请求级缓存以提高性能：
+        - 缓存TTL: 60秒
+        - 基于请求指纹的智能缓存键生成
+        - 自动故障转移和缓存失效
         """
         logger.info(f"🚀 ROUTING START: Processing request for model '{request.model}'")
+        
+        # 生成请求指纹用于缓存
+        fingerprint = RequestFingerprint(
+            model=request.model,
+            routing_strategy=getattr(request, 'routing_strategy', 'balanced'),
+            required_capabilities=getattr(request, 'required_capabilities', None),
+            min_context_length=getattr(request, 'min_context_length', None),
+            max_cost_per_1k=getattr(request, 'max_cost_per_1k', None),
+            prefer_local=getattr(request, 'prefer_local', False),
+            exclude_providers=getattr(request, 'exclude_providers', None),
+            # 新增影响路由的参数
+            max_tokens=getattr(request, 'max_tokens', None),
+            temperature=getattr(request, 'temperature', None),
+            stream=getattr(request, 'stream', False),
+            has_functions=bool(getattr(request, 'functions', None) or getattr(request, 'tools', None))
+        )
+        
+        # 检查缓存
+        cache = get_request_cache()
+        cached_result = await cache.get_cached_selection(fingerprint)
+        
+        if cached_result:
+            # 缓存命中，转换为RoutingScore列表
+            logger.info(f"⚡ CACHE HIT: Using cached selection for '{request.model}' "
+                       f"(cost: ${cached_result.cost_estimate:.4f})")
+            
+            # 构建RoutingScore列表
+            scores = []
+            
+            # 主要渠道
+            primary_score = RoutingScore(
+                channel=cached_result.primary_channel,
+                total_score=1.0,  # 缓存的结果优先级最高
+                cost_score=1.0 if cached_result.cost_estimate == 0.0 else 0.8,
+                speed_score=0.9,  # 缓存访问很快
+                quality_score=0.8,
+                reliability_score=0.9,
+                reason=f"CACHED: {cached_result.selection_reason}",
+                matched_model=request.model
+            )
+            scores.append(primary_score)
+            
+            # 备选渠道  
+            for i, backup_channel in enumerate(cached_result.backup_channels):
+                backup_score = RoutingScore(
+                    channel=backup_channel,
+                    total_score=0.9 - i * 0.1,  # 递减优先级
+                    cost_score=0.7,
+                    speed_score=0.8,
+                    quality_score=0.7,
+                    reliability_score=0.8,
+                    reason=f"CACHED_BACKUP_{i+1}",
+                    matched_model=request.model
+                )
+                scores.append(backup_score)
+            
+            return scores
+        
+        # 缓存未命中，执行正常路由逻辑
+        logger.info(f"⏱️  CACHE MISS: Computing fresh routing for '{request.model}'")
         try:
             # 第一步：获取候选渠道
             logger.info(f"🔍 STEP 1: Finding candidate channels...")
@@ -102,6 +168,28 @@ class JSONRouter:
                 return []
             
             logger.info(f"✅ STEP 3 COMPLETE: Scored {len(scored_channels)} channels")
+            
+            # 缓存结果（异步执行，不阻塞主流程）
+            if scored_channels:
+                primary_channel = scored_channels[0].channel
+                backup_channels = [score.channel for score in scored_channels[1:6]]  # 最多5个备选
+                selection_reason = scored_channels[0].reason
+                cost_estimate = self._estimate_cost_for_channel(primary_channel, request)
+                
+                try:
+                    # 异步保存到缓存
+                    cache_key = await cache.cache_selection(
+                        fingerprint=fingerprint,
+                        primary_channel=primary_channel,
+                        backup_channels=backup_channels,
+                        selection_reason=selection_reason,
+                        cost_estimate=cost_estimate,
+                        ttl_seconds=60  # 1分钟TTL
+                    )
+                    logger.debug(f"💾 CACHED RESULT: {cache_key} -> {primary_channel.name}")
+                except Exception as cache_error:
+                    logger.warning(f"⚠️  CACHE SAVE FAILED: {cache_error}, continuing without caching")
+            
             logger.info(f"🎉 ROUTING SUCCESS: Ready to attempt {len(scored_channels)} channels in ranked order for model '{request.model}'")
             
             return scored_channels
@@ -910,6 +998,46 @@ class JSONRouter:
             if isinstance(content, str):
                 total_chars += len(content)
         return max(1, total_chars // 4)
+    
+    def _estimate_cost_for_channel(self, channel: Channel, request: RoutingRequest) -> float:
+        """估算特定渠道的请求成本"""
+        try:
+            # 估算token数量
+            input_tokens = self._estimate_tokens(request.messages)
+            estimated_output_tokens = max(50, input_tokens // 4)  # 预估输出token
+            
+            # 获取渠道的定价信息
+            model_cache = self.config_loader.get_model_cache()
+            if channel.id in model_cache:
+                discovered_info = model_cache[channel.id]
+                models_pricing = discovered_info.get("models_pricing", {})
+                
+                # 查找模型的定价信息
+                model_pricing = None
+                for model_name, pricing in models_pricing.items():
+                    if model_name == request.model or request.model in model_name:
+                        model_pricing = pricing
+                        break
+                
+                if model_pricing:
+                    input_cost = model_pricing.get("input_cost_per_token", 0.0)
+                    output_cost = model_pricing.get("output_cost_per_token", 0.0)
+                    
+                    total_cost = (input_tokens * input_cost + 
+                                estimated_output_tokens * output_cost)
+                    
+                    return total_cost
+            
+            # 如果没有找到定价信息，使用免费评分来估算
+            free_score = self._calculate_free_score(channel, request.model)
+            if free_score >= 0.9:
+                return 0.0  # 免费模型
+            else:
+                return 0.001  # 默认估算为很低的成本
+                
+        except Exception as e:
+            logger.warning(f"成本估算失败: {e}")
+            return 0.001
     
     def _is_suitable_for_chat(self, model_name: str) -> bool:
         """检查模型是否适合chat对话任务"""

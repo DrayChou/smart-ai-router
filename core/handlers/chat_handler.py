@@ -19,6 +19,7 @@ from ..yaml_config import YAMLConfigLoader
 from ..utils.http_client_pool import get_http_pool
 from ..utils.smart_cache import cache_get, cache_set
 from ..utils.token_counter import get_cost_tracker
+from ..utils.request_cache import get_request_cache
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +102,7 @@ class ChatCompletionHandler:
         )
         
         logger.info(f"🔄 CHANNEL ROUTING: Starting routing process for model '{request.model}'")
-        candidate_channels = self.router.route_request(routing_request)
+        candidate_channels = await self.router.route_request(routing_request)
         
         if not candidate_channels:
             return RoutingResult(candidates=[], execution_time=time.time() - start_time, total_candidates=0)
@@ -275,6 +276,15 @@ class ChatCompletionHandler:
         
         return headers
     
+    def _invalidate_channel_cache(self, channel_id: str, channel_name: str, reason: str):
+        """统一的缓存失效方法"""
+        try:
+            cache = get_request_cache()
+            cache.invalidate_channel(channel_id)
+            logger.info(f"🗑️  CACHE INVALIDATED: Cleared cached selections for channel '{channel_name}' due to {reason}")
+        except Exception as e:
+            logger.warning(f"⚠️  CACHE INVALIDATION FAILED for channel '{channel_name}': {e}")
+
     def _handle_http_status_error(self, error: httpx.HTTPStatusError, channel, attempt_num: int, failed_channels: set, total_candidates: List) -> None:
         """处理HTTP状态错误"""
         error_text = error.response.text if hasattr(error.response, 'text') else str(error)
@@ -288,6 +298,13 @@ class ChatCompletionHandler:
             failed_channels.add(channel.id)
             logger.warning(f"🚫 CHANNEL BLACKLISTED: Channel '{channel.name}' (ID: {channel.id}) blacklisted due to HTTP {error.response.status_code}")
             logger.info(f"⚡ SKIP OPTIMIZATION: Will skip all remaining models from channel '{channel.name}'")
+            
+            # 使相关缓存失效 - 永久性错误需要立即清除缓存
+            self._invalidate_channel_cache(channel.id, channel.name, "permanent error")
+        
+        # 对于临时错误（如429, 500），也使缓存失效但不永久拉黑
+        elif error.response.status_code in [429, 500, 502, 503, 504]:
+            self._invalidate_channel_cache(channel.id, channel.name, "temporary error")
         
         if attempt_num < len(total_candidates):
             logger.info(f"🔄 FAILOVER: Trying next channel (#{attempt_num + 1})")
@@ -296,6 +313,9 @@ class ChatCompletionHandler:
         """处理请求错误"""
         logger.warning(f"❌ ATTEMPT #{attempt_num} FAILED: Channel '{channel.name}' network error: {str(error)}")
         self.router.update_channel_health(channel.id, False)
+        
+        # 网络错误也可能是渠道问题，清除相关缓存
+        self._invalidate_channel_cache(channel.id, channel.name, "network error")
         
         if attempt_num < len(total_candidates):
             logger.info(f"🔄 FAILOVER: Trying next channel (#{attempt_num + 1})")
