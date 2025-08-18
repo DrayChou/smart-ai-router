@@ -12,14 +12,14 @@ from core.utils.smart_cache import close_global_cache
 from core.utils.token_counter import TokenCounter, get_cost_tracker
 from core.handlers.chat_handler import ChatCompletionHandler, ChatCompletionRequest
 from core.exceptions import RouterException, ErrorHandler
-from core.auth import AuthenticationMiddleware
+from core.auth import AuthenticationMiddleware, initialize_admin_auth, get_admin_auth_dependency
 
 import time
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 import uvicorn
 import sys
 import argparse
@@ -98,6 +98,10 @@ def create_app() -> FastAPI:
     async def startup_event() -> None:
         """应用启动事件"""
         try:
+            # 初始化Admin认证
+            initialize_admin_auth(config_loader)
+            logger.info("🔐 Admin authentication initialized")
+            
             tasks_config = config_loader.get_tasks_config()
             await initialize_background_tasks(tasks_config, config_loader)
             logger.info("🚀 Background tasks initialized successfully")
@@ -196,6 +200,222 @@ def create_app() -> FastAPI:
             logger.error(f"Unexpected error in chat completions: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=str(e))
 
+    @app.post("/v1/admin/routing/strategy")
+    async def set_routing_strategy(strategy_data: Dict[str, Any], auth: bool = Depends(get_admin_auth_dependency)):
+        """动态设置路由策略"""
+        try:
+            strategy_name = strategy_data.get("strategy")
+            if not strategy_name:
+                raise HTTPException(status_code=400, detail="Missing 'strategy' field")
+            
+            # 验证策略是否有效
+            valid_strategies = ["cost_first", "free_first", "local_first", "balanced", "speed_optimized", "quality_optimized"]
+            if strategy_name not in valid_strategies:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Invalid strategy '{strategy_name}'. Valid options: {valid_strategies}"
+                )
+            
+            # 动态更新路由策略
+            if hasattr(config_loader.config, 'routing'):
+                config_loader.config.routing.default_strategy = strategy_name
+            else:
+                # 如果没有routing配置，创建一个基本的
+                from core.config_models import Routing
+                config_loader.config.routing = Routing(default_strategy=strategy_name)
+            
+            # 清除路由器缓存以使新策略生效
+            router.clear_cache()
+            
+            logger.info(f"🔄 STRATEGY CHANGE: Routing strategy changed to '{strategy_name}'")
+            
+            return {
+                "status": "success",
+                "message": f"Routing strategy changed to '{strategy_name}'",
+                "previous_strategy": strategy_data.get("previous_strategy"),
+                "new_strategy": strategy_name,
+                "available_strategies": valid_strategies
+            }
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to change routing strategy: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/v1/admin/routing/strategy")
+    async def get_routing_strategy(auth: bool = Depends(get_admin_auth_dependency)):
+        """获取当前路由策略"""
+        try:
+            current_strategy = "cost_first"  # 默认值
+            
+            if hasattr(config_loader.config, 'routing') and hasattr(config_loader.config.routing, 'default_strategy'):
+                current_strategy = config_loader.config.routing.default_strategy
+            
+            available_strategies = ["cost_first", "free_first", "local_first", "balanced", "speed_optimized", "quality_optimized"]
+            
+            return {
+                "current_strategy": current_strategy,
+                "available_strategies": available_strategies,
+                "strategy_descriptions": {
+                    "cost_first": "成本优先 - 最低成本的模型",
+                    "free_first": "免费优先 - 优先使用免费模型",
+                    "local_first": "本地优先 - 优先使用本地模型",
+                    "balanced": "平衡策略 - 成本、速度、质量平衡",
+                    "speed_optimized": "速度优先 - 最快响应的模型",
+                    "quality_optimized": "质量优先 - 最高质量的模型"
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to get routing strategy: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/v1/admin/cost/optimize")
+    async def get_cost_optimization_suggestions(auth: bool = Depends(get_admin_auth_dependency)):
+        """获取成本优化建议"""
+        try:
+            cost_tracker = get_cost_tracker()
+            session_summary = cost_tracker.get_session_summary()
+            
+            current_strategy = "cost_first"
+            if hasattr(config_loader.config, 'routing') and hasattr(config_loader.config.routing, 'default_strategy'):
+                current_strategy = config_loader.config.routing.default_strategy
+            
+            suggestions = []
+            
+            # 基于当前策略给出建议
+            if current_strategy != "free_first":
+                suggestions.append({
+                    "type": "strategy_change",
+                    "priority": "high",
+                    "title": "切换到免费优先策略",
+                    "description": "使用 'free_first' 策略可以最大化免费资源的使用",
+                    "action": "POST /v1/admin/routing/strategy",
+                    "data": {"strategy": "free_first"},
+                    "estimated_savings": "60-90%"
+                })
+            
+            if current_strategy != "local_first":
+                suggestions.append({
+                    "type": "strategy_change", 
+                    "priority": "medium",
+                    "title": "考虑本地优先策略",
+                    "description": "使用 'local_first' 策略可以减少网络请求成本",
+                    "action": "POST /v1/admin/routing/strategy",
+                    "data": {"strategy": "local_first"},
+                    "estimated_savings": "30-70%"
+                })
+            
+            # 基于请求量给出建议
+            total_requests = session_summary.get('total_requests', 0)
+            if total_requests > 100:
+                suggestions.append({
+                    "type": "usage_optimization",
+                    "priority": "medium",
+                    "title": "考虑批量处理",
+                    "description": f"您已发送 {total_requests} 个请求，考虑批量处理以减少API调用次数",
+                    "estimated_savings": "20-40%"
+                })
+            
+            # 基于成本给出建议
+            total_cost = session_summary.get('total_cost', 0.0)
+            if total_cost > 1.0:  # 超过$1
+                suggestions.append({
+                    "type": "cost_alert",
+                    "priority": "high", 
+                    "title": "成本预警",
+                    "description": f"会话成本已达到 {session_summary.get('formatted_total_cost', '$0.00')}，建议检查策略设置",
+                    "estimated_savings": "可能节省 40-80%"
+                })
+            
+            return {
+                "current_session": session_summary,
+                "current_strategy": current_strategy,
+                "suggestions": suggestions,
+                "available_cost_strategies": ["free_first", "cost_first", "local_first"],
+                "optimization_tips": [
+                    "使用 'tag:free' 直接请求免费模型",
+                    "使用 'tag:local' 直接请求本地模型", 
+                    "批量处理多个请求以减少开销",
+                    "定期监控成本趋势"
+                ]
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to get cost optimization suggestions: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    # --- SiliconFlow管理API ---
+    
+    @app.post("/v1/admin/siliconflow/pricing/refresh")
+    async def refresh_siliconflow_pricing(request: Dict[str, Any], auth: bool = Depends(get_admin_auth_dependency)):
+        """手动刷新SiliconFlow定价信息"""
+        try:
+            from core.scheduler.tasks.siliconflow_pricing import run_siliconflow_pricing_update
+            
+            force = request.get("force", False)
+            logger.info(f"开始手动刷新SiliconFlow定价 (force={force})")
+            
+            # 执行定价抓取
+            result = await run_siliconflow_pricing_update(force=force)
+            
+            return {
+                "success": True,
+                "message": "SiliconFlow定价刷新完成",
+                "data": result
+            }
+            
+        except Exception as e:
+            logger.error(f"SiliconFlow定价刷新失败: {e}")
+            raise HTTPException(status_code=500, detail=f"定价刷新失败: {str(e)}")
+    
+    @app.get("/v1/admin/siliconflow/pricing/status")
+    async def get_siliconflow_pricing_status(auth: bool = Depends(get_admin_auth_dependency)):
+        """获取SiliconFlow定价状态"""
+        try:
+            from core.scheduler.tasks.siliconflow_pricing import get_siliconflow_pricing_task
+            
+            pricing_task = get_siliconflow_pricing_task()
+            stats = pricing_task.get_pricing_stats()
+            
+            return {
+                "success": True,
+                "data": {
+                    "pricing_stats": stats,
+                    "cache_status": {
+                        "total_models": len(pricing_task.cached_pricing),
+                        "last_update": pricing_task.last_update.isoformat() if pricing_task.last_update else None,
+                        "needs_update": pricing_task.should_update_pricing()
+                    }
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"获取SiliconFlow定价状态失败: {e}")
+            raise HTTPException(status_code=500, detail=f"获取状态失败: {str(e)}")
+    
+    @app.get("/v1/admin/siliconflow/pricing/models")
+    async def get_siliconflow_pricing_models(auth: bool = Depends(get_admin_auth_dependency)):
+        """获取所有SiliconFlow模型的定价信息"""
+        try:
+            from core.scheduler.tasks.siliconflow_pricing import get_siliconflow_pricing_task
+            
+            pricing_task = get_siliconflow_pricing_task()
+            all_pricing = pricing_task.get_all_pricing()
+            
+            return {
+                "success": True,
+                "data": {
+                    "total_models": len(all_pricing),
+                    "models": all_pricing
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"获取SiliconFlow模型定价失败: {e}")
+            raise HTTPException(status_code=500, detail=f"获取模型定价失败: {str(e)}")
+
     return app
 
 # --- 辅助函数 ---
@@ -207,18 +427,43 @@ def _display_startup_info(config_loader: YAMLConfigLoader, router: JSONRouter) -
         available_models = router.get_available_models()
         model_cache = config_loader.get_model_cache()
         
+        # 统计渠道信息
         total_channels = len(config_loader.config.channels) if hasattr(config_loader.config, 'channels') else 0
+        enabled_channels = sum(1 for ch in config_loader.config.channels if ch.enabled) if hasattr(config_loader.config, 'channels') else 0
+        
+        # 统计模型信息
         total_cached_models = sum(len(data.get("models", [])) for data in (model_cache or {}).values())
         
-        logger.info("=" * 60)
-        logger.info("🤖 Smart AI Router - Architecture Refactored")
-        logger.info("=" * 60)
+        # 统计标签信息
+        tag_models = [m for m in available_models if m.startswith("tag:")]
+        physical_models = [m for m in available_models if not m.startswith("tag:")]
+        unique_tags = set()
+        for tag_model in tag_models:
+            if tag_model.startswith("tag:"):
+                tag_name = tag_model[4:]  # 去掉 "tag:" 前缀
+                unique_tags.add(tag_name)
+        
+        # 认证状态
+        auth_config = config_loader.config.auth
+        auth_status = "🔐 Enabled" if auth_config.enabled else "🔓 Disabled"
+        
+        # 路由策略
+        routing_config = getattr(config_loader.config, 'routing', None)
+        default_strategy = getattr(routing_config, 'default_strategy', 'cost_first') if routing_config else 'cost_first'
+        
+        logger.info("=" * 65)
+        logger.info("🤖 Smart AI Router - Phase 7 Cost Optimization")
+        logger.info("=" * 65)
         logger.info(f"📊 System Status:")
-        logger.info(f"   • Total Channels: {total_channels}")
-        logger.info(f"   • Configured Models: {len(available_models)}")
+        logger.info(f"   • Total Channels: {total_channels} ({enabled_channels} enabled)")
+        logger.info(f"   • Physical Models: {len(physical_models)}")
+        logger.info(f"   • Available Tags: {len(unique_tags)} (tag:* queries supported)")
         logger.info(f"   • Cached Models: {total_cached_models}")
-        logger.info(f"   • Architecture: Modular & Type-Safe")
-        logger.info("=" * 60)
+        logger.info(f"   • Authentication: {auth_status}")
+        logger.info(f"   • Default Strategy: {default_strategy}")
+        logger.info("=" * 65)
+        logger.info("🏷️  Tag-Based Routing: Use 'tag:free', 'tag:gpt', 'tag:local', etc.")
+        logger.info("💰 Cost Optimization: Intelligent routing for minimal costs")
         logger.info("🚀 Ready to serve intelligent routing requests!")
         
     except Exception as e:

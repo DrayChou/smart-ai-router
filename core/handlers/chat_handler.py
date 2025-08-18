@@ -18,6 +18,7 @@ from ..json_router import JSONRouter, RoutingRequest, TagNotFoundError, RoutingS
 from ..yaml_config import YAMLConfigLoader
 from ..utils.http_client_pool import get_http_pool
 from ..utils.smart_cache import cache_get, cache_set
+from ..utils.token_counter import get_cost_tracker
 
 logger = logging.getLogger(__name__)
 
@@ -214,9 +215,12 @@ class ChatCompletionHandler:
         logger.info(f"✅ RESPONSE: Model used -> {response_json.get('model', 'unknown')}")
         logger.info(f"✅ RESPONSE: Usage -> {response_json.get('usage', {})}")
         
+        # 计算并添加成本信息
+        enhanced_response = self._add_cost_information(response_json, channel_info.channel, routing_score)
+        
         debug_headers = self._create_debug_headers(channel_info, routing_score, attempt_num, "regular", latency)
         
-        return JSONResponse(content=response_json, headers=debug_headers)
+        return JSONResponse(content=enhanced_response, headers=debug_headers)
     
     def _prepare_channel_request_info(self, channel, provider, request: Optional[ChatCompletionRequest], matched_model: Optional[str]) -> ChannelRequestInfo:
         """准备渠道请求信息"""
@@ -464,3 +468,145 @@ class ChatCompletionHandler:
             logger.error(f"🌊 STREAM EXCEPTION: Streaming request for channel '{channel_id}' failed: {e}", exc_info=True)
             self.router.update_channel_health(channel_id, False)
             yield f"data: {json.dumps({'error': {'message': str(e), 'code': 500}})}\n\n"
+
+    def _add_cost_information(self, response_json: dict, channel, routing_score: RoutingScore) -> dict:
+        """为响应添加实时成本信息"""
+        try:
+            # 获取usage信息
+            usage = response_json.get('usage', {})
+            if not usage:
+                logger.warning("No usage information in response, cannot calculate cost")
+                return response_json
+            
+            prompt_tokens = usage.get('prompt_tokens', 0)
+            completion_tokens = usage.get('completion_tokens', 0)
+            total_tokens = usage.get('total_tokens', prompt_tokens + completion_tokens)
+            
+            # 计算成本
+            model_used = response_json.get('model', 'unknown')
+            cost_info = self._calculate_request_cost(channel, prompt_tokens, completion_tokens, model_used)
+            
+            # 获取成本追踪器进行记录
+            cost_tracker = get_cost_tracker()
+            cost_tracker.add_request_cost(
+                cost=cost_info['total_cost'],
+                model=response_json.get('model', 'unknown'),
+                channel_id=channel.id,
+                tokens={
+                    'prompt_tokens': prompt_tokens,
+                    'completion_tokens': completion_tokens,
+                    'total_tokens': total_tokens
+                }
+            )
+            
+            # 获取会话统计
+            session_summary = cost_tracker.get_session_summary()
+            
+            # 创建增强的响应
+            enhanced_response = response_json.copy()
+            
+            # 添加成本信息到usage部分
+            enhanced_usage = usage.copy()
+            enhanced_usage.update({
+                'cost_breakdown': cost_info,
+                'session_cost': session_summary.get('formatted_total_cost', '$0.00'),
+                'session_requests': session_summary.get('total_requests', 0)
+            })
+            enhanced_response['usage'] = enhanced_usage
+            
+            # 添加路由信息
+            enhanced_response['smart_router'] = {
+                'channel_used': channel.name,
+                'channel_id': channel.id,
+                'routing_score': round(routing_score.total_score, 3),
+                'cost_score': round(routing_score.cost_score, 3),
+                'speed_score': round(routing_score.speed_score, 3),
+                'provider': channel.provider
+            }
+            
+            logger.info(f"💰 COST: Request cost ${cost_info['total_cost']:.6f} | Session total: {session_summary.get('formatted_total_cost', '$0.00')}")
+            
+            return enhanced_response
+            
+        except Exception as e:
+            logger.error(f"Failed to add cost information: {e}")
+            return response_json
+
+    def _calculate_request_cost(self, channel, prompt_tokens: int, completion_tokens: int, model_name: str = None) -> dict:
+        """计算单次请求的成本 - 优先使用模型级别定价信息"""
+        input_cost_per_token = 0.0
+        output_cost_per_token = 0.0
+        
+        # 🔥 优先使用模型级别的定价信息（从缓存中获取）
+        if model_name:
+            try:
+                # 导入配置加载器来访问模型缓存
+                from core.yaml_config import ConfigLoader
+                config_loader = ConfigLoader()
+                
+                model_cache = config_loader.get_model_cache()
+                if channel.id in model_cache:
+                    discovered_info = model_cache[channel.id]
+                    if isinstance(discovered_info, dict) and 'models_data' in discovered_info:
+                        models_data = discovered_info['models_data']
+                        if model_name in models_data:
+                            model_data = models_data[model_name]
+                            if 'raw_data' in model_data and 'pricing' in model_data['raw_data']:
+                                pricing = model_data['raw_data']['pricing']
+                                prompt_cost = float(pricing.get('prompt', '0'))
+                                completion_cost = float(pricing.get('completion', '0'))
+                                if prompt_cost == 0.0 and completion_cost == 0.0:
+                                    logger.debug(f"COST: Using model-level free pricing for '{model_name}' (prompt={prompt_cost}, completion={completion_cost})")
+                                    input_cost_per_token = 0.0
+                                    output_cost_per_token = 0.0
+                                else:
+                                    # 模型有明确的收费定价
+                                    logger.debug(f"COST: Using model-level pricing for '{model_name}' (prompt={prompt_cost}, completion={completion_cost})")
+                                    input_cost_per_token = prompt_cost
+                                    output_cost_per_token = completion_cost
+                            else:
+                                logger.debug(f"COST: No model-level pricing found for '{model_name}', falling back to channel pricing")
+                        else:
+                            logger.debug(f"COST: Model '{model_name}' not found in cache for channel '{channel.id}'")
+                    else:
+                        logger.debug(f"COST: Invalid cache structure for channel '{channel.id}'")
+            except Exception as e:
+                logger.warning(f"COST: Error accessing model pricing for '{model_name}': {e}")
+        
+        # 🔥 如果没有找到模型级别定价，使用渠道级别配置
+        if input_cost_per_token == 0.0 and output_cost_per_token == 0.0:
+            # 检查是否是明确的免费模型（:free 后缀）
+            if model_name and (":free" in model_name.lower() or "-free" in model_name.lower()):
+                logger.debug(f"COST: Model '{model_name}' has explicit :free suffix, using zero cost")
+                input_cost_per_token = 0.0
+                output_cost_per_token = 0.0
+            # 使用渠道级别定价
+            elif hasattr(channel, 'cost_per_token') and channel.cost_per_token:
+                input_cost_per_token = channel.cost_per_token.get('input', 0.0)
+                output_cost_per_token = channel.cost_per_token.get('output', 0.0)
+                logger.debug(f"COST: Using channel cost_per_token (input={input_cost_per_token}, output={output_cost_per_token})")
+            # 回退到pricing配置
+            elif hasattr(channel, 'pricing') and channel.pricing:
+                input_cost_per_token = channel.pricing.get('input_cost_per_1k', 0.001) / 1000
+                output_cost_per_token = channel.pricing.get('output_cost_per_1k', 0.002) / 1000
+                logger.debug(f"COST: Using channel pricing (input={input_cost_per_token}, output={output_cost_per_token})")
+            else:
+                # 默认估算值
+                input_cost_per_token = 0.0000005  # $0.0005 per 1K tokens
+                output_cost_per_token = 0.0000015  # $0.0015 per 1K tokens
+                logger.debug(f"COST: Using default pricing (input={input_cost_per_token}, output={output_cost_per_token})")
+        
+        input_cost = prompt_tokens * input_cost_per_token
+        output_cost = completion_tokens * output_cost_per_token
+        total_cost = input_cost + output_cost
+        
+        return {
+            'input_tokens': prompt_tokens,
+            'output_tokens': completion_tokens,
+            'input_cost_per_token': input_cost_per_token,
+            'output_cost_per_token': output_cost_per_token,
+            'input_cost': round(input_cost, 8),
+            'output_cost': round(output_cost, 8),
+            'total_cost': round(total_cost, 8),
+            'currency': 'USD'
+        }
