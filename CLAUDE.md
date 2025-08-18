@@ -116,7 +116,7 @@ docker build -t smart-ai-router .
 Smart AI Router 现在使用**基于模型名称的自动标签化系统**，完全替代了传统的 Model Groups 概念。
 
 ### 标签提取机制
-系统会自动从模型名称中提取标签，使用多种分隔符进行拆分：`:`, `/`, `@`, `-`, `_`
+系统会自动从模型名称中提取标签，使用多种分隔符进行拆分：`:`, `/`, `@`, `-`, `_`, `,`
 
 **示例**:
 ```
@@ -124,6 +124,7 @@ qwen/qwen3-30b-a3b:free -> ["qwen", "qwen3", "30b", "a3b", "free"]
 openai/gpt-4o-mini -> ["openai", "gpt", "4o", "mini"]  
 anthropic/claude-3-haiku:free -> ["anthropic", "claude", "3", "haiku", "free"]
 moonshot-v1-128k -> ["moonshot", "v1", "128k"]
+free,gemma,270m -> ["free", "gemma", "270m"]
 ```
 
 ### 标签查询方式
@@ -182,11 +183,17 @@ curl -X POST http://localhost:7601/v1/chat/completions \
 - **Smart recovery**: Automatic re-enabling after cooldown periods
 
 ### Cost Optimization Features
-- **Dynamic pricing policies**: 动态价格策略 (时间段、配额使用率、需求调整)
-- **Multi-layer budget controls**: 多层预算控制 (Model Group、Channel、User等)
-- **Real-time cost calculation**: 实时成本计算 (考虑平台倍率和汇率)
-- **Intelligent channel selection**: 智能渠道选择 (基于effective_cost和多因子评分)
-- **Comprehensive cost tracking**: 详细成本追踪和趋势分析
+- **智能模型分析**: 自动提取模型参数数量(270m-670b)和上下文长度(2k-2m)，基于三层优先级智能评分
+- **可配置排序策略**: 支持cost_first、balanced、speed_optimized、quality_optimized四种路由策略
+- **模型过滤器**: 支持最小参数量、最小上下文长度、排除embedding模型等过滤条件
+- **渠道分离缓存**: 每个渠道独立缓存模型分析结果，便于调试和管理
+
+### Planned Cost Optimization (Phase 7)
+- **免费资源最大化**: 免费优先路由策略、配额监控、API密钥轮换机制
+- **本地模型优先**: 本地优先模式、能力检测、集群负载均衡
+- **智能成本控制**: 实时成本追踪、Token预估、成本感知路由
+- **使用体验优化**: 成本透明化、使用建议、个性化配置助手
+- **预期收益**: 预计可节省70-90%的API费用，最大化利用免费额度和本地资源
 
 ## Database & Dependencies
 
@@ -224,21 +231,30 @@ curl -X POST http://localhost:7601/v1/chat/completions \
 
 ## Development Status
 
-Current implementation status:
+Current implementation status (Phase 1-6 完成):
 - ✅ Project structure and FastAPI setup
 - ✅ 基于Pydantic的配置系统架构
 - ✅ **智能标签化路由系统** (Tag-Based Routing)
+- ✅ **智能模型分析与排序系统** (智能参数提取、可配置策略、模型过滤器)
+- ✅ **渠道分离缓存架构** (每个渠道独立缓存，包含模型分析结果)
 - ✅ 模型发现和缓存系统
 - ✅ **API密钥验证和自动失效检测系统**
 - ✅ 定时任务系统 (模型发现、API密钥验证、健康检查等)
-- ✅ 多层路由引擎 (成本、速度、质量、可靠性评分)
+- ✅ 多层路由引擎 (成本、参数数量、上下文长度、速度评分)
 - ✅ Provider适配器架构
 - ✅ 实时健康监控和统计
 - ✅ Docker配置和部署支持
 - ✅ 完整的错误处理和故障转移机制
-- ⏳ Web管理界面 (用于动态配置管理)
-- ⏳ 高级成本控制和预算管理
-- ⏳ 数据库集成 (当前使用文件系统)
+
+Planned for Phase 7 (个人使用成本优化):
+- 🎯 **免费资源最大化**: 免费优先路由策略、配额监控、API密钥轮换
+- 🎯 **本地模型优先**: 本地优先模式、能力检测、集群负载均衡
+- 🎯 **智能成本控制**: 实时成本追踪、Token预估、成本感知路由
+- 🎯 **使用体验优化**: 成本透明化、使用建议、个性化配置
+
+Future considerations:
+- 📱 Web管理界面 (用于动态配置管理)
+- 🗃️ 数据库集成 (当前使用高效的YAML+文件系统)
 
 ## Testing Philosophy
 
