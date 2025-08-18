@@ -69,6 +69,10 @@ class Server(BaseModel):
     request_timeout: int = 300
     max_request_size: int = 10485760
 
+class Auth(BaseModel):
+    enabled: bool = False
+    api_token: Optional[str] = None
+
 class System(BaseModel):
     name: str = "Smart AI Router"
     version: str = "0.3.0" # Bump version for this change
@@ -77,6 +81,7 @@ class System(BaseModel):
 class Config(BaseModel):
     system: System = Field(default_factory=System)
     server: Server = Field(default_factory=Server)
+    auth: Auth = Field(default_factory=Auth)
     providers: Dict[str, Provider]
     channels: List[Channel]
     routing: Routing = Field(default_factory=Routing)

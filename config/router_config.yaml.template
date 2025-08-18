@@ -22,6 +22,14 @@ server:
   max_request_size: 10485760
 
 # ============================================
+# API认证配置
+# ============================================
+auth:
+  enabled: false  # 是否启用API Token验证
+  # api_token: "your-secret-token-here"  # 取消注释并设置你的Token
+  # 如果不配置api_token，系统会自动生成一个随机Token
+
+# ============================================
 # Provider 配置
 # ============================================
 providers:
@@ -320,10 +328,20 @@ tasks:
 # 使用说明
 # ============================================
 # 1. 复制此文件为 config/router_config.yaml
-# 2. 将所有 "YOUR_*_API_KEY_HERE" 替换为真实API密钥
-# 3. 将需要启用的渠道 enabled 改为 true
-# 4. 运行: python main.py
-# 5. 访问: http://localhost:7601/docs 查看API文档
-# 6. 测试: curl -X POST http://localhost:7601/v1/chat/completions \
-#          -H "Content-Type: application/json" \
-#          -d '{"model":"auto:fast","messages":[{"role":"user","content":"Hello!"}]}'
+# 2. 配置认证（可选但推荐）:
+#    - 启用认证: 设置 auth.enabled: true
+#    - 自定义Token: 取消注释 api_token 行并设置你的Token
+#    - 自动生成: 留空 api_token，系统会自动生成并保存
+# 3. 将所有 "YOUR_*_API_KEY_HERE" 替换为真实API密钥
+# 4. 将需要启用的渠道 enabled 改为 true
+# 5. 运行: python main.py
+# 6. 访问: http://localhost:7601/docs 查看API文档
+# 7. 测试（无认证）: 
+#    curl -X POST http://localhost:7601/v1/chat/completions \
+#    -H "Content-Type: application/json" \
+#    -d '{"model":"tag:free","messages":[{"role":"user","content":"Hello!"}]}'
+# 8. 测试（启用认证）:
+#    curl -X POST http://localhost:7601/v1/chat/completions \
+#    -H "Authorization: Bearer sar-your-token-here" \
+#    -H "Content-Type: application/json" \
+#    -d '{"model":"tag:free","messages":[{"role":"user","content":"Hello!"}]}'

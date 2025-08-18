@@ -10,6 +10,7 @@ from datetime import datetime
 import logging
 
 from .config_models import Config, Channel, Provider
+from .auth.token_generator import generate_random_token
 
 logger = logging.getLogger(__name__)
 
@@ -67,12 +68,60 @@ class YAMLConfigLoader:
             with open(self.config_path, 'r', encoding='utf-8') as f:
                 raw_data = yaml.safe_load(f) or {}
             
+            # 检查Token配置并自动生成
+            config_modified = self._ensure_auth_token(raw_data)
+            
             # 使用Pydantic进行验证和解析
             config = Config.parse_obj(raw_data)
+            
+            # 如果配置被修改，保存回文件
+            if config_modified:
+                self._save_config_to_file(raw_data)
+                
             return config
             
         except Exception as e:
             logger.error(f"Failed to load config from {self.config_path}: {e}")
+            raise
+
+    def _ensure_auth_token(self, config_data: Dict[str, Any]) -> bool:
+        """
+        确保认证配置中有Token，如果启用认证但没有Token则自动生成
+        
+        Returns:
+            bool: 如果配置被修改则返回True
+        """
+        auth_config = config_data.get('auth', {})
+        
+        # 如果认证启用但没有api_token，自动生成
+        if auth_config.get('enabled', False) and not auth_config.get('api_token'):
+            new_token = generate_random_token()
+            auth_config['api_token'] = new_token
+            config_data['auth'] = auth_config
+            
+            logger.info(f"Auto-generated API token for authentication: {new_token}")
+            logger.warning("Please save this token! You will need it to access the API.")
+            
+            return True
+            
+        return False
+
+    def _save_config_to_file(self, config_data: Dict[str, Any]) -> None:
+        """
+        保存配置数据到文件
+        """
+        try:
+            with open(self.config_path, 'w', encoding='utf-8') as f:
+                yaml.dump(
+                    config_data,
+                    f,
+                    default_flow_style=False,
+                    allow_unicode=True,
+                    indent=2
+                )
+            logger.info(f"Configuration updated and saved to {self.config_path}")
+        except Exception as e:
+            logger.error(f"Failed to save config to {self.config_path}: {e}")
             raise
 
     def _load_model_cache_from_disk(self):

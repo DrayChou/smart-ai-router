@@ -52,8 +52,16 @@ cp config/router_config.yaml.template config/router_config.yaml
 vim config/router_config.yaml
 ```
 
-在 `router_config.yaml` 文件中替换API密钥并启用渠道：
+在 `router_config.yaml` 文件中配置API密钥和认证：
+
+#### 基础配置
 ```yaml
+# API认证配置 (可选)
+auth:
+  enabled: true  # 启用Token认证，个人使用建议开启
+  # api_token: "your-secret-token"  # 可选：自定义Token，留空将自动生成
+
+# 渠道配置
 channels:
   - id: "groq_llama3_8b"
     name: "Groq Llama3.1 8B"
@@ -62,6 +70,12 @@ channels:
     api_key: "你的_GROQ_API_密钥"  # 替换这里
     enabled: true  # 改为 true
 ```
+
+#### Token认证说明
+- **启用认证**: 设置 `auth.enabled: true` 
+- **自动生成**: 如果不配置 `api_token`，系统会自动生成并保存到配置文件
+- **手动设置**: 也可以手动设置自定义Token
+- **使用Token**: 请求时在 `Authorization` 头中包含Token
 
 ### 3. 启动服务
 
@@ -96,6 +110,8 @@ Docker部署会自动：
 - 管理数据持久化
 
 ### 4. 测试API
+
+#### 无认证模式（auth.enabled: false）
 ```bash
 # 健康检查
 curl http://127.0.0.1:7601/health
@@ -104,10 +120,33 @@ curl http://127.0.0.1:7601/health
 curl -X POST http://127.0.0.1:7601/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "auto:fast",
+    "model": "tag:free",
     "messages": [{"role": "user", "content": "Hello!"}]
   }'
 ```
+
+#### 启用认证模式（auth.enabled: true）
+```bash
+# 使用Bearer Token格式
+curl -X POST http://127.0.0.1:7601/v1/chat/completions \
+  -H "Authorization: Bearer sar-your-generated-token-here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "tag:free",
+    "messages": [{"role": "user", "content": "Hello!"}]
+  }'
+
+# 或直接使用Token
+curl -X POST http://127.0.0.1:7601/v1/chat/completions \
+  -H "Authorization: sar-your-generated-token-here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "tag:free", 
+    "messages": [{"role": "user", "content": "Hello!"}]
+  }'
+```
+
+**注意**: 启动服务时，如果启用了认证但未配置Token，系统会自动生成Token并显示在日志中，请保存此Token！
 
 ## 🎯 推荐Provider
 

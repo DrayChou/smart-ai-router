@@ -12,6 +12,7 @@ from core.utils.smart_cache import close_global_cache
 from core.utils.token_counter import TokenCounter, get_cost_tracker
 from core.handlers.chat_handler import ChatCompletionHandler, ChatCompletionRequest
 from core.exceptions import RouterException, ErrorHandler
+from core.auth import AuthenticationMiddleware
 
 import time
 from typing import List, Dict, Any, Optional
@@ -67,6 +68,18 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
     )
 
+    # 添加认证中间件
+    auth_config = config_loader.config.auth
+    if auth_config.enabled:
+        app.add_middleware(
+            AuthenticationMiddleware,
+            enabled=auth_config.enabled,
+            api_token=auth_config.api_token
+        )
+        logger.info(f"🔐 Authentication middleware enabled")
+    else:
+        logger.info("🔓 Authentication middleware disabled")
+    
     # 添加CORS中间件
     app.add_middleware(
         CORSMiddleware,
