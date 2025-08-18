@@ -207,13 +207,17 @@ class JSONRouter:
         filtered = []
         
         # 获取路由配置中的过滤条件
-        routing_config = self.config.routing if hasattr(self.config, 'routing') else {}
-        model_filters = routing_config.get('model_filters', {})
+        routing_config = self.config.routing if hasattr(self.config, 'routing') else None
+        if routing_config and hasattr(routing_config, 'model_filters'):
+            model_filters = routing_config.model_filters or {}
+        else:
+            model_filters = {}
         
-        min_context_length = model_filters.get('min_context_length', 0)
-        min_parameter_count = model_filters.get('min_parameter_count', 0)
-        exclude_embedding = model_filters.get('exclude_embedding_models', True)
-        exclude_vision_only = model_filters.get('exclude_vision_only_models', True)
+        # 安全获取model_filters中的值
+        min_context_length = getattr(model_filters, 'min_context_length', 0) if hasattr(model_filters, 'min_context_length') else model_filters.get('min_context_length', 0) if isinstance(model_filters, dict) else 0
+        min_parameter_count = getattr(model_filters, 'min_parameter_count', 0) if hasattr(model_filters, 'min_parameter_count') else model_filters.get('min_parameter_count', 0) if isinstance(model_filters, dict) else 0
+        exclude_embedding = getattr(model_filters, 'exclude_embedding_models', True) if hasattr(model_filters, 'exclude_embedding_models') else model_filters.get('exclude_embedding_models', True) if isinstance(model_filters, dict) else True
+        exclude_vision_only = getattr(model_filters, 'exclude_vision_only_models', True) if hasattr(model_filters, 'exclude_vision_only_models') else model_filters.get('exclude_vision_only_models', True) if isinstance(model_filters, dict) else True
         
         for candidate in channels:
             channel = candidate.channel
@@ -282,10 +286,12 @@ class JSONRouter:
             reliability_score = self._calculate_reliability_score(channel)
             parameter_score = self._calculate_parameter_score(channel, candidate.matched_model)
             context_score = self._calculate_context_score(channel, candidate.matched_model)
+            free_score = self._calculate_free_score(channel, candidate.matched_model)
+            local_score = self._calculate_local_score(channel, candidate.matched_model)
             
             total_score = self._calculate_total_score(
                 strategy, cost_score, speed_score, quality_score, reliability_score, 
-                parameter_score, context_score
+                parameter_score, context_score, free_score, local_score
             )
             
             # 为了减少日志冗余，只显示模型名称和总分
@@ -310,11 +316,17 @@ class JSONRouter:
     
     def _get_routing_strategy(self, model: str) -> List[Dict[str, Any]]:
         """获取并解析路由策略，始终返回规则列表"""
-        routing_config = self.config.routing if hasattr(self.config, 'routing') else {}
-        strategy_name = routing_config.get('default_strategy', 'balanced')
+        routing_config = self.config.routing if hasattr(self.config, 'routing') else None
+        if routing_config and hasattr(routing_config, 'default_strategy'):
+            strategy_name = routing_config.default_strategy or 'balanced'
+        else:
+            strategy_name = 'balanced'
         
         # 尝试从配置中获取自定义策略
-        custom_strategies = routing_config.get('sorting_strategies', {})
+        if routing_config and hasattr(routing_config, 'sorting_strategies'):
+            custom_strategies = routing_config.sorting_strategies or {}
+        else:
+            custom_strategies = {}
         if strategy_name in custom_strategies:
             return custom_strategies[strategy_name]
 
@@ -325,6 +337,18 @@ class JSONRouter:
                 {"field": "parameter_score", "order": "desc", "weight": 0.25},
                 {"field": "context_score", "order": "desc", "weight": 0.2},
                 {"field": "speed_score", "order": "desc", "weight": 0.15}
+            ],
+            "free_first": [
+                {"field": "free_score", "order": "desc", "weight": 0.5},
+                {"field": "cost_score", "order": "desc", "weight": 0.3},
+                {"field": "speed_score", "order": "desc", "weight": 0.15},
+                {"field": "reliability_score", "order": "desc", "weight": 0.05}
+            ],
+            "local_first": [
+                {"field": "local_score", "order": "desc", "weight": 0.6},
+                {"field": "speed_score", "order": "desc", "weight": 0.25},
+                {"field": "cost_score", "order": "desc", "weight": 0.1},
+                {"field": "reliability_score", "order": "desc", "weight": 0.05}
             ],
             "cost_optimized": [
                 {"field": "cost_score", "order": "desc", "weight": 0.7},
@@ -593,17 +617,157 @@ class JSONRouter:
         """计算可靠性评分"""
         health_score = self.config_loader.runtime_state.health_scores.get(channel.id, 1.0)
         return health_score
+
+    def _calculate_free_score(self, channel: Channel, model_name: str = None) -> float:
+        """计算免费优先评分 - 严格验证真正免费的渠道"""
+        free_tags = {"free", "免费", "0cost", "nocost", "trial"}
+        
+        # 🔥 优先检查模型级别的定价信息（从缓存中获取）
+        if model_name:
+            model_specs = self._get_model_specs(channel.id, model_name)
+            if model_specs and 'raw_data' in model_specs:
+                raw_data = model_specs['raw_data']
+                if 'pricing' in raw_data:
+                    pricing = raw_data['pricing']
+                    prompt_cost = float(pricing.get('prompt', '0'))
+                    completion_cost = float(pricing.get('completion', '0'))
+                    if prompt_cost == 0.0 and completion_cost == 0.0:
+                        logger.debug(f"FREE SCORE: Model '{model_name}' confirmed free via model-level pricing (prompt={prompt_cost}, completion={completion_cost})")
+                        return 1.0
+                    else:
+                        logger.debug(f"FREE SCORE: Model '{model_name}' has non-zero costs (prompt={prompt_cost}, completion={completion_cost}), not free")
+                        return 0.1
+        
+        # 🔥 检查模型名称模式 - 对于明确的免费模型后缀
+        if model_name:
+            model_lower = model_name.lower()
+            # 明确的免费模型标识
+            if (":free" in model_lower or 
+                "-free" in model_lower or 
+                "_free" in model_lower):
+                logger.debug(f"FREE SCORE: Model '{model_name}' has explicit :free suffix, assumed free")
+                return 1.0
+            
+            # 检查其他免费模型模式
+            model_tags = self._extract_tags_from_model_name(model_name)
+            model_tags_lower = [tag.lower() for tag in model_tags]
+            if any(tag in free_tags for tag in model_tags_lower):
+                # 开源模型通常免费
+                if ("oss" in model_lower or 
+                    "huggingface" in model_lower or
+                    "hf" in model_lower):
+                    logger.debug(f"FREE SCORE: Model '{model_name}' is open source model, assumed free")
+                    return 1.0
+                else:
+                    # 模型名称包含free但需要进一步验证
+                    logger.debug(f"FREE SCORE: Model '{model_name}' has 'free' in name, needs verification")
+                    # 继续检查渠道级别信息
+        
+        # 🔥 检查渠道级别的定价信息
+        cost_per_token = getattr(channel, 'cost_per_token', None)
+        if cost_per_token:
+            input_cost = cost_per_token.get("input", 0.0)
+            output_cost = cost_per_token.get("output", 0.0)
+            if input_cost <= 0.0 and output_cost <= 0.0:
+                logger.debug(f"FREE SCORE: Channel '{channel.name}' confirmed free via cost_per_token (input={input_cost}, output={output_cost})")
+                return 1.0
+            # 对于有cost_per_token但非零的情况，如果模型名明确包含:free，仍认为该特定模型免费
+            elif model_name and (":free" in model_name.lower() or "-free" in model_name.lower()):
+                logger.debug(f"FREE SCORE: Channel '{channel.name}' has costs but model '{model_name}' explicitly marked as free")
+                return 1.0
+            else:
+                # 渠道有成本且模型未明确标记为免费
+                logger.debug(f"FREE SCORE: Channel '{channel.name}' has non-zero costs (input={input_cost}, output={output_cost}), not free")
+                return 0.1
+        
+        # 检查传统的pricing配置
+        pricing = getattr(channel, 'pricing', None)
+        if pricing:
+            input_cost = pricing.get("input_cost_per_1k", 0.001)
+            output_cost = pricing.get("output_cost_per_1k", 0.002)
+            avg_cost = (input_cost + output_cost) / 2
+            if avg_cost <= 0.0001:  # 极低成本
+                logger.debug(f"FREE SCORE: Channel '{channel.name}' very low cost (avg={avg_cost:.6f}), scored as near-free")
+                return 0.9
+            elif avg_cost <= 0.001:  # 低成本
+                logger.debug(f"FREE SCORE: Channel '{channel.name}' low cost (avg={avg_cost:.6f}), scored as affordable")
+                return 0.7
+            else:
+                # 有明确pricing且不便宜的，但如果模型明确标记为:free，仍认为免费
+                if model_name and (":free" in model_name.lower() or "-free" in model_name.lower()):
+                    logger.debug(f"FREE SCORE: Channel has costs but model '{model_name}' explicitly marked as free")
+                    return 1.0
+                else:
+                    logger.debug(f"FREE SCORE: Channel '{channel.name}' has significant costs (avg={avg_cost:.6f}), not free")
+                    return 0.1
+        
+        # 🔥 检查渠道标签
+        channel_tags_lower = [tag.lower() for tag in getattr(channel, 'tags', [])]
+        if any(tag in free_tags for tag in channel_tags_lower):
+            logger.debug(f"FREE SCORE: Channel '{channel.name}' has free tag in channel tags, assumed free")
+            return 1.0
+        
+        # 默认情况 - 没有免费证据
+        logger.debug(f"FREE SCORE: Channel '{channel.name}' no evidence of being free")
+        return 0.1
+
+    def _calculate_local_score(self, channel: Channel, model_name: str = None) -> float:
+        """计算本地优先评分"""
+        # 检查渠道标签中是否包含本地相关标签
+        local_tags = {"local", "本地", "localhost", "127.0.0.1", "offline", "edge"}
+        
+        # 从渠道标签检查
+        channel_tags_lower = [tag.lower() for tag in channel.tags]
+        if any(tag in local_tags for tag in channel_tags_lower):
+            return 1.0
+        
+        # 从模型名称提取标签检查
+        if model_name:
+            model_tags = self._extract_tags_from_model_name(model_name)
+            model_tags_lower = [tag.lower() for tag in model_tags]
+            if any(tag in local_tags for tag in model_tags_lower):
+                return 1.0
+        
+        # 检查base_url是否指向本地地址
+        base_url = getattr(channel, 'base_url', None)
+        if base_url:
+            base_url_lower = base_url.lower()
+            local_indicators = ["localhost", "127.0.0.1", "0.0.0.0", "::1"]
+            if any(indicator in base_url_lower for indicator in local_indicators):
+                return 1.0
+        
+        # 检查provider是否指向本地地址
+        provider_config = None
+        if hasattr(self.config, 'providers'):
+            provider_config = next((p for p in self.config.providers.values() if p.name == channel.provider), None)
+        
+        if provider_config and hasattr(provider_config, 'base_url'):
+            provider_url_lower = provider_config.base_url.lower()
+            local_indicators = ["localhost", "127.0.0.1", "0.0.0.0", "::1"]
+            if any(indicator in provider_url_lower for indicator in local_indicators):
+                return 1.0
+        
+        # 检查是否是常见本地模型名称
+        if model_name:
+            local_model_patterns = ["ollama", "llama.cpp", "local", "自己的", "私有"]
+            model_lower = model_name.lower()
+            if any(pattern in model_lower for pattern in local_model_patterns):
+                return 0.8
+        
+        return 0.1  # 默认较低评分
     
     def _calculate_total_score(self, strategy: List[Dict[str, Any]], 
                              cost_score: float, speed_score: float, 
                              quality_score: float, reliability_score: float,
-                             parameter_score: float = 0.5, context_score: float = 0.5) -> float:
+                             parameter_score: float = 0.5, context_score: float = 0.5,
+                             free_score: float = 0.1, local_score: float = 0.1) -> float:
         """根据策略计算总评分"""
         total_score = 0.0
         score_map = {
             "cost_score": cost_score, "speed_score": speed_score,
             "quality_score": quality_score, "reliability_score": reliability_score,
-            "parameter_score": parameter_score, "context_score": context_score
+            "parameter_score": parameter_score, "context_score": context_score,
+            "free_score": free_score, "local_score": local_score
         }
         
         total_weight = sum(rule.get("weight", 0.0) for rule in strategy)
@@ -742,9 +906,13 @@ class JSONRouter:
         1. 首先检查渠道级别的标签 (channel.tags)
         2. 如果渠道标签匹配，该渠道下所有模型都被视为匹配
         3. 否则检查从模型名称提取的标签
+        4. 对于 'free' 标签，需要严格验证渠道是否真的免费
         """
         candidate_channels = []
         matched_models = []
+        
+        # 检查是否包含free标签 - 需要严格验证
+        has_free_tag = any(tag.lower() in {"free", "免费", "0cost", "nocost"} for tag in tags)
         
         # 遍历所有有效渠道
         for channel in self.config_loader.get_enabled_channels():
@@ -769,14 +937,25 @@ class JSONRouter:
                 if not model_name:
                     continue
                     
-                # 从模型名称提取标签
+                # 从模型名称提取标签（已经转为小写）
                 model_tags = self._extract_tags_from_model_name(model_name)
                 
-                # 合并渠道标签和模型标签
-                combined_tags = list(set(channel_tags + model_tags))
+                # 合并渠道标签和模型标签，并规范化为小写
+                combined_tags = list(set([tag.lower() for tag in channel_tags] + model_tags))
                 
-                # 验证所有查询标签都在合并后的标签中
-                if all(tag in combined_tags for tag in tags):
+                # 验证所有查询标签都在合并后的标签中（case-insensitive匹配）
+                normalized_query_tags = [tag.lower() for tag in tags]
+                if all(tag in combined_tags for tag in normalized_query_tags):
+                    # 🔥 严格验证 free 标签 - 确保渠道真的免费
+                    if has_free_tag:
+                        free_score = self._calculate_free_score(channel, model_name)
+                        # 只有真正免费的渠道才会被匹配 (free_score >= 0.9)
+                        if free_score < 0.9:
+                            logger.debug(f"❌ FREE TAG VALIDATION FAILED: Channel '{channel.name}' model '{model_name}' has free_score={free_score:.2f} < 0.9, not truly free")
+                            continue
+                        else:
+                            logger.debug(f"✅ FREE TAG VALIDATED: Channel '{channel.name}' model '{model_name}' confirmed as truly free (score={free_score:.2f})")
+                    
                     # 过滤掉不适合chat的模型类型
                     if self._is_suitable_for_chat(model_name):
                         candidate_channels.append(ChannelCandidate(
@@ -834,21 +1013,23 @@ class JSONRouter:
                 if not model_name:
                     continue
                     
-                # 从模型名称提取标签
+                # 从模型名称提取标签（已经转为小写）
                 model_tags = self._extract_tags_from_model_name(model_name)
                 
-                # 合并渠道标签和模型标签
-                combined_tags = list(set(channel_tags + model_tags))
+                # 合并渠道标签和模型标签，并规范化为小写
+                combined_tags = list(set([tag.lower() for tag in channel_tags] + model_tags))
                 
-                # 检查正标签：所有正标签都必须在合并后的标签中
+                # 检查正标签：所有正标签都必须在合并后的标签中（case-insensitive）
                 positive_match = True
                 if positive_tags:
-                    positive_match = all(tag in combined_tags for tag in positive_tags)
+                    normalized_positive = [tag.lower() for tag in positive_tags]
+                    positive_match = all(tag in combined_tags for tag in normalized_positive)
                 
-                # 检查负标签：任何负标签都不能在合并后的标签中
+                # 检查负标签：任何负标签都不能在合并后的标签中（case-insensitive）
                 negative_match = True
                 if negative_tags:
-                    negative_match = not any(tag in combined_tags for tag in negative_tags)
+                    normalized_negative = [tag.lower() for tag in negative_tags]
+                    negative_match = not any(tag in combined_tags for tag in normalized_negative)
                 
                 # 只有同时满足正标签和负标签条件的模型才被选中
                 if positive_match and negative_match:
