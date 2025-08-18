@@ -11,6 +11,7 @@ from .scheduler import get_scheduler, add_task, start_scheduler, stop_scheduler,
 from .tasks.model_discovery import run_model_discovery, get_model_discovery_task
 from .tasks.pricing_discovery import run_pricing_discovery, get_pricing_discovery_task
 from .tasks.service_health_check import run_health_check_task, ServiceHealthChecker
+from .tasks.siliconflow_pricing import run_siliconflow_pricing_update, get_siliconflow_pricing_task
 from ..utils.api_key_validator import run_api_key_validation_task
 
 logger = logging.getLogger(__name__)
@@ -100,7 +101,21 @@ class TaskManager:
             )
             logger.info(f"已添加缓存清理任务，间隔 {interval/3600}h")
         
-        # 5. 统计报告任务
+        # 5. SiliconFlow定价抓取任务
+        siliconflow_pricing_config = task_config.get('siliconflow_pricing', {})
+        if siliconflow_pricing_config.get('enabled', True):
+            interval = siliconflow_pricing_config.get('interval_hours', 24) * 3600  # 每天更新一次
+            run_immediately = siliconflow_pricing_config.get('run_on_startup', True)
+            
+            add_task(
+                name='siliconflow_pricing',
+                func=self._run_siliconflow_pricing_task,
+                interval_seconds=interval,
+                run_immediately=run_immediately
+            )
+            logger.info(f"已添加SiliconFlow定价任务，间隔 {interval/3600}h")
+        
+        # 6. 统计报告任务
         stats_config = task_config.get('stats_report', {})
         if stats_config.get('enabled', False):  # 默认禁用
             interval = stats_config.get('interval_hours', 12) * 3600
@@ -247,6 +262,21 @@ class TaskManager:
             
         except Exception as e:
             logger.error(f"缓存清理任务异常: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    async def _run_siliconflow_pricing_task(self):
+        """运行SiliconFlow定价抓取任务"""
+        logger.info("开始执行SiliconFlow定价抓取任务")
+        
+        try:
+            # 运行定价抓取
+            result = await run_siliconflow_pricing_update(force=False)
+            
+            logger.info(f"SiliconFlow定价任务完成: {result}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"SiliconFlow定价任务异常: {e}", exc_info=True)
             return {'success': False, 'error': str(e)}
     
     async def _run_stats_report_task(self):
