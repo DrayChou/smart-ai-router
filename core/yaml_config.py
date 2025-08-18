@@ -10,7 +10,7 @@ from datetime import datetime
 import logging
 
 from .config_models import Config, Channel, Provider
-from .auth.token_generator import generate_random_token
+from .auth import generate_secure_token as generate_random_token
 
 logger = logging.getLogger(__name__)
 

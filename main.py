@@ -76,9 +76,9 @@ def create_app() -> FastAPI:
             enabled=auth_config.enabled,
             api_token=auth_config.api_token
         )
-        logger.info(f"🔐 Authentication middleware enabled")
+        logger.info(f"[AUTH] Authentication middleware enabled")
     else:
-        logger.info("🔓 Authentication middleware disabled")
+        logger.info("[AUTH] Authentication middleware disabled")
     
     # 添加CORS中间件
     app.add_middleware(
@@ -100,33 +100,33 @@ def create_app() -> FastAPI:
         try:
             # 初始化Admin认证
             initialize_admin_auth(config_loader)
-            logger.info("🔐 Admin authentication initialized")
+            logger.info("[ADMIN] Admin authentication initialized")
             
             tasks_config = config_loader.get_tasks_config()
             await initialize_background_tasks(tasks_config, config_loader)
-            logger.info("🚀 Background tasks initialized successfully")
+            logger.info("[STARTUP] Background tasks initialized successfully")
             
             # 显示启动信息
             _display_startup_info(config_loader, router)
             
         except Exception as e:
-            logger.error(f"❌ Failed to initialize background tasks: {e}")
+            logger.error(f"[ERROR] Failed to initialize background tasks: {e}")
 
     @app.on_event("shutdown")
     async def shutdown_event() -> None:
         """应用关闭事件"""
         try:
             await stop_background_tasks()
-            logger.info("⏹️ Background tasks stopped")
+            logger.info("[TASKS] Background tasks stopped")
             
             await close_global_pool()
-            logger.info("🔌 HTTP connection pool closed")
+            logger.info("[HTTP] HTTP connection pool closed")
             
             await close_global_cache()
-            logger.info("🗄️ Smart cache closed")
+            logger.info("[CACHE] Smart cache closed")
             
         except Exception as e:
-            logger.error(f"❌ Failed to cleanup resources: {e}")
+            logger.error(f"[ERROR] Failed to cleanup resources: {e}")
 
     # --- API 路由 ---
 
@@ -227,7 +227,7 @@ def create_app() -> FastAPI:
             # 清除路由器缓存以使新策略生效
             router.clear_cache()
             
-            logger.info(f"🔄 STRATEGY CHANGE: Routing strategy changed to '{strategy_name}'")
+            logger.info(f"[STRATEGY] Routing strategy changed to '{strategy_name}'")
             
             return {
                 "status": "success",
@@ -445,16 +445,16 @@ def _display_startup_info(config_loader: YAMLConfigLoader, router: JSONRouter) -
         
         # 认证状态
         auth_config = config_loader.config.auth
-        auth_status = "🔐 Enabled" if auth_config.enabled else "🔓 Disabled"
+        auth_status = "[AUTH] Enabled" if auth_config.enabled else "[AUTH] Disabled"
         
         # 路由策略
         routing_config = getattr(config_loader.config, 'routing', None)
         default_strategy = getattr(routing_config, 'default_strategy', 'cost_first') if routing_config else 'cost_first'
         
         logger.info("=" * 65)
-        logger.info("🤖 Smart AI Router - Phase 7 Cost Optimization")
+        logger.info("[AI] Smart AI Router - Phase 7 Cost Optimization")
         logger.info("=" * 65)
-        logger.info(f"📊 System Status:")
+        logger.info("[STATUS] System Status:")
         logger.info(f"   • Total Channels: {total_channels} ({enabled_channels} enabled)")
         logger.info(f"   • Physical Models: {len(physical_models)}")
         logger.info(f"   • Available Tags: {len(unique_tags)} (tag:* queries supported)")
@@ -462,9 +462,9 @@ def _display_startup_info(config_loader: YAMLConfigLoader, router: JSONRouter) -
         logger.info(f"   • Authentication: {auth_status}")
         logger.info(f"   • Default Strategy: {default_strategy}")
         logger.info("=" * 65)
-        logger.info("🏷️  Tag-Based Routing: Use 'tag:free', 'tag:gpt', 'tag:local', etc.")
-        logger.info("💰 Cost Optimization: Intelligent routing for minimal costs")
-        logger.info("🚀 Ready to serve intelligent routing requests!")
+        logger.info("[TAGS] Tag-Based Routing: Use 'tag:free', 'tag:gpt', 'tag:local', etc.")
+        logger.info("[COST] Cost Optimization: Intelligent routing for minimal costs")
+        logger.info("[READY] Ready to serve intelligent routing requests!")
         
     except Exception as e:
         logger.warning(f"Failed to display startup info: {e}")
@@ -486,11 +486,11 @@ def main() -> None:
         port = args.port or config.get("port", 7601)
         debug = args.debug or config.get("debug", False)
 
-        print(f"\n🤖 Smart AI Router - Refactored Architecture")
-        print(f"📋 Configuration: config/router_config.yaml")
-        print(f"🌐 Service: http://{host}:{port}")
-        print(f"📚 API Docs: http://{host}:{port}/docs")
-        print(f"🔧 Architecture: Modular, Type-Safe, High-Performance\n")
+        print(f"\n[AI] Smart AI Router - Refactored Architecture")
+        print(f"[CONFIG] Configuration: config/router_config.yaml")
+        print(f"[WEB] Service: http://{host}:{port}")
+        print(f"[DOCS] API Docs: http://{host}:{port}/docs")
+        print(f"[ARCH] Architecture: Modular, Type-Safe, High-Performance\n")
 
         uvicorn.run(
             "main:create_app",
@@ -501,11 +501,11 @@ def main() -> None:
             log_level="debug" if debug else "info",
         )
     except FileNotFoundError:
-        logger.error("❌ Configuration file 'config/router_config.yaml' not found.")
-        logger.error("💡 Please copy 'config/router_config.yaml.template' to 'config/router_config.yaml' and configure it.")
+        logger.error("[ERROR] Configuration file 'config/router_config.yaml' not found.")
+        logger.error("[TIP] Please copy 'config/router_config.yaml.template' to 'config/router_config.yaml' and configure it.")
         sys.exit(1)
     except Exception as e:
-        logger.error(f"❌ Failed to start application: {e}", exc_info=True)
+        logger.error(f"[ERROR] Failed to start application: {e}", exc_info=True)
         sys.exit(1)
 
 if __name__ == "__main__":
