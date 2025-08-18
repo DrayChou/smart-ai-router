@@ -166,36 +166,57 @@ class JSONRouter:
         model_cache = self.config_loader.get_model_cache()
 
         # 1. 首先尝试作为物理模型查找
+        physical_candidates = []
         for channel in all_enabled_channels:
             if channel.id in model_cache:
                 discovered_info = model_cache[channel.id]
                 if request.model in discovered_info.get("models", []):
                     # 对于物理模型，matched_model 就是请求的模型
-                    candidate_channels.append(ChannelCandidate(
+                    physical_candidates.append(ChannelCandidate(
                         channel=channel,
                         matched_model=request.model
                     ))
         
-        if candidate_channels:
-            logger.info(f"Found {len(candidate_channels)} candidate channels for physical model '{request.model}'")
-            return candidate_channels
-
-        # 2. 如果作为物理模型没找到，尝试自动标签化
-        logger.info(f"🔄 AUTO TAGGING: No physical model found for '{request.model}', trying automatic tag extraction")
+        # 2. 同时尝试自动标签化查找（免费模型优先考虑）
+        auto_tag_candidates = []
+        logger.info(f"🔄 AUTO TAGGING: Extracting tags from model name '{request.model}' for comprehensive search")
         auto_tags = self._extract_tags_from_model_name(request.model)
         if auto_tags:
             logger.info(f"🏷️  AUTO TAGGING: Extracted tags {auto_tags} from model name '{request.model}'")
-            candidates = self._get_candidate_channels_by_auto_tags(auto_tags)
-            if candidates:
-                logger.info(f"🏷️  AUTO TAGGING: Found {len(candidates)} candidate channels using auto-extracted tags")
-                return candidates
+            auto_tag_candidates = self._get_candidate_channels_by_auto_tags(auto_tags)
+            if auto_tag_candidates:
+                logger.info(f"🏷️  AUTO TAGGING: Found {len(auto_tag_candidates)} candidate channels using auto-extracted tags")
             else:
                 logger.warning(f"🏷️  AUTO TAGGING: No channels found for auto-extracted tags {auto_tags}")
         
-        # 3. 最后尝试从配置中查找
+        # 3. 合并物理模型和自动标签化的结果，去重
+        all_candidates = physical_candidates.copy()
+        
+        # 添加自动标签化的候选，避免重复
+        for tag_candidate in auto_tag_candidates:
+            # 检查是否已经存在相同的 channel + model 组合
+            duplicate_found = False
+            for existing in all_candidates:
+                if (existing.channel.id == tag_candidate.channel.id and 
+                    existing.matched_model == tag_candidate.matched_model):
+                    duplicate_found = True
+                    break
+            
+            if not duplicate_found:
+                all_candidates.append(tag_candidate)
+        
+        if all_candidates:
+            physical_count = len(physical_candidates)
+            tag_count = len(auto_tag_candidates)
+            total_count = len(all_candidates)
+            logger.info(f"🔍 COMPREHENSIVE SEARCH: Found {total_count} total candidates "
+                       f"(physical: {physical_count}, auto-tag: {tag_count}, merged without duplicates)")
+            return all_candidates
+        
+        # 4. 最后尝试从配置中查找
         config_channels = self.config_loader.get_channels_by_model(request.model)
         if config_channels:
-            logger.info(f"Found {len(config_channels)} channels in configuration for model '{request.model}'")
+            logger.info(f"📋 CONFIG FALLBACK: Found {len(config_channels)} channels in configuration for model '{request.model}'")
             return [ChannelCandidate(channel=ch, matched_model=request.model) for ch in config_channels]
         
         # 如果都没找到，返回空列表
@@ -306,7 +327,8 @@ class JSONRouter:
                 matched_model=candidate.matched_model
             ))
         
-        scored_channels.sort(key=lambda x: x.total_score, reverse=True)
+        # 使用分层优先级排序，而不是简单的总分排序
+        scored_channels = self._hierarchical_sort(scored_channels)
         
         logger.info(f"🏆 SCORING RESULT: Channels ranked by score:")
         for i, scored in enumerate(scored_channels[:5]):  # 只显示前5个
@@ -783,6 +805,92 @@ class JSONRouter:
                 total_score += score * rule.get("weight", 0.0)
         
         return total_score / total_weight
+    
+    def _hierarchical_sort(self, scored_channels: List[RoutingScore]) -> List[RoutingScore]:
+        """分层优先级排序：使用7位数字评分系统 (成本|本地|上下文|参数|速度|质量|可靠性)"""
+        def sorting_key(score: RoutingScore):
+            # 获取额外的评分信息
+            channel = score.channel
+            free_score = self._calculate_free_score(channel, score.matched_model)
+            local_score = self._calculate_local_score(channel, score.matched_model)
+            parameter_score = self._calculate_parameter_score(channel, score.matched_model)
+            context_score = self._calculate_context_score(channel, score.matched_model)
+            
+            # 将每个维度的评分转换为0-9的整数评分
+            # 第1位：成本优化程度 (9=完全免费, 8=很便宜, 0=很昂贵)
+            # 优先使用免费评分，如果不免费则使用成本评分
+            if free_score >= 0.9:
+                cost_tier = 9  # 免费模型固定为9分
+            else:
+                cost_tier = min(8, int(score.cost_score * 8))  # 付费模型最高8分
+            
+            # 第2位：本地优先程度 (9=本地, 0=远程)
+            local_tier = min(9, int(local_score * 9))
+            
+            # 第3位：上下文长度程度 (9=很长, 0=很短)
+            context_tier = min(9, int(context_score * 9))
+            
+            # 第4位：参数量程度 (9=很大, 0=很小)
+            parameter_tier = min(9, int(parameter_score * 9))
+            
+            # 第5位：速度程度 (9=很快, 0=很慢)
+            speed_tier = min(9, int(score.speed_score * 9))
+            
+            # 第6位：质量程度 (9=很高, 0=很低)
+            quality_tier = min(9, int(score.quality_score * 9))
+            
+            # 第7位：可靠性程度 (9=很可靠, 0=不可靠)
+            reliability_tier = min(9, int(score.reliability_score * 9))
+            
+            # 组成7位数字，数字越大排序越靠前
+            hierarchical_score = (
+                cost_tier * 1000000 +       # 第1位：成本(免费=9,付费最高=8)
+                local_tier * 100000 +       # 第2位：本地
+                context_tier * 10000 +      # 第3位：上下文
+                parameter_tier * 1000 +     # 第4位：参数量
+                speed_tier * 100 +          # 第5位：速度
+                quality_tier * 10 +         # 第6位：质量
+                reliability_tier            # 第7位：可靠性
+            )
+            
+            # 返回负数实现降序排列（分数越高排名越前）
+            return -hierarchical_score
+        
+        sorted_channels = sorted(scored_channels, key=sorting_key)
+        
+        # 记录分层排序的详细信息
+        logger.info("🏆 HIERARCHICAL SORTING: 7-digit scoring system (Cost|Local|Context|Param|Speed|Quality|Reliability)")
+        for i, scored in enumerate(sorted_channels[:5]):
+            free_score = self._calculate_free_score(scored.channel, scored.matched_model)
+            local_score = self._calculate_local_score(scored.channel, scored.matched_model)
+            parameter_score = self._calculate_parameter_score(scored.channel, scored.matched_model)
+            context_score = self._calculate_context_score(scored.channel, scored.matched_model)
+            
+            # 计算7位数字评分
+            if free_score >= 0.9:
+                cost_tier = 9  # 免费模型固定为9分
+            else:
+                cost_tier = min(8, int(scored.cost_score * 8))  # 付费模型最高8分
+            
+            local_tier = min(9, int(local_score * 9))
+            context_tier = min(9, int(context_score * 9))
+            parameter_tier = min(9, int(parameter_score * 9))
+            speed_tier = min(9, int(scored.speed_score * 9))
+            quality_tier = min(9, int(scored.quality_score * 9))
+            reliability_tier = min(9, int(scored.reliability_score * 9))
+            
+            hierarchical_score = (
+                cost_tier * 1000000 + local_tier * 100000 + context_tier * 10000 + 
+                parameter_tier * 1000 + speed_tier * 100 + quality_tier * 10 + reliability_tier
+            )
+            
+            score_display = f"{cost_tier}{local_tier}{context_tier}{parameter_tier}{speed_tier}{quality_tier}{reliability_tier}"
+            is_free = "FREE" if free_score >= 0.9 else "PAID"
+            is_local = "LOCAL" if local_score >= 0.7 else "REMOTE"
+            logger.info(f"🏆   #{i+1}: '{scored.channel.name}' [{is_free}/{is_local}] "
+                       f"Score: {score_display} (Total: {hierarchical_score:,})")
+        
+        return sorted_channels
     
     def _estimate_tokens(self, messages: List[Dict[str, Any]]) -> int:
         """使用tiktoken估算prompt tokens"""

@@ -416,7 +416,10 @@ class ChatCompletionHandler:
         
         async with http_pool.stream('POST', url, json=request_data, headers=headers) as response:
             if response.status_code != 200:
-                error_content = await response.aread(max_bytes=1024)
+                # 读取错误内容，限制大小以避免内存问题
+                error_content = await response.aread()
+                if len(error_content) > 1024:
+                    error_content = error_content[:1024]
                 response._content = error_content
                 response.raise_for_status()
             
@@ -435,7 +438,10 @@ class ChatCompletionHandler:
             
             async with http_pool.stream("POST", url, json=request_data, headers=headers) as response:
                 if response.status_code != 200:
-                    error_body = await response.aread(max_bytes=1024)
+                    # 读取错误内容，限制大小以避免内存问题
+                    error_body = await response.aread()
+                    if len(error_body) > 1024:
+                        error_body = error_body[:1024]
                     logger.error(f"🌊 STREAM ERROR: Channel '{channel_id}' returned status {response.status_code}")
                     
                     error_text = error_body.decode('utf-8', errors='ignore')[:200]
@@ -541,8 +547,8 @@ class ChatCompletionHandler:
         if model_name:
             try:
                 # 导入配置加载器来访问模型缓存
-                from core.yaml_config import ConfigLoader
-                config_loader = ConfigLoader()
+                from core.yaml_config import YAMLConfigLoader
+                config_loader = YAMLConfigLoader()
                 
                 model_cache = config_loader.get_model_cache()
                 if channel.id in model_cache:
