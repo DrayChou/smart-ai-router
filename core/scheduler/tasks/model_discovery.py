@@ -15,6 +15,7 @@ import httpx
 import logging
 from core.utils.smart_cache import get_smart_cache, cache_get, cache_set, cache_get_or_set
 from core.utils.api_key_cache import get_api_key_cache_manager
+from core.utils.async_file_ops import get_async_file_manager
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +43,7 @@ class ModelDiscoveryTask:
         self._load_cache()
     
     def _load_cache(self):
-        """加载现有缓存数据"""
+        """加载现有缓存数据（同步版本，为兼容性保留）"""
         try:
             if self.models_cache_file.exists():
                 with open(self.models_cache_file, 'r', encoding='utf-8') as f:
@@ -57,8 +58,24 @@ class ModelDiscoveryTask:
         except Exception as e:
             logger.error(f"加载缓存失败: {e}")
     
+    async def _load_cache_async(self):
+        """异步加载现有缓存数据"""
+        try:
+            file_manager = get_async_file_manager()
+            
+            if await file_manager.file_exists(self.models_cache_file):
+                self.cached_models = await file_manager.read_json(self.models_cache_file, {})
+                logger.info(f"异步加载缓存的模型数据: {len(self.cached_models)} 个渠道")
+            
+            if await file_manager.file_exists(self.merged_config_file):
+                self.merged_config = await file_manager.read_json(self.merged_config_file, {})
+                logger.info("异步加载合并后的配置数据")
+                
+        except Exception as e:
+            logger.error(f"异步加载缓存失败: {e}")
+    
     def _save_cache(self):
-        """保存缓存数据"""
+        """保存缓存数据（同步版本，为兼容性保留）"""
         try:
             # 保存模型缓存
             with open(self.models_cache_file, 'w', encoding='utf-8') as f:
@@ -72,6 +89,33 @@ class ModelDiscoveryTask:
             
         except Exception as e:
             logger.error(f"保存缓存失败: {e}")
+    
+    async def _save_cache_async(self):
+        """异步保存缓存数据"""
+        try:
+            file_manager = get_async_file_manager()
+            
+            # 异步保存模型缓存
+            models_success = await file_manager.write_json(
+                self.models_cache_file, 
+                self.cached_models, 
+                indent=2
+            )
+            
+            # 异步保存合并后的配置
+            config_success = await file_manager.write_json(
+                self.merged_config_file, 
+                self.merged_config, 
+                indent=2
+            )
+            
+            if models_success and config_success:
+                logger.info(f"异步缓存已保存到 {self.cache_dir}")
+            else:
+                logger.warning("部分异步缓存保存失败")
+            
+        except Exception as e:
+            logger.error(f"异步保存缓存失败: {e}")
     
     def _get_models_endpoint(self, base_url: str) -> str:
         """根据base_url自适应计算models端点"""

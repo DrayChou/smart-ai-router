@@ -23,6 +23,7 @@ from ..utils.token_counter import get_cost_tracker
 from ..utils.request_cache import get_request_cache
 from ..utils.response_aggregator import get_response_aggregator, RequestMetadata
 from ..utils.session_manager import get_session_manager
+from ..utils.cost_estimator import get_cost_estimator
 
 logger = logging.getLogger(__name__)
 
@@ -86,8 +87,11 @@ class ChatCompletionHandler:
             if not routing_result.candidates:
                 return self._create_no_channels_error(request.model, time.time() - start_time)
             
-            # 步骤2: 执行请求并处理重试
-            return await self._execute_request_with_retry(request, routing_result, start_time, request_id)
+            # 步骤2: 请求前成本估算和优化建议
+            cost_preview = await self._perform_cost_estimation(request, routing_result.candidates, request_id)
+            
+            # 步骤3: 执行请求并处理重试
+            return await self._execute_request_with_retry(request, routing_result, start_time, request_id, cost_preview)
             
         except TagNotFoundError as e:
             return self._handle_tag_not_found_error(e, request.model, time.time() - start_time)
@@ -123,6 +127,55 @@ class ChatCompletionHandler:
             total_candidates=len(candidate_channels)
         )
     
+    async def _perform_cost_estimation(self, request: ChatCompletionRequest, candidate_channels: List, request_id: str) -> Optional[Dict[str, Any]]:
+        """执行请求前成本估算"""
+        try:
+            cost_estimator = get_cost_estimator()
+            
+            # 准备候选渠道信息
+            channel_candidates = []
+            for channel_score in candidate_channels[:10]:  # 限制前10个进行成本估算
+                channel_candidates.append({
+                    "id": channel_score.channel.id,
+                    "model_name": getattr(channel_score.channel, 'model_name', request.model),
+                    "provider": getattr(channel_score.channel, 'provider_name', 'unknown')
+                })
+            
+            # 执行成本预览
+            cost_preview = cost_estimator.create_cost_preview(
+                messages=[msg.dict() for msg in request.messages],
+                candidate_channels=channel_candidates,
+                max_tokens=request.max_tokens
+            )
+            
+            # 记录成本估算信息
+            calc_time = cost_preview.get('calculation_time_ms', 0)
+            total_estimates = len(cost_preview.get('estimates', []))
+            
+            logger.info(f"💰 COST PREVIEW: [{request_id}] Analyzed {total_estimates} channels in {calc_time}ms")
+            
+            # 如果有免费选项，优先推荐
+            recommendation = cost_preview.get('recommendation', {})
+            if 'free_options' in recommendation:
+                free_count = recommendation['free_options']['count']
+                logger.info(f"💰 FREE OPTIONS: [{request_id}] Found {free_count} free channels available")
+            
+            # 显示最优推荐
+            if 'cheapest_option' in recommendation:
+                cheapest = recommendation['cheapest_option']
+                logger.info(f"💰 RECOMMENDATION: [{request_id}] Cheapest option: {cheapest['channel_id']} - {cheapest['formatted_cost']}")
+            
+            # 显示潜在节省
+            if 'savings_potential' in recommendation:
+                savings = recommendation['savings_potential']
+                logger.info(f"💰 SAVINGS: [{request_id}] {savings['recommendation']}")
+            
+            return cost_preview
+            
+        except Exception as e:
+            logger.warning(f"💰 COST ESTIMATION FAILED: [{request_id}] {e}")
+            return None
+    
     async def _perform_concurrent_channel_check(self, candidate_channels: List[RoutingScore]) -> None:
         """执行并发渠道可用性检查"""
         logger.info(f"⚡ FAST CHECK: Pre-checking availability of top {min(3, len(candidate_channels))} channels")
@@ -150,7 +203,7 @@ class ChatCompletionHandler:
                     else:
                         logger.info(f"⚡ FAST CHECK: Channel '{channel.name}' unavailable ({status_code}: {message})")
     
-    async def _execute_request_with_retry(self, request: ChatCompletionRequest, routing_result: RoutingResult, start_time: float, request_id: str) -> Union[JSONResponse, StreamingResponse]:
+    async def _execute_request_with_retry(self, request: ChatCompletionRequest, routing_result: RoutingResult, start_time: float, request_id: str, cost_preview: Optional[Dict[str, Any]] = None) -> Union[JSONResponse, StreamingResponse]:
         """执行请求并处理重试逻辑"""
         last_error = None
         failed_channels = set()  # 智能渠道黑名单
@@ -190,7 +243,8 @@ class ChatCompletionHandler:
                     is_streaming=request.stream,
                     routing_strategy=getattr(self.router, 'current_strategy', 'balanced'),
                     routing_score=routing_score.total_score,
-                    routing_reason=routing_score.reason
+                    routing_reason=routing_score.reason,
+                    cost_preview=cost_preview
                 )
                 
                 # 存储元数据到请求中，供后续使用

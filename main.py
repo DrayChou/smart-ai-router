@@ -13,6 +13,10 @@ from core.utils.token_counter import TokenCounter, get_cost_tracker
 from core.handlers.chat_handler import ChatCompletionHandler, ChatCompletionRequest
 from core.exceptions import RouterException, ErrorHandler
 from core.auth import AuthenticationMiddleware, initialize_admin_auth, get_admin_auth_dependency
+from core.utils.logger import setup_logging, shutdown_logging
+from core.middleware.logging import LoggingMiddleware, RequestContextMiddleware
+from core.utils.audit_logger import initialize_audit_logger, get_audit_logger
+from core.middleware.audit import AuditMiddleware, SecurityAuditMiddleware
 
 import time
 from typing import List, Dict, Any, Optional
@@ -29,7 +33,7 @@ from pathlib import Path
 # 添加项目根目录到 Python 路径
 sys.path.insert(0, str(Path(__file__).parent))
 
-# 设置日志
+# 基础日志设置（将被新日志系统覆盖）
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -58,6 +62,22 @@ def create_app() -> FastAPI:
     config_loader: YAMLConfigLoader = get_yaml_config_loader()
     router: JSONRouter = JSONRouter(config_loader)
     server_config: Dict[str, Any] = config_loader.get_server_config()
+    
+    # 设置新的日志系统
+    log_config = {
+        "level": "INFO",
+        "format": "json",
+        "max_file_size": 50 * 1024 * 1024,  # 50MB
+        "backup_count": 5,
+        "batch_size": 100,
+        "flush_interval": 5.0
+    }
+    smart_logger = setup_logging(log_config, "logs/smart-ai-router.log")
+    logger.info("[LOGGING] New structured logging system initialized")
+    
+    # 初始化审计日志系统
+    audit_logger = initialize_audit_logger(smart_logger)
+    logger.info("[AUDIT] Audit logging system initialized")
 
     # 创建FastAPI应用
     app = FastAPI(
@@ -68,6 +88,38 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
     )
 
+    # 添加日志中间件（最先添加，确保记录所有请求）
+    app.add_middleware(
+        LoggingMiddleware,
+        log_requests=True,
+        log_responses=True,
+        log_request_body=False,  # 出于安全考虑默认不记录请求体
+        log_response_body=False,  # 出于性能考虑默认不记录响应体
+        max_body_size=1024 * 10,  # 10KB
+    )
+    logger.info("[LOGGING] Logging middleware enabled")
+    
+    # 添加请求上下文中间件
+    app.add_middleware(RequestContextMiddleware)
+    logger.info("[LOGGING] Request context middleware enabled")
+    
+    # 添加审计日志中间件
+    app.add_middleware(
+        AuditMiddleware,
+        audit_api_requests=True,
+        audit_admin_requests=True,
+        audit_auth_failures=True
+    )
+    logger.info("[AUDIT] Audit middleware enabled")
+    
+    # 添加安全审计中间件
+    app.add_middleware(
+        SecurityAuditMiddleware,
+        rate_limit_check=True,
+        suspicious_pattern_check=True
+    )
+    logger.info("[AUDIT] Security audit middleware enabled")
+    
     # 添加认证中间件
     auth_config = config_loader.config.auth
     if auth_config.enabled:
@@ -106,6 +158,16 @@ def create_app() -> FastAPI:
             await initialize_background_tasks(tasks_config, config_loader)
             logger.info("[STARTUP] Background tasks initialized successfully")
             
+            # 记录系统启动审计事件
+            audit_logger = get_audit_logger()
+            if audit_logger:
+                config_info = {
+                    "providers": len(config_loader.config.providers),
+                    "channels": len(config_loader.config.channels),
+                    "auth_enabled": config_loader.config.auth.enabled
+                }
+                audit_logger.log_system_startup("0.3.0", config_info)
+            
             # 显示启动信息
             _display_startup_info(config_loader, router)
             
@@ -124,6 +186,10 @@ def create_app() -> FastAPI:
             
             await close_global_cache()
             logger.info("[CACHE] Smart cache closed")
+            
+            # 关闭日志系统
+            await shutdown_logging()
+            logger.info("[LOGGING] Structured logging system closed")
             
         except Exception as e:
             logger.error(f"[ERROR] Failed to cleanup resources: {e}")
@@ -415,6 +481,24 @@ def create_app() -> FastAPI:
         except Exception as e:
             logger.error(f"获取SiliconFlow模型定价失败: {e}")
             raise HTTPException(status_code=500, detail=f"获取模型定价失败: {str(e)}")
+
+    # --- 日志管理API ---
+    
+    # 包含日志管理API路由
+    try:
+        from api.admin.logs import router as logs_router
+        app.include_router(logs_router)
+        logger.info("[API] Logs management API endpoints added")
+    except ImportError as e:
+        logger.warning(f"[API] Failed to import logs API: {e}")
+    
+    # 包含审计日志管理API路由
+    try:
+        from api.admin.audit import router as audit_router
+        app.include_router(audit_router)
+        logger.info("[API] Audit management API endpoints added")
+    except ImportError as e:
+        logger.warning(f"[API] Failed to import audit API: {e}")
 
     return app
 

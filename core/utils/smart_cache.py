@@ -13,6 +13,8 @@ from typing import Dict, Any, Optional, Union, Callable, TypeVar
 import logging
 import hashlib
 
+from .async_file_ops import get_async_file_manager
+
 logger = logging.getLogger(__name__)
 
 T = TypeVar('T')
@@ -178,7 +180,7 @@ class SmartCache:
         return data
     
     def _load_persistent_cache(self):
-        """加载持久化缓存"""
+        """加载持久化缓存（同步版本，为兼容性保留）"""
         try:
             if not self.persistent_cache_file.exists():
                 return
@@ -211,14 +213,48 @@ class SmartCache:
         except Exception as e:
             logger.warning(f"加载持久化缓存失败: {e}")
     
-    async def _save_persistent_entry(self, cache_key: str, entry: CacheEntry):
-        """保存单个缓存条目到持久化文件"""
+    async def _load_persistent_cache_async(self):
+        """异步加载持久化缓存"""
         try:
+            file_manager = get_async_file_manager()
+            
+            if not await file_manager.file_exists(self.persistent_cache_file):
+                return
+            
+            data = await file_manager.read_json(self.persistent_cache_file, {})
+            
+            current_time = time.time()
+            loaded_count = 0
+            
+            for cache_key, entry_data in data.items():
+                try:
+                    entry = CacheEntry(
+                        data=entry_data['data'],
+                        ttl=entry_data['ttl'],
+                        created_at=entry_data['created_at']
+                    )
+                    
+                    # 检查是否过期
+                    if not entry.is_expired():
+                        self.memory_cache[cache_key] = entry
+                        loaded_count += 1
+                    
+                except (KeyError, TypeError) as e:
+                    logger.warning(f"跳过无效的缓存条目 {cache_key}: {e}")
+                    continue
+            
+            logger.info(f"异步加载持久化缓存: {loaded_count} 个有效条目")
+            
+        except Exception as e:
+            logger.warning(f"异步加载持久化缓存失败: {e}")
+    
+    async def _save_persistent_entry(self, cache_key: str, entry: CacheEntry):
+        """异步保存单个缓存条目到持久化文件"""
+        try:
+            file_manager = get_async_file_manager()
+            
             # 读取现有数据
-            persistent_data = {}
-            if self.persistent_cache_file.exists():
-                with open(self.persistent_cache_file, 'r', encoding='utf-8') as f:
-                    persistent_data = json.load(f)
+            persistent_data = await file_manager.read_json(self.persistent_cache_file, {})
             
             # 更新数据
             persistent_data[cache_key] = {
@@ -227,12 +263,54 @@ class SmartCache:
                 'created_at': entry.created_at
             }
             
-            # 写回文件
-            with open(self.persistent_cache_file, 'w', encoding='utf-8') as f:
-                json.dump(persistent_data, f, ensure_ascii=False, indent=2, default=str)
+            # 异步写回文件
+            success = await file_manager.write_json(
+                self.persistent_cache_file, 
+                persistent_data, 
+                indent=2
+            )
+            
+            if not success:
+                logger.warning(f"异步保存持久化缓存失败: 文件写入返回失败")
                 
         except Exception as e:
-            logger.warning(f"保存持久化缓存失败: {e}")
+            logger.warning(f"异步保存持久化缓存失败: {e}")
+    
+    async def save_all_persistent_cache(self):
+        """异步保存所有持久化缓存条目"""
+        try:
+            file_manager = get_async_file_manager()
+            
+            # 收集所有需要持久化的缓存条目
+            persistent_data = {}
+            
+            async with self.cache_lock:
+                for cache_key, entry in self.memory_cache.items():
+                    cache_type = cache_key.split(':', 1)[0]
+                    config = self._get_cache_config(cache_type)
+                    
+                    if config.get("persistent", False) and not entry.is_expired():
+                        persistent_data[cache_key] = {
+                            'data': entry.data,
+                            'ttl': entry.ttl,
+                            'created_at': entry.created_at
+                        }
+            
+            # 异步保存所有数据
+            if persistent_data:
+                success = await file_manager.write_json(
+                    self.persistent_cache_file, 
+                    persistent_data, 
+                    indent=2
+                )
+                
+                if success:
+                    logger.info(f"异步保存 {len(persistent_data)} 个持久化缓存条目")
+                else:
+                    logger.warning("异步保存持久化缓存失败: 文件写入返回失败")
+            
+        except Exception as e:
+            logger.warning(f"异步保存所有持久化缓存失败: {e}")
     
     async def cleanup_expired(self) -> int:
         """清理过期的缓存条目"""

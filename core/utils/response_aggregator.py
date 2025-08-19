@@ -45,6 +45,9 @@ class RequestMetadata:
     error_code: Optional[str] = None
     error_message: Optional[str] = None
     
+    # 成本预览信息
+    cost_preview: Optional[Dict[str, Any]] = None
+    
     def finish_request(self, end_time: Optional[float] = None):
         """结束请求，计算最终指标"""
         self.end_time = end_time or time.time()
@@ -70,7 +73,8 @@ class ResponseAggregator:
                               is_streaming: bool,
                               routing_strategy: str = "balanced",
                               routing_score: float = 0.0,
-                              routing_reason: str = "") -> RequestMetadata:
+                              routing_reason: str = "",
+                              cost_preview: Optional[Dict[str, Any]] = None) -> RequestMetadata:
         """创建请求元数据"""
         metadata = RequestMetadata(
             request_id=request_id,
@@ -84,7 +88,8 @@ class ResponseAggregator:
             start_time=time.time(),
             routing_strategy=routing_strategy,
             routing_score=routing_score,
-            routing_reason=routing_reason
+            routing_reason=routing_reason,
+            cost_preview=cost_preview
         )
         
         self.active_requests[request_id] = metadata

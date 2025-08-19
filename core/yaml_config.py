@@ -3,6 +3,7 @@
 """
 import yaml
 import json
+import asyncio
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
@@ -12,6 +13,7 @@ import logging
 from .config_models import Config, Channel, Provider
 from .auth import generate_secure_token as generate_random_token
 from .utils.api_key_cache import get_api_key_cache_manager
+from .utils.async_file_ops import get_async_file_manager
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +69,7 @@ class YAMLConfigLoader:
         raise FileNotFoundError(f"Configuration file {filename} not found in 'config' directory.")
 
     def _load_and_validate_config(self) -> Config:
-        """加载并验证配置文件"""
+        """加载并验证配置文件（同步版本，为兼容性保留）"""
         try:
             with open(self.config_path, 'r', encoding='utf-8') as f:
                 raw_data = yaml.safe_load(f) or {}
@@ -81,6 +83,28 @@ class YAMLConfigLoader:
             # 如果配置被修改，保存回文件
             if config_modified:
                 self._save_config_to_file(raw_data)
+                
+            return config
+            
+        except Exception as e:
+            logger.error(f"Failed to load config from {self.config_path}: {e}")
+            raise
+    
+    async def _load_and_validate_config_async(self) -> Config:
+        """异步加载并验证配置文件"""
+        try:
+            file_manager = get_async_file_manager()
+            raw_data = await file_manager.read_yaml(self.config_path, {})
+            
+            # 检查Token配置并自动生成
+            config_modified = self._ensure_auth_token(raw_data)
+            
+            # 使用Pydantic进行验证和解析
+            config = Config.parse_obj(raw_data)
+            
+            # 如果配置被修改，异步保存回文件
+            if config_modified:
+                await self._save_config_to_file_async(raw_data)
                 
             return config
             
@@ -112,7 +136,7 @@ class YAMLConfigLoader:
 
     def _save_config_to_file(self, config_data: Dict[str, Any]) -> None:
         """
-        保存配置数据到文件
+        保存配置数据到文件（同步版本，为兼容性保留）
         """
         try:
             with open(self.config_path, 'w', encoding='utf-8') as f:
@@ -127,9 +151,25 @@ class YAMLConfigLoader:
         except Exception as e:
             logger.error(f"Failed to save config to {self.config_path}: {e}")
             raise
+    
+    async def _save_config_to_file_async(self, config_data: Dict[str, Any]) -> None:
+        """
+        异步保存配置数据到文件
+        """
+        try:
+            file_manager = get_async_file_manager()
+            success = await file_manager.write_yaml(self.config_path, config_data)
+            
+            if success:
+                logger.info(f"Configuration updated and saved to {self.config_path}")
+            else:
+                raise Exception("Failed to write config file")
+        except Exception as e:
+            logger.error(f"Failed to save config to {self.config_path}: {e}")
+            raise
 
     def _load_model_cache_from_disk(self):
-        """从磁盘加载模型发现任务的缓存"""
+        """从磁盘加载模型发现任务的缓存（同步版本，为兼容性保留）"""
         try:
             # 直接从缓存文件加载
             cache_file = Path(__file__).parent.parent / "cache" / "discovered_models.json"
@@ -216,7 +256,7 @@ class YAMLConfigLoader:
         return channels_map
     
     def _save_migrated_cache(self):
-        """保存迁移后的缓存"""
+        """保存迁移后的缓存（同步版本，为兼容性保留）"""
         try:
             cache_file = Path(__file__).parent.parent / "cache" / "discovered_models.json"
             with open(cache_file, 'w', encoding='utf-8') as f:
@@ -224,6 +264,75 @@ class YAMLConfigLoader:
             logger.info("Migrated cache saved successfully")
         except Exception as e:
             logger.error(f"Failed to save migrated cache: {e}")
+    
+    async def _save_migrated_cache_async(self):
+        """异步保存迁移后的缓存"""
+        try:
+            cache_file = Path(__file__).parent.parent / "cache" / "discovered_models.json"
+            file_manager = get_async_file_manager()
+            success = await file_manager.write_json(cache_file, self.model_cache, indent=2)
+            
+            if success:
+                logger.info("Migrated cache saved successfully")
+            else:
+                raise Exception("Failed to write cache file")
+        except Exception as e:
+            logger.error(f"Failed to save migrated cache: {e}")
+    
+    async def _load_model_cache_from_disk_async(self):
+        """异步从磁盘加载模型发现任务的缓存"""
+        try:
+            file_manager = get_async_file_manager()
+            cache_file = Path(__file__).parent.parent / "cache" / "discovered_models.json"
+            
+            if await file_manager.file_exists(cache_file):
+                raw_cache = await file_manager.read_json(cache_file, {})
+                
+                # 检查是否需要迁移缓存格式
+                if self._needs_cache_migration(raw_cache):
+                    logger.info("Migrating cache from legacy format to API key-level format")
+                    self.model_cache = self.api_key_cache_manager.migrate_legacy_cache(
+                        raw_cache, self._get_channels_for_migration()
+                    )
+                    # 异步保存迁移后的缓存
+                    await self._save_migrated_cache_async()
+                else:
+                    self.model_cache = raw_cache
+                    
+                # 清理无效条目
+                self.model_cache = self.api_key_cache_manager.cleanup_invalid_entries(
+                    self.model_cache, self._get_channels_for_migration()
+                )
+                
+                # 输出缓存统计信息
+                stats = self.api_key_cache_manager.get_cache_statistics(self.model_cache)
+                logger.info(f"Loaded model cache: {stats['total_entries']} entries, "
+                          f"{stats['api_key_entries']} API key-level, {stats['legacy_entries']} legacy, "
+                          f"{stats['api_key_coverage']}% coverage")
+            else:
+                logger.warning("Model cache file not found")
+                self.model_cache = {}
+        except Exception as e:
+            # 作为后备方案，尝试从任务模块加载
+            try:
+                from .scheduler.tasks.model_discovery import get_model_discovery_task
+                task = get_model_discovery_task()
+                raw_cache = task.cached_models
+                if raw_cache:
+                    # 应用相同的迁移逻辑
+                    if self._needs_cache_migration(raw_cache):
+                        logger.info("Migrating task cache from legacy format to API key-level format")
+                        self.model_cache = self.api_key_cache_manager.migrate_legacy_cache(
+                            raw_cache, self._get_channels_for_migration()
+                        )
+                    else:
+                        self.model_cache = raw_cache
+                    logger.info(f"Loaded model cache from task for {len(self.model_cache)} entries")
+                else:
+                    self.model_cache = {}
+            except Exception as e2:
+                logger.warning(f"Failed to load model cache from both sources: {e}, {e2}")
+                self.model_cache = {}
     
     def get_model_cache(self) -> Dict[str, Dict]:
         """获取模型缓存（兼容性方法）"""
