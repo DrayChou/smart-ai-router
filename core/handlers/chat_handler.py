@@ -5,6 +5,7 @@ Chat completion request handler with improved architecture
 import time
 import json
 import asyncio
+import uuid
 from typing import List, Dict, Any, Optional, Union, Tuple
 from dataclasses import dataclass
 import logging
@@ -20,6 +21,8 @@ from ..utils.http_client_pool import get_http_pool
 from ..utils.smart_cache import cache_get, cache_set
 from ..utils.token_counter import get_cost_tracker
 from ..utils.request_cache import get_request_cache
+from ..utils.response_aggregator import get_response_aggregator, RequestMetadata
+from ..utils.session_manager import get_session_manager
 
 logger = logging.getLogger(__name__)
 
@@ -72,9 +75,10 @@ class ChatCompletionHandler:
     async def handle_request(self, request: ChatCompletionRequest) -> Union[JSONResponse, StreamingResponse]:
         """处理聊天完成请求的主入口"""
         start_time = time.time()
+        request_id = f"req_{uuid.uuid4().hex[:8]}"
         
-        logger.info(f"🌐 API REQUEST: Received chat completion request for model '{request.model}' (stream: {request.stream})")
-        logger.info(f"🌐 REQUEST DETAILS: {len(request.messages)} messages, max_tokens: {request.max_tokens}, temperature: {request.temperature}")
+        logger.info(f"🌐 API REQUEST: [{request_id}] Received chat completion request for model '{request.model}' (stream: {request.stream})")
+        logger.info(f"🌐 REQUEST DETAILS: [{request_id}] {len(request.messages)} messages, max_tokens: {request.max_tokens}, temperature: {request.temperature}")
         
         try:
             # 步骤1: 路由请求获取候选渠道
@@ -83,7 +87,7 @@ class ChatCompletionHandler:
                 return self._create_no_channels_error(request.model, time.time() - start_time)
             
             # 步骤2: 执行请求并处理重试
-            return await self._execute_request_with_retry(request, routing_result, start_time)
+            return await self._execute_request_with_retry(request, routing_result, start_time, request_id)
             
         except TagNotFoundError as e:
             return self._handle_tag_not_found_error(e, request.model, time.time() - start_time)
@@ -146,7 +150,7 @@ class ChatCompletionHandler:
                     else:
                         logger.info(f"⚡ FAST CHECK: Channel '{channel.name}' unavailable ({status_code}: {message})")
     
-    async def _execute_request_with_retry(self, request: ChatCompletionRequest, routing_result: RoutingResult, start_time: float) -> Union[JSONResponse, StreamingResponse]:
+    async def _execute_request_with_retry(self, request: ChatCompletionRequest, routing_result: RoutingResult, start_time: float, request_id: str) -> Union[JSONResponse, StreamingResponse]:
         """执行请求并处理重试逻辑"""
         last_error = None
         failed_channels = set()  # 智能渠道黑名单
@@ -164,19 +168,38 @@ class ChatCompletionHandler:
                 logger.warning(f"❌ ATTEMPT #{attempt_num}: Provider '{channel.provider}' for channel '{channel.name}' not found, skipping")
                 continue
             
-            logger.info(f"🚀 ATTEMPT #{attempt_num}: Trying channel '{channel.name}' (ID: {channel.id}) with score {routing_score.total_score:.3f}")
-            logger.info(f"🚀 ATTEMPT #{attempt_num}: Score breakdown - {routing_score.reason}")
+            logger.info(f"🚀 ATTEMPT #{attempt_num}: [{request_id}] Trying channel '{channel.name}' (ID: {channel.id}) with score {routing_score.total_score:.3f}")
+            logger.info(f"🚀 ATTEMPT #{attempt_num}: [{request_id}] Score breakdown - {routing_score.reason}")
             
             try:
                 channel_info = self._prepare_channel_request_info(channel, provider, request, routing_score.matched_model)
                 
-                logger.info(f"📡 FORWARDING: Sending request to {channel_info.url}")
-                logger.info(f"📡 FORWARDING: Target model -> '{channel_info.request_data['model']}'")
+                logger.info(f"📡 FORWARDING: [{request_id}] Sending request to {channel_info.url}")
+                logger.info(f"📡 FORWARDING: [{request_id}] Target model -> '{channel_info.request_data['model']}'")
+                
+                # 创建请求元数据
+                aggregator = get_response_aggregator()
+                metadata = aggregator.create_request_metadata(
+                    request_id=request_id,
+                    model_requested=request.model,
+                    model_used=channel_info.request_data['model'],
+                    channel_name=channel.name,
+                    channel_id=channel.id,
+                    provider=channel.provider,
+                    attempt_count=attempt_num,
+                    is_streaming=request.stream,
+                    routing_strategy=getattr(self.router, 'current_strategy', 'balanced'),
+                    routing_score=routing_score.total_score,
+                    routing_reason=routing_score.reason
+                )
+                
+                # 存储元数据到请求中，供后续使用
+                setattr(request, '_metadata', metadata)
                 
                 if request.stream:
-                    return await self._handle_streaming_request(request, channel_info, routing_score, attempt_num)
+                    return await self._handle_streaming_request(request, channel_info, routing_score, attempt_num, metadata)
                 else:
-                    return await self._handle_regular_request(request, channel_info, routing_score, attempt_num, start_time)
+                    return await self._handle_regular_request(request, channel_info, routing_score, attempt_num, start_time, metadata)
                     
             except httpx.HTTPStatusError as e:
                 last_error = e
@@ -190,21 +213,23 @@ class ChatCompletionHandler:
         # 所有渠道都失败了
         return self._create_all_channels_failed_error(request.model, routing_result.candidates, last_error, time.time() - start_time)
     
-    async def _handle_streaming_request(self, request: ChatCompletionRequest, channel_info: ChannelRequestInfo, routing_score: RoutingScore, attempt_num: int) -> StreamingResponse:
+    async def _handle_streaming_request(self, request: ChatCompletionRequest, channel_info: ChannelRequestInfo, routing_score: RoutingScore, attempt_num: int, metadata: RequestMetadata) -> StreamingResponse:
         """处理流式请求"""
-        logger.info(f"🌊 STREAMING: Starting streaming response for channel '{channel_info.channel.name}'")
+        logger.info(f"🌊 STREAMING: [{metadata.request_id}] Starting streaming response for channel '{channel_info.channel.name}'")
         
-        debug_headers = self._create_debug_headers(channel_info, routing_score, attempt_num, "streaming")
+        # 获取响应汇总器并添加HTTP头信息
+        aggregator = get_response_aggregator()
+        debug_headers = aggregator.get_headers_summary(metadata.request_id)
         
         return StreamingResponse(
-            self._stream_channel_api(channel_info.url, channel_info.headers, channel_info.request_data, channel_info.channel.id),
+            self._stream_channel_api_with_summary(channel_info.url, channel_info.headers, channel_info.request_data, channel_info.channel.id, metadata),
             media_type="text/event-stream",
             headers=debug_headers
         )
     
-    async def _handle_regular_request(self, request: ChatCompletionRequest, channel_info: ChannelRequestInfo, routing_score: RoutingScore, attempt_num: int, start_time: float) -> JSONResponse:
+    async def _handle_regular_request(self, request: ChatCompletionRequest, channel_info: ChannelRequestInfo, routing_score: RoutingScore, attempt_num: int, start_time: float, metadata: RequestMetadata) -> JSONResponse:
         """处理常规请求"""
-        logger.info(f"⏳ REQUEST: Sending optimized request to channel '{channel_info.channel.name}'")
+        logger.info(f"⏳ REQUEST: [{metadata.request_id}] Sending optimized request to channel '{channel_info.channel.name}'")
         
         response_json = await self._call_channel_api(channel_info.url, channel_info.headers, channel_info.request_data)
         
@@ -212,14 +237,43 @@ class ChatCompletionHandler:
         latency = time.time() - start_time
         self.router.update_channel_health(channel_info.channel.id, True, latency)
         
-        logger.info(f"✅ SUCCESS: Channel '{channel_info.channel.name}' responded successfully (latency: {latency:.3f}s)")
-        logger.info(f"✅ RESPONSE: Model used -> {response_json.get('model', 'unknown')}")
-        logger.info(f"✅ RESPONSE: Usage -> {response_json.get('usage', {})}")
+        logger.info(f"✅ SUCCESS: [{metadata.request_id}] Channel '{channel_info.channel.name}' responded successfully (latency: {latency:.3f}s)")
+        logger.info(f"✅ RESPONSE: [{metadata.request_id}] Model used -> {response_json.get('model', 'unknown')}")
+        logger.info(f"✅ RESPONSE: [{metadata.request_id}] Usage -> {response_json.get('usage', {})}")
         
-        # 计算并添加成本信息
-        enhanced_response = self._add_cost_information(response_json, channel_info.channel, routing_score)
+        # 更新元数据
+        aggregator = get_response_aggregator()
+        usage = response_json.get('usage', {})
+        prompt_tokens = usage.get('prompt_tokens', 0)
+        completion_tokens = usage.get('completion_tokens', 0)
+        total_tokens = usage.get('total_tokens', prompt_tokens + completion_tokens)
         
-        debug_headers = self._create_debug_headers(channel_info, routing_score, attempt_num, "regular", latency)
+        # 计算成本信息
+        cost_info = self._calculate_request_cost(channel_info.channel, prompt_tokens, completion_tokens, response_json.get('model'))
+        
+        # 获取用户会话信息
+        session_manager = get_session_manager()
+        user_identifier = self._extract_user_identifier(request)
+        session = session_manager.add_request(
+            user_identifier=user_identifier,
+            cost=cost_info['total_cost'],
+            model=response_json.get('model', 'unknown'),
+            channel=channel_info.channel.name
+        )
+        
+        # 更新聚合器
+        aggregator.update_tokens(metadata.request_id, prompt_tokens, completion_tokens, total_tokens)
+        aggregator.update_cost(metadata.request_id, cost_info['total_cost'], session.total_cost, session.total_requests)
+        aggregator.update_performance(metadata.request_id, ttfb=None)  # 可以后续添加TTFB测量
+        
+        # 完成请求并获取最终元数据
+        final_metadata = aggregator.finish_request(metadata.request_id)
+        
+        # 使用新的响应汇总格式
+        enhanced_response = aggregator.enhance_response_with_summary(response_json, final_metadata)
+        
+        # 获取汇总头信息（虽然非流式主要在响应体中，但保留头信息用于调试）
+        debug_headers = aggregator.get_headers_summary(metadata.request_id)
         
         return JSONResponse(content=enhanced_response, headers=debug_headers)
     
@@ -636,3 +690,146 @@ class ChatCompletionHandler:
             'total_cost': round(total_cost, 8),
             'currency': 'USD'
         }
+    
+    async def _stream_channel_api_with_summary(self, url: str, headers: dict, request_data: dict, channel_id: str, metadata: RequestMetadata):
+        """优化的流式API调用，在结束时添加汇总信息"""
+        chunk_count = 0
+        stream_start_time = time.time()
+        aggregator = get_response_aggregator()
+        
+        logger.info(f"🌊 STREAM START: [{metadata.request_id}] Initiating optimized streaming request to channel '{channel_id}'")
+        
+        try:
+            http_pool = get_http_pool()
+            
+            async with http_pool.stream("POST", url, json=request_data, headers=headers) as response:
+                if response.status_code != 200:
+                    # 读取错误内容，限制大小以避免内存问题
+                    error_body = await response.aread()
+                    if len(error_body) > 1024:
+                        error_body = error_body[:1024]
+                    logger.error(f"🌊 STREAM ERROR: [{metadata.request_id}] Channel '{channel_id}' returned status {response.status_code}")
+                    
+                    error_text = error_body.decode('utf-8', errors='ignore')[:200]
+                    logger.error(f"🌊 STREAM ERROR DETAILS: [{metadata.request_id}] {error_text}")
+                    self.router.update_channel_health(channel_id, False)
+                    
+                    # 设置错误信息并完成请求
+                    aggregator.set_error(metadata.request_id, str(response.status_code), error_text)
+                    final_metadata = aggregator.finish_request(metadata.request_id)
+                    
+                    yield f"data: {json.dumps({'error': {'message': f'Upstream API error: {error_text}', 'code': response.status_code}})}\\n\\n"
+                    # 发送错误情况下的汇总信息
+                    yield aggregator.create_sse_summary_event(final_metadata)
+                    yield "data: [DONE]\\n\\n"
+                    return
+
+                logger.info(f"🌊 STREAM CONNECTED: [{metadata.request_id}] Successfully connected to channel '{channel_id}', starting optimized data flow")
+                
+                # 记录TTFB时间
+                ttfb_recorded = False
+                
+                # 记录token信息的变量
+                total_prompt_tokens = 0
+                total_completion_tokens = 0
+                total_tokens = 0
+                
+                async for chunk in response.aiter_bytes(chunk_size=8192):
+                    if chunk:
+                        chunk_count += 1
+                        
+                        # 记录第一个块的时间作为TTFB
+                        if not ttfb_recorded:
+                            ttfb = time.time() - stream_start_time
+                            aggregator.update_performance(metadata.request_id, ttfb=ttfb)
+                            ttfb_recorded = True
+                        
+                        # 解析响应以提取token信息（简化版）
+                        try:
+                            chunk_str = chunk.decode('utf-8', errors='ignore')
+                            if 'data: ' in chunk_str and '"usage"' in chunk_str:
+                                # 尝试提取最后usage信息
+                                lines = chunk_str.split('\\n')
+                                for line in lines:
+                                    if line.startswith('data: ') and line != 'data: [DONE]':
+                                        try:
+                                            data = json.loads(line[6:])  # 去掉 'data: '
+                                            if 'usage' in data:
+                                                usage = data['usage']
+                                                total_prompt_tokens = usage.get('prompt_tokens', total_prompt_tokens)
+                                                total_completion_tokens = usage.get('completion_tokens', total_completion_tokens) 
+                                                total_tokens = usage.get('total_tokens', total_tokens)
+                                        except (json.JSONDecodeError, KeyError):
+                                            pass
+                        except Exception:
+                            pass  # 忽略解析错误
+                        
+                        if chunk_count % 20 == 0:
+                            logger.debug(f"🌊 STREAMING: [{metadata.request_id}] Received {chunk_count} chunks from channel '{channel_id}'")
+                    
+                    yield chunk
+                
+                # 更新token和成本信息
+                if total_tokens > 0:
+                    aggregator.update_tokens(metadata.request_id, total_prompt_tokens, total_completion_tokens, total_tokens)
+                    # 计算成本（需要估算模型名）
+                    cost_info = self._calculate_request_cost(None, total_prompt_tokens, total_completion_tokens, metadata.model_used)
+                    
+                    # 获取用户会话信息 (流式请求需要从元数据中获取原始请求)
+                    # 这里简化处理，实际应该传递原始请求对象
+                    session_manager = get_session_manager()
+                    user_identifier = session_manager.create_user_identifier("streaming-user", "streaming-client")
+                    session = session_manager.add_request(
+                        user_identifier=user_identifier,
+                        cost=cost_info['total_cost'],
+                        model=metadata.model_used,
+                        channel=metadata.channel_name
+                    )
+                    
+                    aggregator.update_cost(metadata.request_id, cost_info['total_cost'], session.total_cost, session.total_requests)
+                
+                # 完成请求并生成汇总
+                final_metadata = aggregator.finish_request(metadata.request_id)
+                        
+            stream_duration = time.time() - stream_start_time
+            self.router.update_channel_health(channel_id, True, stream_duration)
+            logger.info(f"🌊 STREAM COMPLETE: [{metadata.request_id}] Channel '{channel_id}' completed optimized streaming {chunk_count} chunks in {stream_duration:.3f}s")
+            
+            # 在[DONE]之前发送汇总信息
+            yield aggregator.create_sse_summary_event(final_metadata)
+            yield "data: [DONE]\\n\\n"
+            
+        except httpx.HTTPStatusError as e:
+            error_text = e.response.text if hasattr(e.response, 'text') else str(e)
+            logger.error(f"🌊 STREAM FAILED: [{metadata.request_id}] Channel '{channel_id}' HTTP error {e.response.status_code}: {error_text[:200]}...")
+            self.router.update_channel_health(channel_id, False)
+            
+            # 设置错误信息并完成请求
+            aggregator.set_error(metadata.request_id, str(e.response.status_code), error_text)
+            final_metadata = aggregator.finish_request(metadata.request_id)
+            
+            yield f"data: {json.dumps({'error': {'message': f'Upstream API error: {error_text}', 'code': e.response.status_code}})}\\n\\n"
+            yield aggregator.create_sse_summary_event(final_metadata)
+            yield "data: [DONE]\\n\\n"
+            
+        except Exception as e:
+            logger.error(f"🌊 STREAM EXCEPTION: [{metadata.request_id}] Streaming request for channel '{channel_id}' failed: {e}", exc_info=True)
+            self.router.update_channel_health(channel_id, False)
+            
+            # 设置错误信息并完成请求
+            aggregator.set_error(metadata.request_id, "500", str(e))
+            final_metadata = aggregator.finish_request(metadata.request_id)
+            
+            yield f"data: {json.dumps({'error': {'message': str(e), 'code': 500}})}\\n\\n"
+            yield aggregator.create_sse_summary_event(final_metadata)
+            yield "data: [DONE]\\n\\n"
+    
+    def _extract_user_identifier(self, request) -> str:
+        """从请求中提取用户标识符"""
+        # 这里可以从请求头或其他地方提取API key和User-Agent
+        # 暂时使用简化版本，实际应该从FastAPI的Request对象中获取
+        api_key = getattr(request, 'api_key', None) or "anonymous"
+        user_agent = getattr(request, 'user_agent', None) or "unknown-client"
+        
+        session_manager = get_session_manager()
+        return session_manager.create_user_identifier(api_key, user_agent)
