@@ -180,7 +180,7 @@ class JSONRouter:
             
             # 第三步：评分和排序
             logger.info(f"🎯 STEP 3: Scoring and ranking channels...")
-            scored_channels = self._score_channels(filtered_candidates, request)
+            scored_channels = await self._score_channels(filtered_candidates, request)
             if not scored_channels:
                 logger.warning(f"❌ ROUTING FAILED: Failed to score any channels for model '{request.model}'")
                 return []
@@ -500,16 +500,68 @@ class JSONRouter:
             filtered.append(candidate)
         return filtered
     
-    def _score_channels(self, channels: List[ChannelCandidate], request: RoutingRequest) -> List[RoutingScore]:
-        """计算渠道评分"""
+    async def _score_channels(self, channels: List[ChannelCandidate], request: RoutingRequest) -> List[RoutingScore]:
+        """计算渠道评分 - 批量优化版本"""
         logger.info(f"📊 SCORING: Evaluating {len(channels)} candidate channels for model '{request.model}'")
         
+        # 如果渠道数量较少，使用原有的单个评分方式
+        if len(channels) < 5:
+            return await self._score_channels_individual(channels, request)
+        
+        # 使用批量评分器进行优化
+        if not hasattr(self, '_batch_scorer'):
+            from core.utils.batch_scorer import BatchScorer
+            self._batch_scorer = BatchScorer(self)
+        
+        # 批量计算所有评分
+        batch_result = await self._batch_scorer.batch_score_channels(channels, request)
+        
+        # 构建评分结果
         scored_channels = []
         strategy = self._get_routing_strategy(request.model)
         
         logger.info(f"📊 SCORING: Using routing strategy with {len(strategy)} rules")
         for rule in strategy:
             logger.debug(f"📊 SCORING: Strategy rule: {rule['field']} (weight: {rule['weight']}, order: {rule['order']})")
+        
+        for candidate in channels:
+            # 从批量结果中获取评分
+            scores = self._batch_scorer.get_score_for_channel(batch_result, candidate)
+            
+            total_score = self._calculate_total_score(
+                strategy, 
+                scores['cost_score'], scores['speed_score'], scores['quality_score'], 
+                scores['reliability_score'], scores['parameter_score'], scores['context_score'],
+                scores['free_score'], scores['local_score']
+            )
+            
+            # 简化日志输出
+            model_display = candidate.matched_model or candidate.channel.model_name
+            logger.info(f"📊 SCORE: '{candidate.channel.name}' -> '{model_display}' = {total_score:.3f} (Q:{scores['quality_score']:.2f})")
+            
+            scored_channels.append(RoutingScore(
+                channel=candidate.channel, total_score=total_score, 
+                cost_score=scores['cost_score'], speed_score=scores['speed_score'],
+                quality_score=scores['quality_score'], reliability_score=scores['reliability_score'],
+                reason=f"cost:{scores['cost_score']:.2f} speed:{scores['speed_score']:.2f} quality:{scores['quality_score']:.2f} reliability:{scores['reliability_score']:.2f}",
+                matched_model=candidate.matched_model
+            ))
+        
+        # 使用分层优先级排序
+        scored_channels = self._hierarchical_sort(scored_channels)
+        
+        logger.info(f"🏆 SCORING RESULT: Channels ranked by score (computed in {batch_result.computation_time_ms:.1f}ms):")
+        for i, scored in enumerate(scored_channels[:5]):  # 只显示前5个
+            logger.info(f"🏆   #{i+1}: '{scored.channel.name}' (Score: {scored.total_score:.3f})")
+        
+        return scored_channels
+    
+    async def _score_channels_individual(self, channels: List[ChannelCandidate], request: RoutingRequest) -> List[RoutingScore]:
+        """单个渠道评分方式（用于小数量渠道）"""
+        logger.info(f"📊 SCORING: Using individual scoring for {len(channels)} channels")
+        
+        scored_channels = []
+        strategy = self._get_routing_strategy(request.model)
         
         for candidate in channels:
             channel = candidate.channel
@@ -527,7 +579,6 @@ class JSONRouter:
                 parameter_score, context_score, free_score, local_score
             )
             
-            # 为了减少日志冗余，只显示模型名称和总分
             model_display = candidate.matched_model or channel.model_name
             logger.info(f"📊 SCORE: '{channel.name}' -> '{model_display}' = {total_score:.3f} (Q:{quality_score:.2f})")
             
@@ -539,13 +590,7 @@ class JSONRouter:
                 matched_model=candidate.matched_model
             ))
         
-        # 使用分层优先级排序，而不是简单的总分排序
         scored_channels = self._hierarchical_sort(scored_channels)
-        
-        logger.info(f"🏆 SCORING RESULT: Channels ranked by score:")
-        for i, scored in enumerate(scored_channels[:5]):  # 只显示前5个
-            logger.info(f"🏆   #{i+1}: '{scored.channel.name}' (Score: {scored.total_score:.3f})")
-        
         return scored_channels
     
     def _get_routing_strategy(self, model: str) -> List[Dict[str, Any]]:
@@ -1452,6 +1497,12 @@ class JSONRouter:
         result = sorted(list(models | all_tags))
         self._available_models_cache = result
         return result
+    
+    def get_all_available_tags(self) -> List[str]:
+        """获取所有可用的标签（不带tag:前缀）"""
+        models = self.get_available_models()
+        tags = [model[4:] for model in models if model.startswith("tag:")]
+        return sorted(tags)
     
     def clear_cache(self):
         """清除所有缓存"""
