@@ -11,6 +11,7 @@ import logging
 
 from .config_models import Config, Channel, Provider
 from .auth import generate_secure_token as generate_random_token
+from .utils.api_key_cache import get_api_key_cache_manager
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,9 @@ class YAMLConfigLoader:
         
         # 模型缓存
         self.model_cache: Dict[str, Dict] = {}
+        
+        # API Key缓存管理器
+        self.api_key_cache_manager = get_api_key_cache_manager()
         
         # 加载并解析配置
         self.config: Config = self._load_and_validate_config()
@@ -131,25 +135,54 @@ class YAMLConfigLoader:
             cache_file = Path(__file__).parent.parent / "cache" / "discovered_models.json"
             if cache_file.exists():
                 with open(cache_file, 'r', encoding='utf-8') as f:
-                    self.model_cache = json.load(f)
-                    logger.info(f"Loaded model cache for {len(self.model_cache)} channels")
+                    raw_cache = json.load(f)
+                    
+                    # 检查是否需要迁移缓存格式
+                    if self._needs_cache_migration(raw_cache):
+                        logger.info("Migrating cache from legacy format to API key-level format")
+                        self.model_cache = self.api_key_cache_manager.migrate_legacy_cache(
+                            raw_cache, self._get_channels_for_migration()
+                        )
+                        # 保存迁移后的缓存
+                        self._save_migrated_cache()
+                    else:
+                        self.model_cache = raw_cache
+                        
+                    # 清理无效条目
+                    self.model_cache = self.api_key_cache_manager.cleanup_invalid_entries(
+                        self.model_cache, self._get_channels_for_migration()
+                    )
+                    
+                    # 输出缓存统计信息
+                    stats = self.api_key_cache_manager.get_cache_statistics(self.model_cache)
+                    logger.info(f"Loaded model cache: {stats['total_entries']} entries, "
+                              f"{stats['api_key_entries']} API key-level, {stats['legacy_entries']} legacy, "
+                              f"{stats['api_key_coverage']}% coverage")
             else:
                 logger.warning("Model cache file not found")
+                self.model_cache = {}
         except Exception as e:
             # 作为后备方案，尝试从任务模块加载
             try:
                 from .scheduler.tasks.model_discovery import get_model_discovery_task
                 task = get_model_discovery_task()
-                self.model_cache = task.cached_models
-                if self.model_cache:
-                    logger.info(f"Loaded model cache from task for {len(self.model_cache)} channels")
+                raw_cache = task.cached_models
+                if raw_cache:
+                    # 应用相同的迁移逻辑
+                    if self._needs_cache_migration(raw_cache):
+                        logger.info("Migrating task cache from legacy format to API key-level format")
+                        self.model_cache = self.api_key_cache_manager.migrate_legacy_cache(
+                            raw_cache, self._get_channels_for_migration()
+                        )
+                    else:
+                        self.model_cache = raw_cache
+                    logger.info(f"Loaded model cache from task for {len(self.model_cache)} entries")
+                else:
+                    self.model_cache = {}
             except Exception as e2:
                 logger.warning(f"Failed to load model cache from both sources: {e}, {e2}")
                 self.model_cache = {}
 
-    def get_enabled_channels(self) -> List[Channel]:
-        """获取所有启用的渠道"""
-        return [ch for ch in self.config.channels if ch.enabled]
 
     def get_channels_by_model(self, model_name: str) -> List[Channel]:
         """根据模型名称获取渠道"""
@@ -159,14 +192,153 @@ class YAMLConfigLoader:
         """根据标签获取渠道"""
         return [ch for ch in self.get_enabled_channels() if tag in ch.tags]
 
+    def _needs_cache_migration(self, cache: Dict[str, Any]) -> bool:
+        """检查缓存是否需要迁移到API Key级别格式"""
+        if not cache:
+            return False
+        
+        # 检查是否存在旧格式的缓存键
+        for cache_key in cache.keys():
+            if not self.api_key_cache_manager.is_api_key_cache(cache_key):
+                return True
+        return False
+    
+    def _get_channels_for_migration(self) -> Dict[str, Any]:
+        """获取用于缓存迁移的渠道映射"""
+        channels_map = {}
+        for channel in self.config.channels:
+            channels_map[channel.id] = {
+                'id': channel.id,
+                'provider': getattr(channel, 'provider_name', getattr(channel, 'provider', 'unknown')),
+                'api_key': getattr(channel, 'api_key', ''),
+                'enabled': channel.enabled
+            }
+        return channels_map
+    
+    def _save_migrated_cache(self):
+        """保存迁移后的缓存"""
+        try:
+            cache_file = Path(__file__).parent.parent / "cache" / "discovered_models.json"
+            with open(cache_file, 'w', encoding='utf-8') as f:
+                json.dump(self.model_cache, f, indent=2, ensure_ascii=False)
+            logger.info("Migrated cache saved successfully")
+        except Exception as e:
+            logger.error(f"Failed to save migrated cache: {e}")
+    
     def get_model_cache(self) -> Dict[str, Dict]:
-        """获取模型缓存"""
+        """获取模型缓存（兼容性方法）"""
         return self.model_cache
     
+    def get_model_cache_by_channel_and_key(self, channel_id: str, api_key: str) -> Optional[Dict]:
+        """获取特定API Key的模型缓存"""
+        cache_key = self.api_key_cache_manager.generate_cache_key(channel_id, api_key)
+        return self.model_cache.get(cache_key)
+    
+    def get_model_cache_by_channel(self, channel_id: str) -> Dict[str, Any]:
+        """获取渠道下所有API Key的缓存（兼容性方法）"""
+        # 查找该渠道的所有缓存条目
+        channel_cache_keys = self.api_key_cache_manager.find_cache_entries_by_channel(
+            self.model_cache, channel_id
+        )
+        
+        if not channel_cache_keys:
+            # 尝试查找旧格式缓存
+            legacy_cache = self.model_cache.get(channel_id)
+            if legacy_cache:
+                return legacy_cache
+            return {}
+        
+        # 如果只有一个API Key，返回其缓存（向后兼容）
+        if len(channel_cache_keys) == 1:
+            return self.model_cache[channel_cache_keys[0]]
+        
+        # 多个API Key的情况，返回合并结果
+        merged_models = []
+        latest_status = 'unknown'
+        latest_update = None
+        
+        for cache_key in channel_cache_keys:
+            cache_data = self.model_cache[cache_key]
+            models = cache_data.get('models', [])
+            merged_models.extend(models)
+            
+            # 使用最新的状态和更新时间
+            if cache_data.get('last_updated', '') > (latest_update or ''):
+                latest_update = cache_data.get('last_updated')
+                latest_status = cache_data.get('status', 'unknown')
+        
+        # 去重并排序
+        unique_models = sorted(list(set(merged_models)))
+        
+        return {
+            'channel_id': channel_id,
+            'models': unique_models,
+            'model_count': len(unique_models),
+            'status': latest_status,
+            'last_updated': latest_update,
+            'merged_from_keys': len(channel_cache_keys),
+            'note': f'Merged from {len(channel_cache_keys)} API keys'
+        }
+
+    def get_enabled_channels(self) -> List[Channel]:
+        """获取所有启用的渠道"""
+        return [ch for ch in self.config.channels if ch.enabled]
+    
     def update_model_cache(self, new_cache: Dict[str, Dict]):
-        """更新模型缓存"""
-        self.model_cache = new_cache
-        logger.info(f"Updated model cache with {len(new_cache)} channels")
+        """更新模型缓存（支持API Key级别缓存）"""
+        # 检查是否需要迁移新的缓存数据
+        if self._needs_cache_migration(new_cache):
+            logger.info("Migrating new cache data to API key-level format")
+            migrated_cache = self.api_key_cache_manager.migrate_legacy_cache(
+                new_cache, self._get_channels_for_migration()
+            )
+            self.model_cache.update(migrated_cache)
+        else:
+            self.model_cache.update(new_cache)
+        
+        # 输出更新统计信息
+        stats = self.api_key_cache_manager.get_cache_statistics(self.model_cache)
+        logger.info(f"Updated model cache: {stats['total_entries']} entries, "
+                  f"{stats['api_key_coverage']}% API key-level coverage")
+    
+    def update_model_cache_for_channel_and_key(self, channel_id: str, api_key: str, cache_data: Dict[str, Any]):
+        """更新特定渠道和API Key的模型缓存"""
+        cache_key = self.api_key_cache_manager.generate_cache_key(channel_id, api_key)
+        
+        # 添加API Key相关元数据
+        enhanced_cache_data = {
+            **cache_data,
+            'cache_key': cache_key,
+            'channel_id': channel_id,
+            'api_key_hash': cache_key.split('_')[-1] if '_' in cache_key else '',
+            'updated_at': datetime.now().isoformat()
+        }
+        
+        self.model_cache[cache_key] = enhanced_cache_data
+        logger.info(f"Updated cache for channel '{channel_id}' with API key hash '{enhanced_cache_data['api_key_hash'][:8]}...'")
+    
+    def invalidate_cache_for_channel(self, channel_id: str, api_key: Optional[str] = None):
+        """使特定渠道的缓存失效"""
+        if api_key:
+            # 清除特定API Key的缓存
+            cache_key = self.api_key_cache_manager.generate_cache_key(channel_id, api_key)
+            if cache_key in self.model_cache:
+                del self.model_cache[cache_key]
+                logger.info(f"Invalidated cache for channel '{channel_id}' with specific API key")
+        else:
+            # 清除该渠道所有API Key的缓存
+            channel_cache_keys = self.api_key_cache_manager.find_cache_entries_by_channel(
+                self.model_cache, channel_id
+            )
+            for cache_key in channel_cache_keys:
+                if cache_key in self.model_cache:
+                    del self.model_cache[cache_key]
+            
+            # 同时清除可能存在的旧格式缓存
+            if channel_id in self.model_cache:
+                del self.model_cache[channel_id]
+            
+            logger.info(f"Invalidated {len(channel_cache_keys)} cache entries for channel '{channel_id}'")
 
     def update_channel_health(self, channel_id: str, success: bool, latency: Optional[float] = None):
         """更新渠道健康状态"""
@@ -264,9 +436,6 @@ class YAMLConfigLoader:
             capabilities=["text", "function_calling"]
         )
 
-    def get_enabled_channels(self) -> List[Channel]:
-        """获取所有启用的渠道"""
-        return [ch for ch in self.config.channels if ch.enabled]
 
     @property
     def config_data(self) -> Dict[str, Any]:

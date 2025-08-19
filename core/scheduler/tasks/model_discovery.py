@@ -14,6 +14,7 @@ from urllib.parse import urljoin, urlparse
 import httpx
 import logging
 from core.utils.smart_cache import get_smart_cache, cache_get, cache_set, cache_get_or_set
+from core.utils.api_key_cache import get_api_key_cache_manager
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,9 @@ class ModelDiscoveryTask:
         self.cached_models: Dict[str, Dict] = {}
         self.merged_config: Dict[str, Any] = {}
         self.last_update: Optional[datetime] = None
+        
+        # API Key缓存管理器
+        self.api_key_cache_manager = get_api_key_cache_manager()
         
         # 加载现有缓存
         self._load_cache()
@@ -177,6 +181,9 @@ class ModelDiscoveryTask:
                         if isinstance(models_data, list):
                             models = [model.get('id') if isinstance(model, dict) else str(model) for model in models_data]
                     
+                    # 生成API Key级别的缓存键
+                    cache_key = self.api_key_cache_manager.generate_cache_key(channel_id, api_key)
+                    
                     result = {
                         'channel_id': channel_id,
                         'provider': provider,
@@ -186,6 +193,9 @@ class ModelDiscoveryTask:
                         'model_count': len(models),
                         'last_updated': datetime.now().isoformat(),
                         'status': 'success',
+                        'cache_key': cache_key,
+                        'api_key_hash': cache_key.split('_')[-1] if '_' in cache_key else '',
+                        'user_level': self._detect_user_level(models, provider),
                         'response_data': data  # 保存原始响应用于调试
                     }
                     
@@ -411,6 +421,43 @@ class ModelDiscoveryTask:
         
         age = datetime.now() - self.last_update
         return age <= timedelta(hours=max_age_hours)
+    
+    def _detect_user_level(self, models: List[str], provider: str) -> str:
+        """检测用户等级（基于模型列表和提供商）"""
+        if not models:
+            return 'unknown'
+        
+        # SiliconFlow用户等级检测
+        if provider == 'siliconflow':
+            pro_models = [m for m in models if 'Pro/' in m or '/Pro' in m]
+            if pro_models:
+                return 'pro'
+            return 'free'
+        
+        # OpenRouter用户等级检测
+        if provider == 'openrouter':
+            model_count = len(models)
+            if model_count > 100:
+                return 'premium'
+            elif model_count > 50:
+                return 'pro'
+            return 'free'
+        
+        # Groq用户等级检测
+        if provider == 'groq':
+            # Groq的免费模型通常较少
+            return 'free' if len(models) <= 10 else 'pro'
+        
+        # 其他提供商的默认检测逻辑
+        model_count = len(models)
+        if model_count > 50:
+            return 'premium'
+        elif model_count > 20:
+            return 'pro'
+        elif model_count > 0:
+            return 'free'
+        
+        return 'unknown'
 
 
 # 全局实例
