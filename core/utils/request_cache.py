@@ -70,6 +70,9 @@ class CachedModelSelection:
     expires_at: datetime
     request_count: int = 0
     last_used_at: Optional[datetime] = None
+    # 新增：存储实际匹配的模型名（对于标签路由很重要）
+    primary_matched_model: Optional[str] = None
+    backup_matched_models: Optional[List[str]] = None
     
     def is_expired(self) -> bool:
         """检查是否已过期"""
@@ -172,7 +175,9 @@ class RequestModelCache:
                              backup_channels: List[Channel],
                              selection_reason: str,
                              cost_estimate: float,
-                             ttl_seconds: Optional[int] = None) -> str:
+                             ttl_seconds: Optional[int] = None,
+                             primary_matched_model: Optional[str] = None,
+                             backup_matched_models: Optional[List[str]] = None) -> str:
         """缓存模型选择结果"""
         
         cache_key = fingerprint.to_cache_key()
@@ -192,13 +197,16 @@ class RequestModelCache:
                 selection_reason=selection_reason,
                 cost_estimate=cost_estimate,
                 created_at=now,
-                expires_at=expires_at
+                expires_at=expires_at,
+                primary_matched_model=primary_matched_model,
+                backup_matched_models=backup_matched_models[:5] if backup_matched_models else None
             )
             
             self._cache[cache_key] = cached_selection
             
             logger.debug(f"💾 CACHED: {cache_key} -> {primary_channel.name} "
-                       f"(ttl: {ttl}s, backups: {len(backup_channels)}, cost: ${cost_estimate:.4f})")
+                       f"(ttl: {ttl}s, backups: {len(backup_channels)}, cost: ${cost_estimate:.4f}, "
+                       f"matched_model: {primary_matched_model})")
             
             return cache_key
     

@@ -119,12 +119,17 @@ class JSONRouter:
                 quality_score=0.8,
                 reliability_score=0.9,
                 reason=f"CACHED: {cached_result.selection_reason}",
-                matched_model=request.model
+                matched_model=cached_result.primary_matched_model or request.model  # 使用缓存中的真实模型名
             )
             scores.append(primary_score)
             
             # 备选渠道  
             for i, backup_channel in enumerate(cached_result.backup_channels):
+                # 获取对应的备选模型名
+                backup_matched_model = None
+                if cached_result.backup_matched_models and i < len(cached_result.backup_matched_models):
+                    backup_matched_model = cached_result.backup_matched_models[i]
+                
                 backup_score = RoutingScore(
                     channel=backup_channel,
                     total_score=0.9 - i * 0.1,  # 递减优先级
@@ -133,7 +138,7 @@ class JSONRouter:
                     quality_score=0.7,
                     reliability_score=0.8,
                     reason=f"CACHED_BACKUP_{i+1}",
-                    matched_model=request.model
+                    matched_model=backup_matched_model or request.model  # 使用缓存中的真实模型名
                 )
                 scores.append(backup_score)
             
@@ -176,6 +181,10 @@ class JSONRouter:
                 selection_reason = scored_channels[0].reason
                 cost_estimate = self._estimate_cost_for_channel(primary_channel, request)
                 
+                # 提取真实的匹配模型名
+                primary_matched_model = scored_channels[0].matched_model
+                backup_matched_models = [score.matched_model for score in scored_channels[1:6]]
+                
                 try:
                     # 异步保存到缓存
                     cache_key = await cache.cache_selection(
@@ -184,7 +193,9 @@ class JSONRouter:
                         backup_channels=backup_channels,
                         selection_reason=selection_reason,
                         cost_estimate=cost_estimate,
-                        ttl_seconds=60  # 1分钟TTL
+                        ttl_seconds=60,  # 1分钟TTL
+                        primary_matched_model=primary_matched_model,
+                        backup_matched_models=backup_matched_models
                     )
                     logger.debug(f"💾 CACHED RESULT: {cache_key} -> {primary_channel.name}")
                 except Exception as cache_error:
@@ -258,11 +269,20 @@ class JSONRouter:
         for channel in all_enabled_channels:
             if channel.id in model_cache:
                 discovered_info = model_cache[channel.id]
+                models_data = discovered_info.get("models_data", {}) if isinstance(discovered_info, dict) else {}
+                
+                # 检查是否存在精确匹配的模型
                 if request.model in discovered_info.get("models", []):
-                    # 对于物理模型，matched_model 就是请求的模型
+                    # 获取真实的模型ID - 可能与请求的不同（别名映射）
+                    real_model_id = request.model
+                    if models_data and request.model in models_data:
+                        model_info = models_data[request.model]
+                        real_model_id = model_info.get("id", request.model)
+                    
+                    logger.debug(f"🔍 PHYSICAL MODEL: Found '{request.model}' -> '{real_model_id}' in channel '{channel.name}'")
                     physical_candidates.append(ChannelCandidate(
                         channel=channel,
-                        matched_model=request.model
+                        matched_model=real_model_id  # 使用真实的模型ID
                     ))
         
         # 2. 同时尝试自动标签化查找（免费模型优先考虑）
@@ -305,7 +325,19 @@ class JSONRouter:
         config_channels = self.config_loader.get_channels_by_model(request.model)
         if config_channels:
             logger.info(f"📋 CONFIG FALLBACK: Found {len(config_channels)} channels in configuration for model '{request.model}'")
-            return [ChannelCandidate(channel=ch, matched_model=request.model) for ch in config_channels]
+            # 对于配置查找，尝试获取真实的模型ID
+            config_candidates = []
+            for ch in config_channels:
+                real_model_id = request.model
+                if ch.id in model_cache:
+                    discovered_info = model_cache[ch.id]
+                    models_data = discovered_info.get("models_data", {}) if isinstance(discovered_info, dict) else {}
+                    if models_data and request.model in models_data:
+                        model_info = models_data[request.model]
+                        real_model_id = model_info.get("id", request.model)
+                
+                config_candidates.append(ChannelCandidate(channel=ch, matched_model=real_model_id))
+            return config_candidates
         
         # 如果都没找到，返回空列表
         logger.warning(f"❌ NO MATCH: No channels found for model '{request.model}' (tried physical, auto-tag, and config)")
