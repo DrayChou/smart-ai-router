@@ -284,6 +284,13 @@ class YAMLConfigLoader:
         """获取所有启用的渠道"""
         return [ch for ch in self.config.channels if ch.enabled]
     
+    def get_channel_by_id(self, channel_id: str) -> Optional[Channel]:
+        """根据ID获取渠道"""
+        for channel in self.config.channels:
+            if channel.id == channel_id:
+                return channel
+        return None
+    
     def update_model_cache(self, new_cache: Dict[str, Dict]):
         """更新模型缓存（支持API Key级别缓存）"""
         # 检查是否需要迁移新的缓存数据
