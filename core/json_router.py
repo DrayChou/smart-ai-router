@@ -1152,10 +1152,8 @@ class JSONRouter:
         
         # 遍历所有有效渠道
         for channel in self.config_loader.get_enabled_channels():
-            if channel.id not in model_cache:
-                continue
-                
-            discovered_info = model_cache[channel.id]
+            # 🔥 修复：使用API Key级别缓存查找方法
+            discovered_info = self.config_loader.get_model_cache_by_channel(channel.id)
             if not isinstance(discovered_info, dict):
                 continue
                 
@@ -1228,10 +1226,8 @@ class JSONRouter:
         
         # 遍历所有有效渠道
         for channel in self.config_loader.get_enabled_channels():
-            if channel.id not in model_cache:
-                continue
-                
-            discovered_info = model_cache[channel.id]
+            # 🔥 修复：使用API Key级别缓存查找方法
+            discovered_info = self.config_loader.get_model_cache_by_channel(channel.id)
             if not isinstance(discovered_info, dict):
                 continue
                 
