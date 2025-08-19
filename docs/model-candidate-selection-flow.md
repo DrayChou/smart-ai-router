@@ -173,16 +173,17 @@ config_channels = self.config_loader.get_channels_by_model(request.model)
 ### 排序逻辑
 ```python
 hierarchical_score = (
-    cost_tier * 1000000 +       # 第1位：成本(免费=9,付费最高=8)
-    local_tier * 100000 +       # 第2位：本地
-    context_tier * 10000 +      # 第3位：上下文
-    parameter_tier * 1000 +     # 第4位：参数量
-    speed_tier * 100 +          # 第5位：速度
-    quality_tier * 10 +         # 第6位：质量
-    reliability_tier            # 第7位：可靠性
+    cost_tier * 100000 +        # 第1位：成本(免费=9,付费最高=8)
+    context_tier * 10000 +      # 第2位：上下文(优先级高于参数量)
+    parameter_tier * 1000 +     # 第3位：参数量(在参数量比较查询中关键)
+    speed_tier * 100 +          # 第4位：速度
+    quality_tier * 10 +         # 第5位：质量
+    reliability_tier            # 第6位：可靠性
 )
 return -hierarchical_score  # 负数实现降序排列
 ```
+
+**注意**：移除了自动本地优先逻辑，只有在用户明确指定 local 标签或 local_first 策略时才会优先本地
 
 ## 4. 自动标签提取规则
 

@@ -47,9 +47,9 @@ Smart AI Router 使用分层优先级排序系统，而不是简单的加权平�
 - **评分逻辑**: `reliability_score` 基于历史成功率和健康状态
 - **熔断机制**: 自动排除不可用的渠道
 
-## 7位数字评分系统
+## 6位数字评分系统
 
-系统使用精确的7位数字评分，而不是简单的元组排序，确保每个维度都有细致的区分度。
+系统使用精确的6位数字评分，而不是简单的元组排序，确保每个维度都有细致的区分度。
 
 ### 评分结构
 ```
@@ -61,12 +61,13 @@ Smart AI Router 使用分层优先级排序系统，而不是简单的加权平�
 - **第1位：成本 (9=完全免费, 8=很便宜, 0=很昂贵)**
   - 免费模型固定得9分（绝对优先）
   - 付费模型根据实际成本得0-8分
-- **第2位：本地 (9=本地, 0=远程)**
-- **第3位：上下文长度 (9=很长, 0=很短)**
-- **第4位：参数量 (9=很大, 0=很小)**
-- **第5位：速度 (9=很快, 0=很慢)**
-- **第6位：质量 (9=很高, 0=很低)**
-- **第7位：可靠性 (9=很可靠, 0=不可靠)**
+- **第2位：上下文长度 (9=很长, 0=很短)** - 优先级高于参数量
+- **第3位：参数量 (9=很大, 0=很小)** - 在参数量比较查询中关键
+- **第4位：速度 (9=很快, 0=很慢)**
+- **第5位：质量 (9=很高, 0=很低)**
+- **第6位：可靠性 (9=很可靠, 0=不可靠)**
+
+**注意**：移除了自动本地优先逻辑，只有在用户明确指定 local 标签或 local_first 策略时才会优先本地
 
 ### 排序算法
 
@@ -79,22 +80,20 @@ def sorting_key(score: RoutingScore):
         cost_tier = min(8, int(score.cost_score * 8))  # 付费模型最高8分
     
     # 其他维度评分 (0-9)
-    local_tier = min(9, int(local_score * 9))
     context_tier = min(9, int(context_score * 9))
     parameter_tier = min(9, int(parameter_score * 9))
     speed_tier = min(9, int(score.speed_score * 9))
     quality_tier = min(9, int(score.quality_score * 9))
     reliability_tier = min(9, int(score.reliability_score * 9))
     
-    # 组成7位数字，数字越大排序越靠前
+    # 组成6位数字，数字越大排序越靠前
     hierarchical_score = (
-        cost_tier * 1000000 +       # 第1位：成本(免费=9,付费最高=8)
-        local_tier * 100000 +       # 第2位：本地
-        context_tier * 10000 +      # 第3位：上下文
-        parameter_tier * 1000 +     # 第4位：参数量
-        speed_tier * 100 +          # 第5位：速度
-        quality_tier * 10 +         # 第6位：质量
-        reliability_tier            # 第7位：可靠性
+        cost_tier * 100000 +        # 第1位：成本(免费=9,付费最高=8)
+        context_tier * 10000 +      # 第2位：上下文(优先级高于参数量)
+        parameter_tier * 1000 +     # 第3位：参数量(在参数量比较查询中关键)
+        speed_tier * 100 +          # 第4位：速度
+        quality_tier * 10 +         # 第5位：质量
+        reliability_tier            # 第6位：可靠性
     )
     
     return -hierarchical_score  # 负数实现降序排列

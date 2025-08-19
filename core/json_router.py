@@ -12,6 +12,7 @@ from .config_models import Channel
 from .utils.model_analyzer import get_model_analyzer
 from .utils.channel_cache_manager import get_channel_cache_manager
 from .utils.request_cache import get_request_cache, RequestFingerprint
+from .utils.parameter_comparator import get_parameter_comparator
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,14 @@ class TagNotFoundError(Exception):
                 message = f"没有找到匹配标签 '{tags[0]}' 的模型"
             else:
                 message = f"没有找到同时匹配标签 {tags} 的模型"
+        super().__init__(message)
+
+class ParameterComparisonError(Exception):
+    """参数量比较错误"""
+    def __init__(self, query: str, message: str = None):
+        self.query = query
+        if message is None:
+            message = f"没有找到满足参数量比较 '{query}' 的模型"
         super().__init__(message)
 
 @dataclass
@@ -67,9 +76,10 @@ class JSONRouter:
         self._available_tags_cache: Optional[set] = None
         self._available_models_cache: Optional[List[str]] = None
         
-        # 模型分析器和缓存管理器
+        # 模型分析器、缓存管理器和参数量比较器
         self.model_analyzer = get_model_analyzer()
         self.cache_manager = get_channel_cache_manager()
+        self.parameter_comparator = get_parameter_comparator()
         
     async def route_request(self, request: RoutingRequest) -> List[RoutingScore]:
         """
@@ -100,6 +110,9 @@ class JSONRouter:
         
         # 检查缓存
         cache = get_request_cache()
+        cache_key = fingerprint.to_cache_key()
+        logger.debug(f"🔍 CACHE LOOKUP: Key={cache_key}, Model={request.model}")
+        
         cached_result = await cache.get_cached_selection(fingerprint)
         
         if cached_result:
@@ -208,13 +221,92 @@ class JSONRouter:
         except TagNotFoundError:
             # 让TagNotFoundError传播出去，以便上层处理
             raise
+        except ParameterComparisonError:
+            # 让ParameterComparisonError传播出去，以便上层处理
+            raise
         except Exception as e:
             logger.error(f"❌ ROUTING ERROR: Request failed for model '{request.model}': {e}", exc_info=True)
             return []
     
     def _get_candidate_channels(self, request: RoutingRequest) -> List[ChannelCandidate]:
-        """获取候选渠道，支持按标签集合或物理模型进行智能路由"""
+        """获取候选渠道，支持按标签集合、物理模型或参数量比较进行智能路由"""
         
+        # 1. 检查是否为参数量比较查询（qwen3->8b, qwen3-<72b 等）
+        if self.parameter_comparator.is_parameter_comparison(request.model):
+            logger.info(f"🔢 PARAMETER COMPARISON: Processing query '{request.model}'")
+            comparison = self.parameter_comparator.parse_comparison(request.model)
+            if not comparison:
+                logger.error(f"❌ PARAM PARSE FAILED: Could not parse parameter comparison '{request.model}'")
+                raise ParameterComparisonError(request.model)
+            
+            # 获取所有模型缓存
+            model_cache = self.config_loader.get_model_cache()
+            if not model_cache:
+                logger.error(f"❌ NO MODEL CACHE: Model cache is empty for parameter comparison")
+                raise ParameterComparisonError(request.model, "模型缓存为空，无法进行参数量比较")
+            
+            # 按参数量比较筛选模型
+            matching_models = self.parameter_comparator.filter_models_by_comparison(comparison, model_cache)
+            if not matching_models:
+                logger.error(f"❌ PARAM COMPARISON FAILED: No models found matching '{request.model}'")
+                raise ParameterComparisonError(request.model)
+            else:
+                logger.info(f"📝 First 5 matched models:")
+                for i, (channel_id, model_name, model_params) in enumerate(matching_models[:5]):
+                    logger.info(f"  {i+1}. {channel_id} -> {model_name} ({model_params:.3f}B)")
+            
+            # 转换为候选渠道列表
+            candidates = []
+            disabled_count = 0
+            not_found_count = 0
+            
+            logger.debug(f"🔍 Processing {len(matching_models)} matching models for channel lookup...")
+            
+            for channel_id, model_name, model_params in matching_models:
+                # 从 API key-level cache key 中提取真实的 channel ID
+                # 格式: "channel_id_apikeyash" -> "channel_id"
+                real_channel_id = channel_id
+                if '_' in channel_id:
+                    # 尝试去掉 API key hash 后缀
+                    parts = channel_id.split('_')
+                    if len(parts) >= 2:
+                        # 检查最后一部分是否为 hash 格式（长度为8的十六进制字符串）
+                        potential_hash = parts[-1]
+                        if len(potential_hash) == 8 and all(c in '0123456789abcdef' for c in potential_hash.lower()):
+                            real_channel_id = '_'.join(parts[:-1])
+                
+                logger.debug(f"🔍 Channel ID mapping: '{channel_id}' -> '{real_channel_id}'")
+                
+                # 查找对应的渠道对象
+                channel = self.config_loader.get_channel_by_id(real_channel_id)
+                if channel:
+                    if channel.enabled:
+                        candidates.append(ChannelCandidate(
+                            channel=channel,
+                            matched_model=model_name
+                        ))
+                        logger.debug(f"✅ Added channel: {channel.name} -> {model_name} ({model_params:.3f}B)")
+                    else:
+                        disabled_count += 1
+                        logger.debug(f"❌ Disabled channel: {real_channel_id} -> {model_name}")
+                else:
+                    not_found_count += 1
+                    logger.debug(f"❌ Channel not found: {real_channel_id} (from {channel_id}) -> {model_name}")
+            
+            logger.info(f"🔍 CHANNEL LOOKUP: Found {len(candidates)} enabled channels, "
+                       f"disabled: {disabled_count}, not_found: {not_found_count}")
+            
+            logger.info(f"✅ PARAMETER COMPARISON: Found {len(candidates)} candidate channels "
+                       f"for '{comparison.model_prefix}' models {comparison.operator} {comparison.target_params}B")
+            
+            # 显示前几个匹配的渠道
+            if candidates:
+                logger.info(f"📝 Top matched channels:")
+                for i, candidate in enumerate(candidates[:5]):
+                    logger.info(f"  {i+1}. {candidate.channel.name} -> {candidate.matched_model}")
+            return candidates
+        
+        # 2. 检查是否为标签查询
         if request.model.startswith("tag:"):
             tag_query = request.model.split(":", 1)[1]
             
@@ -927,72 +1019,69 @@ class JSONRouter:
         return total_score / total_weight
     
     def _hierarchical_sort(self, scored_channels: List[RoutingScore]) -> List[RoutingScore]:
-        """分层优先级排序：使用7位数字评分系统 (成本|本地|上下文|参数|速度|质量|可靠性)"""
+        """分层优先级排序：使用6位数字评分系统 (成本|上下文|参数|速度|质量|可靠性)
+        
+        注意：移除了自动本地优先逻辑，只有在用户明确指定 local 标签或 local_first 策略时才会优先本地
+        """
         def sorting_key(score: RoutingScore):
             # 获取额外的评分信息
             channel = score.channel
             free_score = self._calculate_free_score(channel, score.matched_model)
-            local_score = self._calculate_local_score(channel, score.matched_model)
             parameter_score = self._calculate_parameter_score(channel, score.matched_model)
             context_score = self._calculate_context_score(channel, score.matched_model)
             
             # 将每个维度的评分转换为0-9的整数评分
             # 第1位：成本优化程度 (9=完全免费, 8=很便宜, 0=很昂贵)
-            # 优先使用免费评分，如果不免费则使用成本评分
             if free_score >= 0.9:
                 cost_tier = 9  # 免费模型固定为9分
             else:
                 cost_tier = min(8, int(score.cost_score * 8))  # 付费模型最高8分
             
-            # 第2位：本地优先程度 (9=本地, 0=远程)
-            local_tier = min(9, int(local_score * 9))
-            
-            # 第3位：上下文长度程度 (9=很长, 0=很短)
+            # 第2位：上下文长度程度 (9=很长, 0=很短) - 优先级高于参数量
             context_tier = min(9, int(context_score * 9))
             
-            # 第4位：参数量程度 (9=很大, 0=很小)
+            # 第3位：参数量程度 (9=很大, 0=很小) - 在参数量比较查询中关键
             parameter_tier = min(9, int(parameter_score * 9))
             
-            # 第5位：速度程度 (9=很快, 0=很慢)
+            # 第4位：速度程度 (9=很快, 0=很慢)
             speed_tier = min(9, int(score.speed_score * 9))
             
-            # 第6位：质量程度 (9=很高, 0=很低)
+            # 第5位：质量程度 (9=很高, 0=很低)
             quality_tier = min(9, int(score.quality_score * 9))
             
-            # 第7位：可靠性程度 (9=很可靠, 0=不可靠)
+            # 第6位：可靠性程度 (9=很可靠, 0=很不可靠)
             reliability_tier = min(9, int(score.reliability_score * 9))
             
-            # 组成7位数字，数字越大排序越靠前
+            # 组成6位数字，数字越大排序越靠前
             hierarchical_score = (
-                cost_tier * 1000000 +       # 第1位：成本(免费=9,付费最高=8)
-                local_tier * 100000 +       # 第2位：本地
-                context_tier * 10000 +      # 第3位：上下文
-                parameter_tier * 1000 +     # 第4位：参数量
-                speed_tier * 100 +          # 第5位：速度
-                quality_tier * 10 +         # 第6位：质量
-                reliability_tier            # 第7位：可靠性
+                cost_tier * 100000 +        # 第1位：成本(免费=9,付费最高=8)
+                context_tier * 10000 +      # 第2位：上下文(优先级高于参数量)
+                parameter_tier * 1000 +     # 第3位：参数量(在参数量比较查询中关键)
+                speed_tier * 100 +          # 第4位：速度
+                quality_tier * 10 +         # 第5位：质量
+                reliability_tier            # 第6位：可靠性
             )
             
-            # 返回负数实现降序排列（分数越高排名越前）
-            return -hierarchical_score
+            return (-hierarchical_score, score.channel.name)
         
+        logger.info("HIERARCHICAL SORTING: 6-digit scoring system (Cost|Context|Param|Speed|Quality|Reliability)")
+        
+        # 按分层评分排序
         sorted_channels = sorted(scored_channels, key=sorting_key)
         
-        # 记录分层排序的详细信息
-        logger.info("🏆 HIERARCHICAL SORTING: 7-digit scoring system (Cost|Local|Context|Param|Speed|Quality|Reliability)")
+        # 打印排序结果用于调试
         for i, scored in enumerate(sorted_channels[:5]):
+            # 重新计算用于显示
             free_score = self._calculate_free_score(scored.channel, scored.matched_model)
-            local_score = self._calculate_local_score(scored.channel, scored.matched_model)
             parameter_score = self._calculate_parameter_score(scored.channel, scored.matched_model)
             context_score = self._calculate_context_score(scored.channel, scored.matched_model)
             
-            # 计算7位数字评分
+            # 计算6位数字评分
             if free_score >= 0.9:
                 cost_tier = 9  # 免费模型固定为9分
             else:
                 cost_tier = min(8, int(scored.cost_score * 8))  # 付费模型最高8分
             
-            local_tier = min(9, int(local_score * 9))
             context_tier = min(9, int(context_score * 9))
             parameter_tier = min(9, int(parameter_score * 9))
             speed_tier = min(9, int(scored.speed_score * 9))
@@ -1000,15 +1089,13 @@ class JSONRouter:
             reliability_tier = min(9, int(scored.reliability_score * 9))
             
             hierarchical_score = (
-                cost_tier * 1000000 + local_tier * 100000 + context_tier * 10000 + 
-                parameter_tier * 1000 + speed_tier * 100 + quality_tier * 10 + reliability_tier
+                cost_tier * 100000 + context_tier * 10000 + parameter_tier * 1000 + 
+                speed_tier * 100 + quality_tier * 10 + reliability_tier
             )
             
-            score_display = f"{cost_tier}{local_tier}{context_tier}{parameter_tier}{speed_tier}{quality_tier}{reliability_tier}"
+            score_display = f"{cost_tier}{context_tier}{parameter_tier}{speed_tier}{quality_tier}{reliability_tier}"
             is_free = "FREE" if free_score >= 0.9 else "PAID"
-            is_local = "LOCAL" if local_score >= 0.7 else "REMOTE"
-            logger.info(f"🏆   #{i+1}: '{scored.channel.name}' [{is_free}/{is_local}] "
-                       f"Score: {score_display} (Total: {hierarchical_score:,})")
+            logger.info(f"   #{i+1}: '{scored.channel.name}' [{is_free}] Score: {score_display} (Total: {hierarchical_score:,})")
         
         return sorted_channels
     
