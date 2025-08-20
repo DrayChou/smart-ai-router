@@ -13,6 +13,8 @@ from .utils.model_analyzer import get_model_analyzer
 from .utils.channel_cache_manager import get_channel_cache_manager
 from .utils.request_cache import get_request_cache, RequestFingerprint
 from .utils.parameter_comparator import get_parameter_comparator
+from .utils.local_model_capabilities import get_capability_detector
+from .utils.capability_mapper import get_capability_mapper
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +65,7 @@ class RoutingRequest:
     stream: bool = False
     functions: Optional[List[Dict[str, Any]]] = None
     required_capabilities: List[str] = None
+    data: Optional[Dict[str, Any]] = None  # 完整的请求数据，用于能力检测
 
 class JSONRouter:
     """基于Pydantic验证后配置的路由器"""
@@ -80,6 +83,10 @@ class JSONRouter:
         self.model_analyzer = get_model_analyzer()
         self.cache_manager = get_channel_cache_manager()
         self.parameter_comparator = get_parameter_comparator()
+        
+        # 能力检测器和映射器
+        self.capability_detector = get_capability_detector()
+        self.capability_mapper = get_capability_mapper()
         
     async def route_request(self, request: RoutingRequest) -> List[RoutingScore]:
         """
@@ -176,7 +183,15 @@ class JSONRouter:
                 logger.warning(f"❌ ROUTING FAILED: No available channels after filtering for model '{request.model}'")
                 return []
             
-            logger.info(f"✅ STEP 2 COMPLETE: {len(filtered_candidates)} channels passed filtering (filtered out {len(candidates) - len(filtered_candidates)})")
+            # 第2.5步：能力检测过滤（仅对本地模型）
+            logger.info(f"🧠 STEP 2.5: Checking model capabilities...")
+            capability_filtered = await self._filter_by_capabilities(filtered_candidates, request)
+            if not capability_filtered:
+                logger.warning(f"❌ ROUTING FAILED: No channels with required capabilities for model '{request.model}'")
+                return []
+            
+            logger.info(f"✅ STEP 2.5 COMPLETE: {len(capability_filtered)} channels passed capability check (filtered out {len(filtered_candidates) - len(capability_filtered)})")
+            filtered_candidates = capability_filtered
             
             # 第三步：评分和排序
             logger.info(f"🎯 STEP 3: Scoring and ranking channels...")
@@ -436,7 +451,7 @@ class JSONRouter:
         return []
     
     def _filter_channels(self, channels: List[ChannelCandidate], request: RoutingRequest) -> List[ChannelCandidate]:
-        """过滤渠道"""
+        """过滤渠道，包含能力检测"""
         filtered = []
         
         # 获取路由配置中的过滤条件
@@ -1504,6 +1519,111 @@ class JSONRouter:
         tags = [model[4:] for model in models if model.startswith("tag:")]
         return sorted(tags)
     
+    async def _filter_by_capabilities(self, channels: List[ChannelCandidate], request: RoutingRequest) -> List[ChannelCandidate]:
+        """基于模型能力过滤渠道"""
+        if not hasattr(request, 'data') or not request.data:
+            # 没有请求数据，跳过能力检测
+            return channels
+        
+        # 分析请求需要的能力
+        capability_requirements = self.capability_mapper.get_capability_requirements(request.data)
+        
+        # 如果请求不需要特殊能力，跳过检测
+        if not any(capability_requirements.values()):
+            logger.debug("Request doesn't require special capabilities, skipping capability check")
+            return channels
+        
+        logger.info(f"📋 CAPABILITY REQUIREMENTS: {capability_requirements}")
+        
+        capability_filtered = []
+        fallback_channels = []
+        
+        for candidate in channels:
+            channel = candidate.channel
+            model_name = candidate.matched_model or channel.model_name
+            
+            try:
+                # 检测模型能力
+                capabilities = await self.capability_detector.detect_model_capabilities(
+                    model_name=model_name,
+                    provider=channel.provider,
+                    base_url=channel.base_url or "",
+                    api_key=channel.api_key
+                )
+                
+                # 检查是否能处理当前请求
+                can_handle = self.capability_detector.can_handle_request(capabilities, request.data)
+                
+                if can_handle:
+                    capability_filtered.append(candidate)
+                    logger.debug(f"✅ CAPABILITY MATCH: {channel.name} can handle request")
+                else:
+                    # 如果是本地模型不支持，记录为备用选项
+                    if capabilities.is_local:
+                        fallback_channels.append((candidate, capabilities))
+                        logger.debug(f"⚠️ LOCAL LIMITATION: {channel.name} lacks required capabilities, marked for fallback")
+                    else:
+                        logger.debug(f"❌ CAPABILITY MISMATCH: {channel.name} cannot handle request")
+                
+            except Exception as e:
+                logger.warning(f"Error checking capabilities for {channel.name}: {e}")
+                # 检测失败时，保留渠道（保守策略）
+                capability_filtered.append(candidate)
+        
+        # 如果没有合适的渠道且有本地模型无法处理，尝试添加云端备用渠道
+        if not capability_filtered and fallback_channels:
+            logger.info("🔄 FALLBACK SEARCH: Looking for cloud alternatives for local model limitations...")
+            
+            # 获取所有可用渠道进行备用搜索
+            all_channels = []
+            for provider_config in self.config.providers:
+                for channel_config in provider_config.channels:
+                    if channel_config.enabled:
+                        all_channels.append({
+                            "id": channel_config.id,
+                            "name": channel_config.name,
+                            "provider": provider_config.name,
+                            "model_name": channel_config.model_name,
+                            "base_url": channel_config.base_url or provider_config.base_url,
+                            "api_key": channel_config.api_key,
+                            "priority": getattr(channel_config, 'priority', 1)
+                        })
+            
+            # 对每个失败的本地模型，寻找备用渠道
+            for failed_candidate, failed_capabilities in fallback_channels[:1]:  # 只为第一个失败的本地模型寻找备用
+                fallback_candidates = await self.capability_detector.get_fallback_channels(
+                    original_channel=failed_candidate.channel.id,
+                    request_data=request.data,
+                    available_channels=all_channels
+                )
+                
+                if fallback_candidates:
+                    logger.info(f"🔄 FOUND FALLBACK: {len(fallback_candidates)} alternative channels for {failed_candidate.channel.name}")
+                    
+                    # 将前3个备用渠道转换为ChannelCandidate
+                    for fallback_channel_config in fallback_candidates[:3]:
+                        # 创建Channel对象
+                        fallback_channel = Channel(
+                            id=fallback_channel_config["id"],
+                            name=fallback_channel_config["name"],
+                            provider=fallback_channel_config["provider"],
+                            model_name=fallback_channel_config["model_name"],
+                            api_key=fallback_channel_config["api_key"],
+                            base_url=fallback_channel_config["base_url"],
+                            enabled=True,
+                            priority=fallback_channel_config.get("priority", 1)
+                        )
+                        
+                        fallback_candidate = ChannelCandidate(
+                            channel=fallback_channel,
+                            matched_model=fallback_channel_config["model_name"]
+                        )
+                        
+                        capability_filtered.append(fallback_candidate)
+                    break  # 只为第一个失败的渠道寻找备用
+        
+        return capability_filtered
+
     def clear_cache(self):
         """清除所有缓存"""
         self._tag_cache.clear()

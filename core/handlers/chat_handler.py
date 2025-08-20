@@ -106,7 +106,8 @@ class ChatCompletionHandler:
             model=request.model,
             messages=[msg.dict() for msg in request.messages],
             stream=request.stream,
-            required_capabilities=self._infer_capabilities(request)
+            required_capabilities=self._infer_capabilities(request),
+            data=request.dict()  # 传递完整的请求数据用于能力检测
         )
         
         logger.info(f"🔄 CHANNEL ROUTING: Starting routing process for model '{request.model}'")

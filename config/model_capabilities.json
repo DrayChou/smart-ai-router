@@ -1,0 +1,65 @@
+{
+  "vision_models": [
+    "llava:latest",
+    "llava:7b",
+    "llava:13b",
+    "cogvlm:latest",
+    "minicpm-v:latest",
+    "internvl:latest",
+    "gpt-4-vision-preview",
+    "gpt-4o",
+    "claude-3-opus",
+    "claude-3-sonnet",
+    "claude-3-haiku"
+  ],
+  "function_calling_models": [
+    "qwen2:7b",
+    "qwen2:72b",
+    "deepseek-coder:latest",
+    "mistral:latest",
+    "llama3.1:8b",
+    "llama3.1:70b"
+  ],
+  "code_generation_models": [
+    "deepseek-coder:latest",
+    "codellama:latest",
+    "codeqwen:latest",
+    "starcoder:latest",
+    "qwen2:7b",
+    "qwen2:72b"
+  ],
+  "provider_capabilities": {
+    "ollama": {
+      "vision": false,
+      "function_calling": false,
+      "code_generation": true,
+      "streaming": true
+    },
+    "lmstudio": {
+      "vision": false,
+      "function_calling": false,
+      "code_generation": true,
+      "streaming": true
+    }
+  },
+  "model_overrides": {
+    "llava:latest": {
+      "vision": true,
+      "function_calling": false,
+      "code_generation": false,
+      "streaming": true
+    },
+    "cogvlm:latest": {
+      "vision": true,
+      "function_calling": false,
+      "code_generation": false,
+      "streaming": true
+    },
+    "deepseek-coder:latest": {
+      "vision": false,
+      "function_calling": true,
+      "code_generation": true,
+      "streaming": true
+    }
+  }
+}
