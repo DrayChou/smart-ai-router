@@ -48,6 +48,10 @@ class RoutingScore:
     reliability_score: float
     reason: str
     matched_model: Optional[str] = None  # 对于标签路由，记录实际匹配的模型
+    # 性能优化：预计算层次排序所需的额外评分
+    parameter_score: float = 0.0
+    context_score: float = 0.0
+    free_score: float = 0.0
 
 @dataclass
 class ChannelCandidate:
@@ -192,6 +196,13 @@ class JSONRouter:
             
             logger.info(f"✅ STEP 2.5 COMPLETE: {len(capability_filtered)} channels passed capability check (filtered out {len(filtered_candidates) - len(capability_filtered)})")
             filtered_candidates = capability_filtered
+            
+            # 第2.7步：预筛选（性能优化）- 限制参与详细评分的渠道数量
+            if len(filtered_candidates) > 20:  # 仅在渠道数量过多时预筛选
+                logger.info(f"⚡ STEP 2.7: Pre-filtering {len(filtered_candidates)} channels to reduce scoring overhead...")
+                pre_filtered = await self._pre_filter_channels(filtered_candidates, request, max_channels=20)
+                logger.info(f"✅ STEP 2.7 COMPLETE: Pre-filtered to {len(pre_filtered)} channels for detailed scoring")
+                filtered_candidates = pre_filtered
             
             # 第三步：评分和排序
             logger.info(f"🎯 STEP 3: Scoring and ranking channels...")
@@ -472,7 +483,11 @@ class JSONRouter:
             if not channel.enabled or not channel.api_key:
                 continue
             
-            health_score = self.config_loader.runtime_state.health_scores.get(channel.id, 1.0)
+            # 🚀 优化健康分数检查（避免重复访问）
+            if not hasattr(self, '_cached_health_scores'):
+                self._cached_health_scores = self.config_loader.runtime_state.health_scores.copy()
+            
+            health_score = self._cached_health_scores.get(channel.id, 1.0)
             if health_score < 0.3:
                 continue
             
@@ -552,14 +567,20 @@ class JSONRouter:
             
             # 简化日志输出
             model_display = candidate.matched_model or candidate.channel.model_name
-            logger.info(f"📊 SCORE: '{candidate.channel.name}' -> '{model_display}' = {total_score:.3f} (Q:{scores['quality_score']:.2f})")
+            # 只在调试模式记录详细评分，生产模式减少日志噪音
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"📊 SCORE: '{candidate.channel.name}' -> '{model_display}' = {total_score:.3f} (Q:{scores['quality_score']:.2f})")
             
             scored_channels.append(RoutingScore(
                 channel=candidate.channel, total_score=total_score, 
                 cost_score=scores['cost_score'], speed_score=scores['speed_score'],
                 quality_score=scores['quality_score'], reliability_score=scores['reliability_score'],
                 reason=f"cost:{scores['cost_score']:.2f} speed:{scores['speed_score']:.2f} quality:{scores['quality_score']:.2f} reliability:{scores['reliability_score']:.2f}",
-                matched_model=candidate.matched_model
+                matched_model=candidate.matched_model,
+                # 预计算层次排序所需的额外评分
+                parameter_score=scores['parameter_score'],
+                context_score=scores['context_score'], 
+                free_score=scores['free_score']
             ))
         
         # 使用分层优先级排序
@@ -595,17 +616,29 @@ class JSONRouter:
             )
             
             model_display = candidate.matched_model or channel.model_name
-            logger.info(f"📊 SCORE: '{channel.name}' -> '{model_display}' = {total_score:.3f} (Q:{quality_score:.2f})")
+            # 只在调试模式记录详细评分，生产模式减少日志噪音
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"📊 SCORE: '{channel.name}' -> '{model_display}' = {total_score:.3f} (Q:{quality_score:.2f})")
             
             scored_channels.append(RoutingScore(
                 channel=channel, total_score=total_score, cost_score=cost_score,
                 speed_score=speed_score, quality_score=quality_score,
                 reliability_score=reliability_score, 
                 reason=f"cost:{cost_score:.2f} speed:{speed_score:.2f} quality:{quality_score:.2f} reliability:{reliability_score:.2f}",
-                matched_model=candidate.matched_model
+                matched_model=candidate.matched_model,
+                # 预计算层次排序所需的额外评分
+                parameter_score=parameter_score,
+                context_score=context_score,
+                free_score=free_score
             ))
         
         scored_channels = self._hierarchical_sort(scored_channels)
+        
+        # 记录评分结果摘要
+        logger.info(f"🏆 INDIVIDUAL SCORING RESULT: Processed {len(scored_channels)} channels")
+        for i, scored in enumerate(scored_channels[:3]):  # 只显示前3个
+            logger.info(f"🏆   #{i+1}: '{scored.channel.name}' (Score: {scored.total_score:.3f})")
+        
         return scored_channels
     
     def _get_routing_strategy(self, model: str) -> List[Dict[str, Any]]:
@@ -869,16 +902,27 @@ class JSONRouter:
         return score
     
     def _get_model_specs(self, channel_id: str, model_name: str) -> Optional[Dict[str, Any]]:
-        """获取模型规格信息"""
+        """获取模型规格信息（内存索引优化版）"""
         try:
-            # 从渠道缓存中获取
+            # 🚀 优先使用内存索引（消除文件I/O瓶颈）
+            from core.utils.memory_index import get_memory_index
+            memory_index = get_memory_index()
+            specs = memory_index.get_model_specs(channel_id, model_name)
+            if specs:
+                return specs
+                
+        except Exception as e:
+            logger.debug(f"Memory index specs lookup failed for {model_name}: {e}")
+        
+        try:
+            # 回退：从渠道缓存中获取
             channel_cache = self.cache_manager.load_channel_models(channel_id)
             if channel_cache and 'models' in channel_cache:
                 return channel_cache['models'].get(model_name)
         except Exception as e:
             logger.debug(f"Failed to load model specs for {model_name}: {e}")
         
-        # 回退到分析器分析
+        # 最后回退到分析器分析
         analyzed_specs = self.model_analyzer.analyze_model(model_name)
         return {
             'parameter_count': analyzed_specs.parameter_count,
@@ -908,8 +952,29 @@ class JSONRouter:
         return channel.performance.get("speed_score", 0.8)
 
     def _calculate_reliability_score(self, channel: Channel) -> float:
-        """计算可靠性评分"""
+        """计算可靠性评分（完全后台化：只使用缓存结果）"""
+        # 🚀 完全依赖后台任务维护的缓存数据，主线程不执行任何健康检查
+        # 1. 优先从内存索引获取缓存的健康评分
+        try:
+            from core.utils.memory_index import get_memory_index
+            memory_index = get_memory_index()
+            cached_health = memory_index.get_health_score(channel.id, cache_ttl=300.0)  # 5分钟TTL
+            if cached_health is not None:
+                return cached_health
+        except Exception:
+            pass
+        
+        # 2. 回退到运行时状态缓存（由后台健康检查任务更新）
         health_score = self.config_loader.runtime_state.health_scores.get(channel.id, 1.0)
+        
+        # 3. 🚀 异步更新内存缓存（非阻塞）
+        try:
+            from core.utils.memory_index import get_memory_index
+            memory_index = get_memory_index()
+            memory_index.set_health_score(channel.id, health_score)
+        except Exception:
+            pass  # 静默失败，不影响主路由性能
+        
         return health_score
 
     def _calculate_free_score(self, channel: Channel, model_name: str = None) -> float:
@@ -1084,11 +1149,10 @@ class JSONRouter:
         注意：移除了自动本地优先逻辑，只有在用户明确指定 local 标签或 local_first 策略时才会优先本地
         """
         def sorting_key(score: RoutingScore):
-            # 获取额外的评分信息
-            channel = score.channel
-            free_score = self._calculate_free_score(channel, score.matched_model)
-            parameter_score = self._calculate_parameter_score(channel, score.matched_model)
-            context_score = self._calculate_context_score(channel, score.matched_model)
+            # 使用预计算的评分信息（性能优化）
+            free_score = score.free_score
+            parameter_score = score.parameter_score
+            context_score = score.context_score
             
             # 将每个维度的评分转换为0-9的整数评分
             # 第1位：成本优化程度 (9=完全免费, 8=很便宜, 0=很昂贵)
@@ -1131,10 +1195,10 @@ class JSONRouter:
         
         # 打印排序结果用于调试
         for i, scored in enumerate(sorted_channels[:5]):
-            # 重新计算用于显示
-            free_score = self._calculate_free_score(scored.channel, scored.matched_model)
-            parameter_score = self._calculate_parameter_score(scored.channel, scored.matched_model)
-            context_score = self._calculate_context_score(scored.channel, scored.matched_model)
+            # 使用预计算的评分（性能优化）
+            free_score = scored.free_score
+            parameter_score = scored.parameter_score
+            context_score = scored.context_score
             
             # 计算6位数字评分
             if free_score >= 0.9:
@@ -1298,6 +1362,51 @@ class JSONRouter:
             return []
         
         logger.info(f"🔍 TAG MATCHING: Searching through {len(model_cache)} cached channels")
+        
+        # 🚀 性能优化：使用内存索引进行超高速标签查询
+        try:
+            from core.utils.memory_index import get_memory_index, rebuild_index_if_needed
+            
+            # 🚀 智能检查：仅在必要时重建内存索引
+            memory_index = get_memory_index()
+            current_stats = memory_index.get_stats()
+            cache_size = len(model_cache)
+            
+            logger.debug(f"🔍 INDEX CHECK: Current index has {current_stats.total_models} models, {current_stats.total_channels} channels")
+            logger.debug(f"🔍 INDEX CHECK: Cache has {cache_size} entries")
+            
+            needs_rebuild = current_stats.total_models == 0 or memory_index.needs_rebuild(model_cache)
+            if needs_rebuild:
+                logger.info(f"🔨 REBUILDING MEMORY INDEX: Cache structure changed or index empty (cache: {cache_size}, indexed: {current_stats.total_channels})")
+                stats = rebuild_index_if_needed(model_cache, force_rebuild=True)
+                logger.info(f"✅ INDEX REBUILT: {stats.total_models} models, {stats.total_tags} tags in {stats.build_time_ms:.1f}ms")
+            else:
+                logger.debug("⚡ MEMORY INDEX: Using existing index (no rebuild needed)")
+            
+            # 使用内存索引进行超高速查询
+            start_time = time.time()
+            matching_models = memory_index.find_models_by_tags(normalized_positive, normalized_negative)
+            index_time_ms = (time.time() - start_time) * 1000
+            
+            logger.info(f"⚡ MEMORY INDEX QUERY: Found {len(matching_models)} models in {index_time_ms:.2f}ms")
+            
+            # 将结果转换为 ChannelCandidate 格式
+            memory_candidates = []
+            for channel_id, model_name in matching_models:
+                # 查找对应的渠道对象
+                channel = self.config_loader.get_channel_by_id(channel_id)
+                if channel and channel.enabled:
+                    memory_candidates.append(ChannelCandidate(
+                        channel=channel, matched_model=model_name
+                    ))
+                    logger.debug(f"✅ FOUND: {channel.name} -> {model_name}")
+            
+            logger.info(f"🎯 MEMORY INDEX RESULT: {len(memory_candidates)} enabled channels found")
+            return memory_candidates
+            
+        except Exception as e:
+            logger.warning(f"⚠️ MEMORY INDEX FAILED: {e}, falling back to legacy file-based search")
+            # 继续使用原有的文件搜索逻辑作为后备
         
         # 严格匹配：支持正负标签的严格匹配
         if not normalized_negative:
@@ -1623,6 +1732,86 @@ class JSONRouter:
                     break  # 只为第一个失败的渠道寻找备用
         
         return capability_filtered
+
+    async def _pre_filter_channels(self, channels: List[ChannelCandidate], request: RoutingRequest, max_channels: int = 20) -> List[ChannelCandidate]:
+        """
+        性能优化：使用快速启发式方法预筛选渠道，减少详细评分的开销
+        
+        Args:
+            channels: 候选渠道列表
+            request: 路由请求
+            max_channels: 最大保留渠道数量
+            
+        Returns:
+            预筛选后的渠道列表
+        """
+        if len(channels) <= max_channels:
+            return channels
+        
+        logger.info(f"⚡ PRE-FILTER: Fast pre-filtering {len(channels)} channels to top {max_channels}")
+        
+        # 使用快速启发式评分
+        channel_scores = []
+        for candidate in channels:
+            channel = candidate.channel
+            
+            # 快速评分因子（避免复杂计算）
+            score = 0.0
+            
+            # 1. 免费优先（最重要）
+            if self._is_free_channel(channel, candidate.matched_model):
+                score += 1000  # 免费渠道获得最高优先级
+            
+            # 2. 可靠性评分（基于简单指标）
+            if hasattr(channel, 'priority') and channel.priority:
+                score += (10 - channel.priority) * 10  # 优先级越高分数越高
+            
+            # 3. 本地模型优先
+            if self._is_local_channel(channel):
+                score += 100
+            
+            # 4. 健康状态
+            if getattr(channel, 'enabled', True):
+                score += 50
+            
+            # 5. 随机因子（避免总是选择相同渠道）
+            import random
+            score += random.uniform(0, 10)
+            
+            channel_scores.append((score, candidate))
+        
+        # 按评分排序并选择top N
+        channel_scores.sort(key=lambda x: x[0], reverse=True)
+        selected = [candidate for score, candidate in channel_scores[:max_channels]]
+        
+        # 记录预筛选结果
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"⚡ PRE-FILTER RESULTS:")
+            for i, (score, candidate) in enumerate(channel_scores[:max_channels]):
+                logger.debug(f"  #{i+1}: {candidate.channel.name} (score: {score:.1f})")
+        
+        logger.info(f"⚡ PRE-FILTER COMPLETE: Selected {len(selected)}/{len(channels)} channels for detailed scoring")
+        return selected
+
+    def _is_free_channel(self, channel: Channel, model_name: str) -> bool:
+        """快速判断是否为免费渠道"""
+        # 简单的免费判断规则
+        if hasattr(channel, 'cost') and channel.cost == 0:
+            return True
+        if model_name and 'free' in model_name.lower():
+            return True
+        if hasattr(channel, 'name') and 'free' in channel.name.lower():
+            return True
+        return False
+    
+    def _is_local_channel(self, channel: Channel) -> bool:
+        """快速判断是否为本地渠道"""
+        if hasattr(channel, 'base_url') and channel.base_url:
+            url = channel.base_url.lower()
+            return any(local_indicator in url for local_indicator in [
+                'localhost', '127.0.0.1', ':11434', ':1234', 'ollama', 'lmstudio'
+            ])
+        return False
 
     def clear_cache(self):
         """清除所有缓存"""

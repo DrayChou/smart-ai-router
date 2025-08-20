@@ -40,6 +40,10 @@ class YAMLConfigLoader:
         # API Key缓存管理器
         self.api_key_cache_manager = get_api_key_cache_manager()
         
+        # 🚀 迁移状态标志，防止重复迁移
+        self._migration_completed = False
+        self._migration_in_progress = False
+        
         # 加载并解析配置
         self.config: Config = self._load_and_validate_config()
         
@@ -178,26 +182,34 @@ class YAMLConfigLoader:
                     raw_cache = json.load(f)
                     
                     # 检查是否需要迁移缓存格式
-                    if self._needs_cache_migration(raw_cache):
-                        logger.info("Migrating cache from legacy format to API key-level format")
-                        self.model_cache = self.api_key_cache_manager.migrate_legacy_cache(
-                            raw_cache, self._get_channels_for_migration()
-                        )
-                        # 保存迁移后的缓存
-                        self._save_migrated_cache()
+                    if self._needs_cache_migration(raw_cache) and not self._migration_completed and not self._migration_in_progress:
+                        logger.info("🔄 CACHE MIGRATION: Detected legacy cache format, using as-is and scheduling background migration")
+                        # 🚀 优化：先使用现有缓存，避免阻塞启动
+                        self.model_cache = raw_cache  # 临时使用原始缓存
+                        
+                        # 标记迁移正在进行
+                        self._migration_in_progress = True
+                        
+                        # 🚀 启动后台迁移任务（不阻塞启动）
+                        asyncio.create_task(self._migrate_cache_background(raw_cache))
                     else:
                         self.model_cache = raw_cache
+                        if not self._needs_cache_migration(raw_cache):
+                            self._migration_completed = True
                         
-                    # 清理无效条目
-                    self.model_cache = self.api_key_cache_manager.cleanup_invalid_entries(
-                        self.model_cache, self._get_channels_for_migration()
-                    )
+                        # 清理无效条目（仅对已迁移的缓存执行）
+                        self.model_cache = self.api_key_cache_manager.cleanup_invalid_entries(
+                            self.model_cache, self._get_channels_for_migration()
+                        )
                     
                     # 输出缓存统计信息
                     stats = self.api_key_cache_manager.get_cache_statistics(self.model_cache)
                     logger.info(f"Loaded model cache: {stats['total_entries']} entries, "
                               f"{stats['api_key_entries']} API key-level, {stats['legacy_entries']} legacy, "
                               f"{stats['api_key_coverage']}% coverage")
+                    
+                    # 🚀 立即构建内存索引（启动时预加载）
+                    self._build_memory_index()
             else:
                 logger.warning("Model cache file not found")
                 self.model_cache = {}
@@ -231,6 +243,24 @@ class YAMLConfigLoader:
     def get_channels_by_tag(self, tag: str) -> List[Channel]:
         """根据标签获取渠道"""
         return [ch for ch in self.get_enabled_channels() if tag in ch.tags]
+    
+    def _build_memory_index(self):
+        """构建内存索引（启动时预加载）"""
+        try:
+            if not self.model_cache:
+                logger.warning("⚠️ MEMORY INDEX: No model cache to index")
+                return
+                
+            from core.utils.memory_index import get_memory_index
+            memory_index = get_memory_index()
+            stats = memory_index.build_index_from_cache(self.model_cache)
+            
+            logger.info(f"🚀 MEMORY INDEX READY: {stats.total_models} models, {stats.total_tags} tags, "
+                       f"{stats.memory_usage_mb:.1f}MB memory in {stats.build_time_ms:.1f}ms")
+                       
+        except Exception as e:
+            logger.error(f"❌ MEMORY INDEX BUILD FAILED: {e}")
+            # 不影响系统启动，继续运行
 
     def _needs_cache_migration(self, cache: Dict[str, Any]) -> bool:
         """检查缓存是否需要迁移到API Key级别格式"""
@@ -277,7 +307,40 @@ class YAMLConfigLoader:
             else:
                 raise Exception("Failed to write cache file")
         except Exception as e:
-            logger.error(f"Failed to save migrated cache: {e}")
+            logger.error(f"Failed to save migrated cache async: {e}")
+    
+    async def _migrate_cache_background(self, raw_cache: Dict[str, Any]):
+        """后台迁移缓存格式（不阻塞主线程）"""
+        try:
+            logger.info("🔄 BACKGROUND MIGRATION: Starting cache migration in background")
+            
+            # 执行迁移
+            migrated_cache = self.api_key_cache_manager.migrate_legacy_cache(
+                raw_cache, self._get_channels_for_migration()
+            )
+            
+            # 清理无效条目
+            cleaned_cache = self.api_key_cache_manager.cleanup_invalid_entries(
+                migrated_cache, self._get_channels_for_migration()
+            )
+            
+            # 🚀 先保存已清理的缓存到磁盘，但不立即更新内存缓存
+            self.model_cache = cleaned_cache  # 临时设置以便保存
+            await self._save_migrated_cache_async()
+            
+            # 🚀 标记迁移完成状态
+            self._migration_completed = True
+            self._migration_in_progress = False
+            
+            # 🚀 重建内存索引以使用新缓存（一次性操作）
+            self._build_memory_index()
+            
+            logger.info("✅ BACKGROUND MIGRATION: Cache migration completed successfully")
+            
+        except Exception as e:
+            logger.error(f"❌ BACKGROUND MIGRATION: Failed to migrate cache in background: {e}")
+            # 🚀 迁移失败时重置状态，允许重试
+            self._migration_in_progress = False
     
     async def _load_model_cache_from_disk_async(self):
         """异步从磁盘加载模型发现任务的缓存"""
@@ -309,6 +372,9 @@ class YAMLConfigLoader:
                 logger.info(f"Loaded model cache: {stats['total_entries']} entries, "
                           f"{stats['api_key_entries']} API key-level, {stats['legacy_entries']} legacy, "
                           f"{stats['api_key_coverage']}% coverage")
+                
+                # 🚀 立即构建内存索引（启动时预加载）
+                self._build_memory_index()
             else:
                 logger.warning("Model cache file not found")
                 self.model_cache = {}

@@ -48,6 +48,9 @@ class CostEstimator:
         self._model_profiles_cache = {}
         self._last_cache_update = 0
         self._cache_ttl = 300  # 5分钟缓存
+        # 🚀 添加成本估算缓存
+        self._cost_preview_cache = {}
+        self._preview_cache_ttl = 60  # 1分钟缓存
         
     def _get_model_pricing(self, channel_id: str, model_name: str) -> Optional[Dict[str, float]]:
         """获取模型定价信息"""
@@ -323,6 +326,22 @@ class CostEstimator:
         
         return recommendation
     
+    def _get_preview_cache_key(
+        self, 
+        messages: List[Dict[str, Any]], 
+        candidate_channels: List[Dict[str, Any]],
+        max_tokens: Optional[int] = None
+    ) -> str:
+        """生成成本预览缓存键"""
+        import hashlib
+        
+        # 提取关键信息用于缓存键
+        message_content = str([msg.get('content', '')[:100] for msg in messages])  # 截取前100字符
+        channel_ids = sorted([ch.get('id', '') for ch in candidate_channels])
+        key_data = f"{message_content}_{channel_ids}_{max_tokens}"
+        
+        return hashlib.md5(key_data.encode()).hexdigest()
+    
     def create_cost_preview(
         self, 
         messages: List[Dict[str, Any]], 
@@ -333,6 +352,21 @@ class CostEstimator:
         """创建完整的成本预览"""
         
         start_time = time.time()
+        
+        # 🚀 检查缓存
+        cache_key = self._get_preview_cache_key(messages, candidate_channels, max_tokens)
+        current_time = time.time()
+        
+        if cache_key in self._cost_preview_cache:
+            cached_time, cached_result = self._cost_preview_cache[cache_key]
+            if (current_time - cached_time) < self._preview_cache_ttl:
+                cache_hit_time = round((time.time() - start_time) * 1000, 2)
+                logger.info(f"💰 COST CACHE: Cache hit for preview ({len(candidate_channels)} channels) in {cache_hit_time}ms")
+                # 🚀 修复：正确显示缓存命中时间，但保留原始计算时间用于统计
+                cached_result_copy = cached_result.copy()
+                cached_result_copy['calculation_time_ms'] = cache_hit_time
+                cached_result_copy['cache_hit'] = True
+                return cached_result_copy
         
         # 1. 估算所有候选渠道的成本
         estimates = self.compare_channel_costs(messages, candidate_channels, max_tokens)
@@ -364,6 +398,20 @@ class CostEstimator:
             ],
             "recommendation": recommendation
         }
+        
+        # 🚀 缓存结果
+        self._cost_preview_cache[cache_key] = (current_time, preview)
+        
+        # 清理过期缓存（简单策略：每10次调用清理一次）
+        if len(self._cost_preview_cache) > 10:
+            expired_keys = [
+                k for k, (cached_time, _) in self._cost_preview_cache.items()
+                if (current_time - cached_time) > self._preview_cache_ttl
+            ]
+            for k in expired_keys:
+                del self._cost_preview_cache[k]
+        
+        logger.debug(f"💰 COST ESTIMATION: Computed {len(estimates)} estimates in {preview['calculation_time_ms']}ms")
         
         return preview
 

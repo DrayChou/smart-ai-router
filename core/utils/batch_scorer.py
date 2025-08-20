@@ -274,10 +274,36 @@ class BatchScorer:
         reliability_scores = {}
         local_scores = {}
         
-        # 批量获取运行时状态
+        # 🚀 批量获取运行时状态 - 优化健康评分获取
         runtime_state = self.router.config_loader.runtime_state
         channel_stats = runtime_state.channel_stats
-        health_scores_dict = runtime_state.health_scores
+        
+        # 🚀 优化：优先使用内存索引的健康缓存，减少实时计算
+        health_scores_dict = {}
+        health_cache_hits = 0
+        health_cache_misses = 0
+        
+        try:
+            from core.utils.memory_index import get_memory_index
+            memory_index = get_memory_index()
+            for candidate in channels:
+                cached_health = memory_index.get_health_score(candidate.channel.id, cache_ttl=600.0)  # 10分钟TTL
+                if cached_health is not None:
+                    health_scores_dict[candidate.channel.id] = cached_health
+                    health_cache_hits += 1
+                else:
+                    # 回退到运行时状态
+                    health_scores_dict[candidate.channel.id] = runtime_state.health_scores.get(candidate.channel.id, 1.0)
+                    health_cache_misses += 1
+            
+            if health_cache_hits + health_cache_misses > 0:
+                hit_rate = health_cache_hits / (health_cache_hits + health_cache_misses) * 100
+                logger.debug(f"🏥 HEALTH CACHE: {health_cache_hits}/{health_cache_hits + health_cache_misses} hits ({hit_rate:.1f}%)")
+                
+        except Exception as e:
+            # 如果内存索引失败，使用运行时状态
+            logger.warning(f"🏥 HEALTH CACHE: Failed to access memory index, using runtime state: {e}")
+            health_scores_dict = runtime_state.health_scores
         
         local_tags = {"local", "本地", "localhost", "127.0.0.1", "offline", "edge"}
         

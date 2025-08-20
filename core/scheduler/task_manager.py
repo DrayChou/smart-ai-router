@@ -33,11 +33,11 @@ class TaskManager:
         # 从配置中获取任务设置
         task_config = config.get('tasks', {})
         
-        # 1. 模型发现任务
+        # 1. 模型发现任务 - 🚀 优化：改为后台执行，不阻塞启动
         model_discovery_config = task_config.get('model_discovery', {})
         if model_discovery_config.get('enabled', True):
             interval = model_discovery_config.get('interval_hours', 6) * 3600  # 转换为秒
-            run_immediately = model_discovery_config.get('run_on_startup', True)
+            run_immediately = model_discovery_config.get('run_on_startup', False)  # 🚀 改为False：使用现有缓存启动
             
             add_task(
                 name='model_discovery',
@@ -62,10 +62,11 @@ class TaskManager:
             logger.info(f"已添加定价发现任务，间隔 {interval/3600}h")
         
         # 2. API密钥验证任务
+        # 2. API密钥验证任务 - 🚀 优化：改为后台执行，不阻塞启动  
         api_key_config = task_config.get('api_key_validation', {})
         if api_key_config.get('enabled', True):
             interval = api_key_config.get('interval_hours', 6) * 3600  # 转换为秒
-            run_immediately = api_key_config.get('run_on_startup', True)
+            run_immediately = api_key_config.get('run_on_startup', False)  # 🚀 改为False：后台验证
             
             add_task(
                 name='api_key_validation',
