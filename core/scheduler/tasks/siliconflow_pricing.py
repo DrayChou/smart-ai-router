@@ -25,9 +25,15 @@ class SiliconFlowPricingTask:
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(exist_ok=True)
         
+        # 调试目录
+        self.debug_dir = self.cache_dir / "siliconflow_debug"
+        self.debug_dir.mkdir(exist_ok=True)
+        
         # 缓存文件路径
         self.pricing_cache_file = self.cache_dir / "siliconflow_pricing.json"
         self.pricing_log_file = self.cache_dir / "siliconflow_pricing_log.json"
+        self.html_cache_file = self.debug_dir / "latest_pricing_page.html"
+        self.parsed_data_file = self.debug_dir / "parsed_pricing_data.json"
         
         # 定价相关配置
         self.pricing_url = "https://siliconflow.cn/pricing"
@@ -106,19 +112,34 @@ class SiliconFlowPricingTask:
             html_file = self.cache_dir.parent / "logs" / "siliconflow_pricing" / "大模型 API 价格方案 - 硅基流动 SiliconFlow.html"
             
             if html_file.exists():
-                logger.info("使用本地HTML文件进行定价解析")
+                logger.info(f"使用本地HTML文件进行定价解析: {html_file}")
                 with open(html_file, 'r', encoding='utf-8') as f:
                     html_content = f.read()
+                logger.info(f"从本地文件读取HTML内容，长度: {len(html_content)} 字符")
             else:
-                logger.info("从官网获取定价页面...")
+                logger.info(f"从官网获取定价页面: {self.pricing_url}")
                 headers = {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'zh-CN,zh;q=0.8,en;q=0.6',
+                    'Accept-Encoding': 'gzip, deflate, br',
+                    'Connection': 'keep-alive',
+                    'Upgrade-Insecure-Requests': '1'
                 }
                 
                 async with httpx.AsyncClient(timeout=30, headers=headers) as client:
                     response = await client.get(self.pricing_url)
                     response.raise_for_status()
                     html_content = response.text
+                    logger.info(f"从官网获取HTML内容，状态码: {response.status_code}，长度: {len(html_content)} 字符")
+            
+            # 保存HTML内容到调试文件
+            try:
+                with open(self.html_cache_file, 'w', encoding='utf-8') as f:
+                    f.write(html_content)
+                logger.info(f"HTML内容已保存到: {self.html_cache_file}")
+            except Exception as e:
+                logger.warning(f"保存HTML内容失败: {e}")
             
             # 如果无法获取内容，使用回退定价
             if not html_content.strip():
@@ -126,7 +147,34 @@ class SiliconFlowPricingTask:
                 return self._get_fallback_pricing()
             
             # 解析HTML获取定价
+            logger.info("开始解析HTML内容获取定价信息...")
             pricing_data = self._parse_pricing_html(html_content)
+            
+            # 保存解析结果到调试文件
+            debug_data = {
+                'timestamp': datetime.now().isoformat(),
+                'html_length': len(html_content),
+                'parsing_strategies_used': [],
+                'models_found': len(pricing_data) if pricing_data else 0,
+                'parsed_models': []
+            }
+            
+            if pricing_data:
+                for model_name, pricing in pricing_data.items():
+                    debug_data['parsed_models'].append({
+                        'model_name': model_name,
+                        'display_name': pricing.display_name,
+                        'input_price': pricing.input_price,
+                        'output_price': pricing.output_price,
+                        'description': pricing.description
+                    })
+            
+            try:
+                with open(self.parsed_data_file, 'w', encoding='utf-8') as f:
+                    json.dump(debug_data, f, indent=2, ensure_ascii=False)
+                logger.info(f"解析数据已保存到: {self.parsed_data_file}")
+            except Exception as e:
+                logger.warning(f"保存解析数据失败: {e}")
             
             if not pricing_data:
                 logger.warning("HTML解析未获得定价数据，使用增强的回退定价")
@@ -137,6 +185,12 @@ class SiliconFlowPricingTask:
             paid_count = len(pricing_data) - free_count
             
             logger.info(f"成功解析到 {len(pricing_data)} 个模型的定价信息 (免费: {free_count}, 收费: {paid_count})")
+            
+            # 打印前10个模型用于调试
+            logger.info("前10个解析到的模型:")
+            for i, (model_name, pricing) in enumerate(list(pricing_data.items())[:10]):
+                logger.info(f"  {i+1}. {model_name}: 输入={pricing.input_price}, 输出={pricing.output_price}, 描述={pricing.description}")
+            
             return pricing_data
             
         except Exception as e:
@@ -148,31 +202,49 @@ class SiliconFlowPricingTask:
         try:
             # 尝试多种解析策略
             pricing_data = None
+            strategies_tried = []
+            
+            logger.info(f"开始解析HTML，内容长度: {len(html_content)} 字符")
             
             # 策略1: 查找JSON数据 (Next.js通常在script标签中嵌入数据)
+            logger.info("尝试策略1: 提取JSON数据...")
             pricing_data = self._extract_json_data(html_content)
+            strategies_tried.append('json_extraction')
             if pricing_data:
-                logger.info("从JSON数据中解析到定价信息")
+                logger.info(f"从JSON数据中解析到定价信息: {len(pricing_data)} 个模型")
                 return pricing_data
+            else:
+                logger.info("策略1: JSON数据提取未找到有效数据")
             
             # 策略2: 使用BeautifulSoup解析静态内容
+            logger.info("尝试策略2: 解析静态HTML内容...")
             pricing_data = self._parse_static_content(html_content)
+            strategies_tried.append('static_content')
             if pricing_data:
-                logger.info("从静态HTML内容中解析到定价信息")
+                logger.info(f"从静态HTML内容中解析到定价信息: {len(pricing_data)} 个模型")
                 return pricing_data
+            else:
+                logger.info("策略2: 静态内容解析未找到有效数据")
             
             # 策略3: 正则表达式提取定价模式
+            logger.info("尝试策略3: 提取文本模式...")
             pricing_data = self._extract_pricing_patterns(html_content)
+            strategies_tried.append('pattern_extraction')
             if pricing_data:
-                logger.info("从文本模式中解析到定价信息")
+                logger.info(f"从文本模式中解析到定价信息: {len(pricing_data)} 个模型")
                 return pricing_data
+            else:
+                logger.info("策略3: 文本模式提取未找到有效数据")
             
-            logger.warning("所有HTML解析策略均未获得数据，使用增强的回退定价")
-            return self._get_enhanced_fallback_pricing()
+            logger.warning(f"所有HTML解析策略均未获得数据，已尝试策略: {strategies_tried}")
+            logger.info("HTML内容预览 (前500字符):")
+            logger.info(html_content[:500] + "..." if len(html_content) > 500 else html_content)
+            
+            return {}
             
         except Exception as e:
             logger.error(f"HTML解析失败: {e}")
-            return self._get_enhanced_fallback_pricing()
+            return {}
     
     def _extract_json_data(self, html_content: str) -> Optional[Dict[str, SiliconFlowModelPricing]]:
         """尝试从HTML中提取JSON数据 (Next.js SPA常用模式)"""
@@ -204,44 +276,105 @@ class SiliconFlowPricingTask:
             return None
     
     def _parse_static_content(self, html_content: str) -> Optional[Dict[str, SiliconFlowModelPricing]]:
-        """解析静态HTML内容"""
+        """解析静态HTML内容 - 专门针对SiliconFlow定价表格"""
         try:
             soup = BeautifulSoup(html_content, 'html.parser')
             pricing_dict = {}
             
-            # 查找表格结构
-            tables = soup.find_all('table')
-            for table in tables:
-                table_pricing = self._parse_pricing_table(table)
-                if table_pricing:
-                    pricing_dict.update(table_pricing)
+            logger.info("解析SiliconFlow定价表格...")
             
-            # 查找卡片结构
-            cards = soup.find_all(['div', 'section'], class_=re.compile(r'card|pricing|model', re.I))
-            for card in cards:
-                card_pricing = self._parse_pricing_card(card)
-                if card_pricing:
-                    pricing_dict.update(card_pricing)
+            # 查找所有模型价格行（SiliconFlow使用的特定格式）
+            # 寻找包含模型链接的行
+            model_rows = soup.find_all('div', class_=lambda x: x and 'flex' in x and 'items-center' in x and 'px-[0.12rem]' in x)
+            logger.info(f"找到 {len(model_rows)} 个可能的模型行")
             
+            for row in model_rows:
+                try:
+                    # 查找模型链接
+                    model_link = row.find('a', {'href': lambda x: x and 'models?target=' in x})
+                    if not model_link:
+                        continue
+                    
+                    # 提取模型名称
+                    model_name = model_link.get_text(strip=True)
+                    if not model_name or len(model_name) < 5:
+                        continue
+                    
+                    # 获取所有列（flex-1 div）
+                    columns = row.find_all('div', class_='flex-1')
+                    if len(columns) < 3:
+                        continue
+                    
+                    # 第二列是输入价格，第三列是输出价格
+                    input_price_text = columns[1].get_text(strip=True)
+                    output_price_text = columns[2].get_text(strip=True)
+                    
+                    # 解析价格
+                    input_price = self._parse_price_text(input_price_text)
+                    output_price = self._parse_price_text(output_price_text)
+                    
+                    # 创建定价条目
+                    pricing_dict[model_name] = SiliconFlowModelPricing(
+                        model_name=model_name,
+                        display_name=model_name.split('/')[-1] if '/' in model_name else model_name,
+                        input_price=input_price,
+                        output_price=output_price,
+                        description="从SiliconFlow官方定价表格提取"
+                    )
+                    
+                    logger.debug(f"提取模型: {model_name} -> 输入:{input_price}, 输出:{output_price}")
+                    
+                except Exception as e:
+                    logger.debug(f"解析模型行失败: {e}")
+                    continue
+            
+            logger.info(f"成功解析到 {len(pricing_dict)} 个模型的定价信息")
             return pricing_dict if pricing_dict else None
             
         except Exception as e:
-            logger.debug(f"静态内容解析失败: {e}")
+            logger.error(f"静态内容解析失败: {e}")
             return None
+    
+    def _parse_price_text(self, price_text: str) -> float:
+        """解析价格文本为数值"""
+        try:
+            price_text = price_text.strip().lower()
+            
+            # 免费模型
+            if price_text in ['免费', 'free', '0', '0.00']:
+                return 0.0
+            
+            # 提取数字
+            import re
+            numbers = re.findall(r'\d+\.?\d*', price_text)
+            if numbers:
+                return float(numbers[0])
+            
+            # 默认价格（解析失败时）
+            return 0.7
+            
+        except Exception:
+            return 0.7
     
     def _extract_pricing_patterns(self, html_content: str) -> Optional[Dict[str, SiliconFlowModelPricing]]:
         """使用正则表达式提取定价模式"""
         try:
             pricing_dict = {}
             
-            # 模型名称模式
+            logger.info("开始使用正则表达式提取定价模式...")
+            
+            # 更全面的模型名称模式
             model_patterns = [
                 r'((?:Qwen|qwen)[\w/\.-]*\d+[bB]?[\w/-]*)',
                 r'((?:GLM|glm)[\w/\.-]*\d+[\w/-]*)',
                 r'((?:DeepSeek|deepseek)[\w/\.-]*)',
                 r'((?:Claude|claude)[\w/\.-]*)',
                 r'((?:GPT|gpt)[\w/\.-]*)',
-                r'([\w/-]+/[\w-]+(?:-\d+[bB])?[\w-]*)',
+                r'((?:Llama|llama)[\w/\.-]*)',
+                r'((?:Yi|yi)[\w/\.-]*)',
+                r'((?:gemma|Gemma)[\w/\.-]*)',
+                r'([\w-]+/[\w-]+(?:-\d+[bB])?[\w-]*)',
+                r'(Pro/[\w/-]+)',
             ]
             
             # 价格模式
@@ -251,19 +384,35 @@ class SiliconFlowPricingTask:
                 r'(\d+\.\d+)\s*元',
                 r'免费',
                 r'Free',
+                r'(\d+\.\d+)\s*/\s*1K\s*tokens',
             ]
             
             # 查找所有模型名称
             all_models = set()
-            for pattern in model_patterns:
+            for i, pattern in enumerate(model_patterns):
                 models = re.findall(pattern, html_content, re.IGNORECASE)
+                logger.info(f"模式 {i+1} ({pattern[:30]}...) 找到 {len(models)} 个匹配")
                 all_models.update(models)
+            
+            logger.info(f"总共找到 {len(all_models)} 个潜在模型名称")
+            
+            # 查找免费关键词
+            free_keywords = re.findall(r'免费|Free|free', html_content, re.IGNORECASE)
+            logger.info(f"找到 {len(free_keywords)} 个免费关键词")
+            
+            # 查找价格数字
+            price_numbers = re.findall(r'\d+\.\d+', html_content)
+            logger.info(f"找到 {len(price_numbers)} 个价格数字")
             
             # 为找到的模型创建基础定价
             for model in all_models:
-                if len(model) > 3:  # 过滤太短的匹配
+                if self._is_valid_model_name(model):
                     # 判断是否为免费模型
-                    is_free = any(keyword in model.lower() for keyword in ['free', '免费', 'qwen2.5-7b', 'glm-4.1v-9b'])
+                    is_free = any(keyword in model.lower() for keyword in [
+                        'free', '免费', 'qwen2.5-7b', 'glm-4-9b', 'yi-1.5-9b', 
+                        'deepseeк-r1-distill-qwen-1.5b', 'deepseeк-r1-distill-qwen-7b',
+                        'dialagpt', 'llama-3.2-3b', 'llama-3.2-1b', 'gemma-2-2b'
+                    ])
                     
                     pricing_dict[model] = SiliconFlowModelPricing(
                         model_name=model,
@@ -273,11 +422,59 @@ class SiliconFlowPricingTask:
                         description="免费" if is_free else "从HTML模式提取"
                     )
             
+            logger.info(f"正则表达式提取完成，创建了 {len(pricing_dict)} 个模型定价")
+            
             return pricing_dict if pricing_dict else None
             
         except Exception as e:
-            logger.debug(f"模式提取失败: {e}")
+            logger.error(f"模式提取失败: {e}")
             return None
+    
+    def _is_valid_model_name(self, model_name: str) -> bool:
+        """验证模型名称是否有效"""
+        if not model_name or len(model_name) < 5:
+            return False
+        
+        # 过滤明显的噪音数据
+        if any(char in model_name for char in ['=', '?', '#', '%', '<', '>', '"', "'", '&', '\\']):
+            return False
+        
+        # 过滤过长的随机字符串
+        if len(model_name) > 80:
+            return False
+        
+        # 过滤全数字或全大写字母的字符串
+        if model_name.isdigit() or (model_name.isupper() and len(model_name) > 10):
+            return False
+        
+        # 过滤包含太多连续大写字母的字符串（可能是编码）
+        import re
+        if re.search(r'[A-Z]{6,}', model_name):
+            return False
+        
+        # 过滤明显的文件路径或URL
+        if any(keyword in model_name.lower() for keyword in [
+            'static/', 'css/', 'js/', 'html', 'http', 'www', '.com', '.svg', '.png', 
+            'chunk', 'webpack', 'polyfill', 'script', 'style', 'font', 'image',
+            'siliconflow_files', '_next/', 'layout-', 'main-app', 'text/', 'app/',
+            'cn/pricing', 'userguide', 'legals/', 'explorer/edge', 'chrome'
+        ]):
+            return False
+        
+        # 验证是否包含有效的模型名称特征
+        valid_prefixes = [
+            'qwen', 'deepseek', 'glm', 'claude', 'gpt', 'llama', 'yi', 'gemma',
+            'baai', 'thudm', 'microsoft', 'meta-llama', 'google', 'anthropic',
+            'openai', 'moonshot', 'step', 'tencent', 'netease', 'pro/', 'ascend'
+        ]
+        
+        model_lower = model_name.lower()
+        has_valid_prefix = any(prefix in model_lower for prefix in valid_prefixes)
+        
+        # 如果包含有效前缀，或者是标准的 provider/model 格式，则认为有效
+        has_slash_format = '/' in model_name and len(model_name.split('/')) == 2
+        
+        return has_valid_prefix or has_slash_format
     
     def _process_json_pricing_data(self, data: Any) -> Optional[Dict[str, SiliconFlowModelPricing]]:
         """处理JSON定价数据"""
@@ -333,22 +530,49 @@ class SiliconFlowPricingTask:
             pricing_dict = {}
             text = card.get_text(strip=True)
             
-            # 查找模型名称和价格
-            model_match = re.search(r'([\w/-]+(?:\d+[bB])?[\w/-]*)', text)
-            price_match = re.search(r'(\d+\.\d+|免费|free)', text, re.IGNORECASE)
+            # 跳过明显的页面标题和非模型内容
+            skip_keywords = [
+                '大模型', '托管服务', '私有化部署', '预留实例', '量身定制', 
+                '企业场景', '支持用户', '定制化', '私有云', '公有云',
+                'API', 'API价格', '价格方案', '定价', 'SiliconFlow',
+                '硅基流动', '联系我们', '立即购买', '了解更多', '查看详情'
+            ]
             
-            if model_match:
-                model_name = model_match.group(1)
-                is_free = bool(re.search(r'免费|free', text, re.IGNORECASE))
-                price = 0.0 if is_free else 0.7
-                
-                pricing_dict[model_name] = SiliconFlowModelPricing(
-                    model_name=model_name,
-                    display_name=model_name.split('/')[-1] if '/' in model_name else model_name,
-                    input_price=price,
-                    output_price=price,
-                    description="从HTML卡片提取"
-                )
+            # 如果文本包含这些关键词，跳过
+            if any(keyword in text for keyword in skip_keywords):
+                return {}
+            
+            # 更精确的模型名称匹配
+            # 真正的模型名称通常包含特定格式
+            model_patterns = [
+                r'((?:Qwen|qwen)[\w/\.-]*\d+[bB]?[\w/-]*)',  # Qwen系列
+                r'((?:GLM|glm)[\w/\.-]*\d+[\w/-]*)',        # GLM系列
+                r'((?:DeepSeek|deepseek)[\w/\.-]*)',         # DeepSeek系列
+                r'((?:Claude|claude)[\w/\.-]*)',             # Claude系列
+                r'((?:GPT|gpt)[\w/\.-]*)',                   # GPT系列
+                r'((?:Llama|llama)[\w/\.-]*)',               # Llama系列
+                r'((?:Yi|yi)[\w/\.-]*)',                     # Yi系列
+                r'((?:gemma|Gemma)[\w/\.-]*)',               # Gemma系列
+                r'([\w-]+/[\w-]+(?:-\d+[bB])?[\w-]*)',       # 标准格式: provider/model
+            ]
+            
+            model_found = False
+            for pattern in model_patterns:
+                matches = re.findall(pattern, text, re.IGNORECASE)
+                for match in matches:
+                    if len(match) > 5:  # 模型名称长度至少6个字符
+                        model_name = match
+                        is_free = bool(re.search(r'免费|free', text, re.IGNORECASE))
+                        price = 0.0 if is_free else 0.7
+                        
+                        pricing_dict[model_name] = SiliconFlowModelPricing(
+                            model_name=model_name,
+                            display_name=model_name.split('/')[-1] if '/' in model_name else model_name,
+                            input_price=price,
+                            output_price=price,
+                            description="从HTML卡片提取"
+                        )
+                        model_found = True
             
             return pricing_dict
         except Exception:

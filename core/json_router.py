@@ -552,6 +552,7 @@ class JSONRouter:
         # 批量计算所有评分，获取性能指标
         batch_result, metrics = await self._batch_scorer.batch_score_channels(channels, request)
         
+        
         # 构建评分结果
         scored_channels = []
         strategy = self._get_routing_strategy(request.model)
@@ -1393,6 +1394,16 @@ class JSONRouter:
         if not model_cache:
             logger.warning("🔍 TAG MATCHING: Model cache is empty, cannot perform tag routing")
             return []
+        
+        # 🚀 性能优化：检查缓存是否包含API Key级别的格式
+        # API Key级别缓存格式示例: {"channel_id_apikeyhash": {...}}
+        # 旧格式: {"channel_id": {...}}
+        has_api_key_format = any('_' in key and len(key.split('_')[-1]) == 8 for key in model_cache.keys())
+        if has_api_key_format:
+            logger.info(f"🔍 TAG MATCHING: Using API key-level cache format with {len(model_cache)} entries")
+            # API Key级别缓存格式需要特殊处理，但可以继续路由
+        else:
+            logger.info(f"🔍 TAG MATCHING: Using legacy cache format with {len(model_cache)} entries")
         
         logger.info(f"🔍 TAG MATCHING: Searching through {len(model_cache)} cached channels")
         

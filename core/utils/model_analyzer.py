@@ -4,7 +4,7 @@
 
 import re
 import logging
-from typing import Dict, Optional, Tuple, Any
+from typing import Dict, Optional, Tuple, Any, List
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -400,6 +400,33 @@ class ModelAnalyzer:
             results[model_name] = specs
         
         return results
+    
+    def extract_tags_from_model_name(self, model_name: str) -> List[str]:
+        """从模型名称中提取标签"""
+        import re
+        
+        if not model_name:
+            return []
+        
+        # 使用多种分隔符进行拆分
+        separators = r'[:/\-_@,]'
+        parts = re.split(separators, model_name.lower())
+        
+        tags = []
+        for part in parts:
+            part = part.strip()
+            if part and len(part) > 0:
+                tags.append(part)
+        
+        # 去重并保持顺序
+        seen = set()
+        unique_tags = []
+        for tag in tags:
+            if tag not in seen:
+                seen.add(tag)
+                unique_tags.append(tag)
+        
+        return unique_tags
 
 # 全局分析器实例
 _analyzer: Optional[ModelAnalyzer] = None

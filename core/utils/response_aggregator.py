@@ -111,12 +111,14 @@ class ResponseAggregator:
             metadata.session_cost = session_cost
             metadata.session_requests = session_requests
     
-    def update_performance(self, request_id: str, ttfb: Optional[float] = None):
+    def update_performance(self, request_id: str, ttfb: Optional[float] = None, tokens_per_second: Optional[float] = None):
         """更新性能信息"""
         if request_id in self.active_requests:
             metadata = self.active_requests[request_id]
             if ttfb is not None:
                 metadata.ttfb = ttfb
+            if tokens_per_second is not None:
+                metadata.tokens_per_second = tokens_per_second
     
     def set_error(self, request_id: str, error_code: str, error_message: str):
         """设置错误信息"""

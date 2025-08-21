@@ -39,6 +39,10 @@ class Channel(BaseModel):
     # performance and pricing are optional dictionaries  
     performance: Dict[str, float] = Field(default_factory=dict)
     pricing: Dict[str, Any] = Field(default_factory=dict)
+    
+    # Currency exchange configuration for special pricing providers
+    # Example: {"currency_exchange": {"from": "USD", "to": "CNY", "rate": 0.7, "description": "充值0.7人民币获得1美元"}}
+    currency_exchange: Optional[Dict[str, Any]] = Field(default=None)
 
 class Routing(BaseModel):
     default_strategy: str = "balanced"

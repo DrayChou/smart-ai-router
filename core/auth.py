@@ -36,7 +36,7 @@ def get_or_generate_admin_token(config_token: Optional[str] = None) -> str:
         return config_token
     if not _generated_admin_token:
         _generated_admin_token = generate_secure_token()
-        logger.info(f"🔑 Generated Admin Token: {_generated_admin_token}")
+        logger.info(f"[KEY] Generated Admin Token: {_generated_admin_token}")
     return _generated_admin_token
 
 class AuthenticationMiddleware(BaseHTTPMiddleware):
@@ -105,9 +105,9 @@ class AdminAuthDependency:
             admin_config = self.config_loader.config.auth.admin
             if admin_config.enabled:
                 self._admin_token = get_or_generate_admin_token(admin_config.admin_token)
-                logger.info("🔐 Admin authentication enabled")
+                logger.info("[AUTH] Admin authentication enabled")
             else:
-                logger.info("🔓 Admin authentication disabled")
+                logger.info("[AUTH] Admin authentication disabled")
         except Exception as e:
             logger.warning(f"Failed to initialize admin token: {e}")
             self._admin_token = None

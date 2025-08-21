@@ -91,23 +91,72 @@ class TokenCounter:
             return max(10, prompt_tokens // 5)
     
     @classmethod
-    def calculate_cost(cls, prompt_tokens: int, completion_tokens: int, pricing: Dict[str, float]) -> float:
-        """计算请求成本"""
-        cost = 0.0
+    def calculate_cost(cls, prompt_tokens: int, completion_tokens: int, pricing: Dict[str, float], 
+                      currency_exchange: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """计算请求成本，支持货币转换
+        
+        Args:
+            prompt_tokens: 输入token数量
+            completion_tokens: 输出token数量  
+            pricing: 定价配置
+            currency_exchange: 货币转换配置
+            
+        Returns:
+            包含原始成本和转换后成本的字典
+        """
+        # 计算基础成本（美元）
+        base_cost = 0.0
         
         # 输入token成本
         if "input" in pricing:
-            cost += prompt_tokens * pricing["input"]
+            base_cost += prompt_tokens * pricing["input"]
         elif "prompt" in pricing:
-            cost += prompt_tokens * pricing["prompt"]
+            base_cost += prompt_tokens * pricing["prompt"]
         
         # 输出token成本
         if "output" in pricing:
-            cost += completion_tokens * pricing["output"]
+            base_cost += completion_tokens * pricing["output"]
         elif "completion" in pricing:
-            cost += completion_tokens * pricing["completion"]
+            base_cost += completion_tokens * pricing["completion"]
         
-        return cost
+        result = {
+            "base_cost": base_cost,
+            "base_currency": "USD",
+            "actual_cost": base_cost,
+            "actual_currency": "USD",
+            "exchange_rate": 1.0,
+            "exchange_info": None
+        }
+        
+        # 应用货币转换
+        if currency_exchange:
+            exchange_rate = currency_exchange.get("rate", 1.0)
+            from_currency = currency_exchange.get("from", "USD")
+            to_currency = currency_exchange.get("to", "CNY")
+            description = currency_exchange.get("description", "")
+            
+            if from_currency == "USD" and exchange_rate != 1.0:
+                # 应用汇率转换
+                actual_cost = base_cost * exchange_rate
+                result.update({
+                    "actual_cost": actual_cost,
+                    "actual_currency": to_currency,
+                    "exchange_rate": exchange_rate,
+                    "exchange_info": {
+                        "description": description,
+                        "from": from_currency,
+                        "to": to_currency,
+                        "rate": exchange_rate
+                    }
+                })
+        
+        return result
+    
+    @classmethod
+    def calculate_cost_legacy(cls, prompt_tokens: int, completion_tokens: int, pricing: Dict[str, float]) -> float:
+        """传统成本计算方法（保持向后兼容）"""
+        result = cls.calculate_cost(prompt_tokens, completion_tokens, pricing)
+        return result["actual_cost"]
     
     @classmethod
     def get_cost_per_1k_tokens(cls, pricing: Dict[str, float], token_type: str = "input") -> float:
@@ -123,12 +172,32 @@ class TokenCounter:
     @classmethod
     def format_cost(cls, cost: float, currency: str = "USD") -> str:
         """格式化成本显示"""
+        # 根据货币类型选择符号
+        symbol = "Y" if currency == "CNY" else "$"
+        
         if cost < 0.001:
-            return f"${cost * 1000000:.2f}µ{currency}"  # 微单位
+            return f"{symbol}{cost * 1000000:.2f}µ{currency}"  # 微单位
         elif cost < 1:
-            return f"${cost * 1000:.2f}m{currency}"  # 毫单位
+            return f"{symbol}{cost * 1000:.2f}m{currency}"  # 毫单位
         else:
-            return f"${cost:.4f} {currency}"
+            return f"{symbol}{cost:.4f} {currency}"
+    
+    @classmethod
+    def format_cost_comparison(cls, cost_info: Dict[str, Any]) -> str:
+        """格式化成本对比显示"""
+        base_cost = cost_info.get("base_cost", 0)
+        actual_cost = cost_info.get("actual_cost", 0)
+        base_currency = cost_info.get("base_currency", "USD")
+        actual_currency = cost_info.get("actual_currency", "USD")
+        exchange_info = cost_info.get("exchange_info")
+        
+        base_str = cls.format_cost(base_cost, base_currency)
+        actual_str = cls.format_cost(actual_cost, actual_currency)
+        
+        if exchange_info:
+            return f"{actual_str} (原价: {base_str}, {exchange_info['description']})"
+        else:
+            return actual_str
     
     @classmethod
     def get_token_stats(cls, messages: List[Dict[str, Any]], max_tokens: Optional[int] = None) -> Dict[str, Any]:

@@ -7,7 +7,7 @@ import logging
 import time
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Dict, List, Set, Tuple, Optional
+from typing import Dict, List, Set, Tuple, Optional, Any
 import threading
 
 logger = logging.getLogger(__name__)
@@ -115,6 +115,11 @@ class MemoryModelIndex:
                     
                     # 生成标签
                     tags = self._generate_model_tags(model_name, provider)
+                    
+                    # 🚀 合并渠道级别的标签
+                    channel_tags = self._get_channel_tags(channel_id)
+                    if channel_tags:
+                        tags = tags.union(channel_tags)
                     
                     # 获取模型详细规格
                     model_specs = models_data.get(model_name, {}) if models_data else {}
@@ -361,6 +366,20 @@ class MemoryModelIndex:
         
         return tags
     
+    def _get_channel_tags(self, channel_id: str) -> Optional[Set[str]]:
+        """获取渠道级别的标签"""
+        try:
+            # 在构建索引时，渠道信息应该已经加载到内存中
+            # 这里我们使用一个简单的映射表来避免递归
+            channel_tag_map = {
+                'ollama_local': {'free', 'local', 'ollama'},
+                'lmstudio_local': {'free', 'local', 'lmstudio'}
+            }
+            return channel_tag_map.get(channel_id)
+        except Exception as e:
+            logger.debug(f"Failed to get channel tags for {channel_id}: {e}")
+        return None
+
     def _extract_capabilities(self, cache_data: Dict, model_name: str) -> Optional[Dict]:
         """提取模型能力信息"""
         capabilities_data = cache_data.get("models_capabilities", {})

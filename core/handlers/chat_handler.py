@@ -286,13 +286,14 @@ class ChatCompletionHandler:
         """处理常规请求"""
         logger.info(f"⏳ REQUEST: [{metadata.request_id}] Sending optimized request to channel '{channel_info.channel.name}'")
         
-        response_json = await self._call_channel_api(channel_info.url, channel_info.headers, channel_info.request_data)
+        response_json, ttfb = await self._call_channel_api(channel_info.url, channel_info.headers, channel_info.request_data)
         
         # 成功，更新健康度并返回
         latency = time.time() - start_time
         self.router.update_channel_health(channel_info.channel.id, True, latency)
         
         logger.info(f"✅ SUCCESS: [{metadata.request_id}] Channel '{channel_info.channel.name}' responded successfully (latency: {latency:.3f}s)")
+        logger.info(f"✅ TIMING: [{metadata.request_id}] TTFB: {ttfb*1000:.1f}ms, Total: {latency*1000:.1f}ms")
         logger.info(f"✅ RESPONSE: [{metadata.request_id}] Model used -> {response_json.get('model', 'unknown')}")
         logger.info(f"✅ RESPONSE: [{metadata.request_id}] Usage -> {response_json.get('usage', {})}")
         
@@ -316,10 +317,10 @@ class ChatCompletionHandler:
             channel=channel_info.channel.name
         )
         
-        # 更新聚合器
+        # 更新聚合器 (传递TTFB信息)
         aggregator.update_tokens(metadata.request_id, prompt_tokens, completion_tokens, total_tokens)
         aggregator.update_cost(metadata.request_id, cost_info['total_cost'], session.total_cost, session.total_requests)
-        aggregator.update_performance(metadata.request_id, ttfb=None)  # 可以后续添加TTFB测量
+        aggregator.update_performance(metadata.request_id, ttfb=ttfb)  # TTFB已经是秒为单位
         
         # 完成请求并获取最终元数据
         final_metadata = aggregator.finish_request(metadata.request_id)
@@ -415,15 +416,88 @@ class ChatCompletionHandler:
         elif error.response.status_code in [429, 500, 502, 503, 504]:
             self._invalidate_channel_cache(channel.id, channel.name, "temporary error")
             
-            # 429错误需要特别处理 - 实施退避策略
+            # 429错误需要特别处理 - 实施智能退避策略
             if error.response.status_code == 429:
                 failed_channels.add(channel.id)  # 暂时拉黑，避免连续重试
-                backoff_time = min(2 ** (attempt_num - 1), 16)  # 指数退避，最大16秒
-                logger.warning(f"🔄 RATE LIMIT: Channel '{channel.name}' rate limited, applying {backoff_time}s backoff")
+                
+                # 尝试从错误信息中提取等待时间
+                wait_time = self._extract_rate_limit_wait_time(error_text)
+                if wait_time:
+                    backoff_time = min(wait_time, 60)  # 最大等待60秒
+                    logger.warning(f"🔄 SMART RATE LIMIT: Channel '{channel.name}' suggests waiting {wait_time}s, applying {backoff_time}s backoff")
+                else:
+                    backoff_time = min(2 ** (attempt_num - 1), 16)  # 指数退避，最大16秒
+                    logger.warning(f"🔄 RATE LIMIT: Channel '{channel.name}' rate limited, applying {backoff_time}s backoff")
+                
                 await asyncio.sleep(backoff_time)
         
         if attempt_num < len(total_candidates):
             logger.info(f"🔄 FAILOVER: Trying next channel (#{attempt_num + 1})")
+    
+    def _extract_rate_limit_wait_time(self, error_text: str) -> Optional[int]:
+        """从错误信息中提取建议的等待时间（秒）"""
+        import re
+        import json
+        
+        if not error_text:
+            return None
+        
+        try:
+            # 尝试解析JSON格式的错误信息
+            if error_text.strip().startswith('{'):
+                error_data = json.loads(error_text)
+                
+                # 检查是否是速率限制错误
+                if isinstance(error_data, dict):
+                    error_obj = error_data.get('error', {})
+                    if isinstance(error_obj, dict):
+                        message = error_obj.get('message', '')
+                        code = error_obj.get('code')
+                        
+                        # 如果是429错误且包含rate limit相关信息
+                        if code == 429 or 'rate' in message.lower() or 'limit' in message.lower():
+                            # 从消息中提取等待时间的各种模式
+                            wait_patterns = [
+                                r'retry after (\d+) seconds?',
+                                r'retry in (\d+) seconds?', 
+                                r'wait (\d+) seconds?',
+                                r'try again in (\d+) seconds?',
+                                r'retry shortly',  # 默认等待时间
+                                r'请(\d+)秒后重试',
+                                r'等待(\d+)秒'
+                            ]
+                            
+                            for pattern in wait_patterns:
+                                match = re.search(pattern, message, re.IGNORECASE)
+                                if match and match.groups():
+                                    return int(match.group(1))
+                                elif 'retry shortly' in message.lower():
+                                    return 5  # 默认短暂等待5秒
+            
+            # 直接从文本中搜索等待时间模式
+            text_patterns = [
+                r'retry after (\d+) seconds?',
+                r'retry in (\d+) seconds?',
+                r'wait (\d+) seconds?', 
+                r'try again in (\d+) seconds?',
+                r'请(\d+)秒后重试',
+                r'等待(\d+)秒'
+            ]
+            
+            for pattern in text_patterns:
+                match = re.search(pattern, error_text, re.IGNORECASE)
+                if match:
+                    return int(match.group(1))
+            
+            # 如果包含rate limit相关关键词但没有具体时间，返回默认等待时间
+            rate_limit_keywords = ['rate limit', 'rate-limit', 'too many requests', 'quota exceeded', 'temporarily rate-limited']
+            if any(keyword in error_text.lower() for keyword in rate_limit_keywords):
+                return 10  # 默认等待10秒
+                
+        except (json.JSONDecodeError, ValueError, AttributeError) as e:
+            logger.debug(f"Failed to parse rate limit wait time from error: {e}")
+        
+        return None
     
     def _handle_request_error(self, error: httpx.RequestError, channel, attempt_num: int, total_candidates: List) -> None:
         """处理请求错误"""
@@ -547,10 +621,16 @@ class ChatCompletionHandler:
             return False, 0, str(e)
     
     async def _call_channel_api(self, url: str, headers: dict, request_data: dict):
-        """优化的API调用"""
+        """优化的API调用 - 返回响应和TTFB时间"""
         http_pool = get_http_pool()
         
+        # 记录开始时间
+        request_start = time.time()
+        
         async with http_pool.stream('POST', url, json=request_data, headers=headers) as response:
+            # 记录首字节时间 (TTFB)
+            ttfb = time.time() - request_start
+            
             if response.status_code != 200:
                 # 读取错误内容，限制大小以避免内存问题
                 error_content = await response.aread()
@@ -560,12 +640,17 @@ class ChatCompletionHandler:
                 response.raise_for_status()
             
             content = await response.aread()
-            return response.json()
+            result = response.json()
+            
+            # 返回响应和TTFB时间 (不修改原始响应)
+            return result, ttfb
     
     async def _stream_channel_api(self, url: str, headers: dict, request_data: dict, channel_id: str):
         """优化的流式API调用"""
         chunk_count = 0
         stream_start_time = time.time()
+        ttfb = None
+        first_token_received = False
         
         logger.info(f"🌊 STREAM START: Initiating optimized streaming request to channel '{channel_id}'")
         
@@ -592,6 +677,13 @@ class ChatCompletionHandler:
                 async for chunk in response.aiter_bytes(chunk_size=8192):
                     if chunk:
                         chunk_count += 1
+                        
+                        # 记录首次接收到数据的时间 (TTFB)
+                        if not first_token_received:
+                            ttfb = time.time() - stream_start_time
+                            first_token_received = True
+                            logger.info(f"🌊 FIRST TOKEN: Received first token from channel '{channel_id}' in {ttfb:.3f}s")
+                        
                         if chunk_count % 20 == 0:
                             logger.debug(f"🌊 STREAMING: Received {chunk_count} chunks from channel '{channel_id}'")
                     yield chunk
@@ -772,15 +864,26 @@ class ChatCompletionHandler:
                         error_body = error_body[:1024]
                     logger.error(f"🌊 STREAM ERROR: [{metadata.request_id}] Channel '{channel_id}' returned status {response.status_code}")
                     
-                    error_text = error_body.decode('utf-8', errors='ignore')[:200]
-                    logger.error(f"🌊 STREAM ERROR DETAILS: [{metadata.request_id}] {error_text}")
+                    error_text = error_body.decode('utf-8', errors='ignore')
+                    logger.error(f"🌊 STREAM ERROR DETAILS: [{metadata.request_id}] {error_text[:200]}")
                     self.router.update_channel_health(channel_id, False)
                     
+                    # 检测流式响应中的速率限制错误
+                    if response.status_code == 429:
+                        wait_time = self._extract_rate_limit_wait_time(error_text)
+                        if wait_time:
+                            logger.warning(f"🌊 STREAM RATE LIMIT: [{metadata.request_id}] Channel '{channel_id}' suggests waiting {wait_time}s")
+                            # 在错误响应中包含等待时间信息
+                            yield f"data: {json.dumps({'error': {'message': f'Rate limited: retry after {wait_time}s - {error_text[:100]}', 'code': response.status_code, 'retry_after': wait_time}})}\\n\\n"
+                        else:
+                            yield f"data: {json.dumps({'error': {'message': f'Rate limited - {error_text[:100]}', 'code': response.status_code}})}\\n\\n"
+                    else:
+                        yield f"data: {json.dumps({'error': {'message': f'Upstream API error: {error_text[:100]}', 'code': response.status_code}})}\\n\\n"
+                    
                     # 设置错误信息并完成请求
-                    aggregator.set_error(metadata.request_id, str(response.status_code), error_text)
+                    aggregator.set_error(metadata.request_id, str(response.status_code), error_text[:200])
                     final_metadata = aggregator.finish_request(metadata.request_id)
                     
-                    yield f"data: {json.dumps({'error': {'message': f'Upstream API error: {error_text}', 'code': response.status_code}})}\\n\\n"
                     # 发送错误情况下的汇总信息
                     yield aggregator.create_sse_summary_event(final_metadata)
                     yield "data: [DONE]\\n\\n"
@@ -788,8 +891,9 @@ class ChatCompletionHandler:
 
                 logger.info(f"🌊 STREAM CONNECTED: [{metadata.request_id}] Successfully connected to channel '{channel_id}', starting optimized data flow")
                 
-                # 记录TTFB时间
+                # 记录TTFB时间 - 修正：连接建立后的第一个数据块时间
                 ttfb_recorded = False
+                first_data_time = None
                 
                 # 记录token信息的变量
                 total_prompt_tokens = 0
@@ -800,15 +904,49 @@ class ChatCompletionHandler:
                     if chunk:
                         chunk_count += 1
                         
-                        # 记录第一个块的时间作为TTFB
+                        # 记录第一个数据块的时间作为TTFB（真正的首字节时间）
                         if not ttfb_recorded:
-                            ttfb = time.time() - stream_start_time
+                            first_data_time = time.time()
+                            ttfb = first_data_time - stream_start_time
                             aggregator.update_performance(metadata.request_id, ttfb=ttfb)
                             ttfb_recorded = True
+                            logger.info(f"🌊 TTFB: [{metadata.request_id}] First data received in {ttfb:.3f}s")
                         
-                        # 解析响应以提取token信息（简化版）
+                        # 解析响应以提取token信息并检测流式错误（简化版）
                         try:
                             chunk_str = chunk.decode('utf-8', errors='ignore')
+                            
+                            # 检测流式数据中的速率限制错误
+                            if 'data: ' in chunk_str and '"error"' in chunk_str:
+                                lines = chunk_str.split('\\n')
+                                for line in lines:
+                                    if line.startswith('data: ') and line != 'data: [DONE]':
+                                        try:
+                                            data = json.loads(line[6:])  # 去掉 'data: '
+                                            if 'error' in data:
+                                                error_obj = data['error']
+                                                error_code = error_obj.get('code')
+                                                error_message = error_obj.get('message', '')
+                                                
+                                                # 检测速率限制错误
+                                                if error_code == 429 or 'rate limit' in error_message.lower() or 'temporarily rate-limited' in error_message.lower():
+                                                    wait_time = self._extract_rate_limit_wait_time(error_message)
+                                                    if wait_time:
+                                                        logger.warning(f"🌊 CONTENT RATE LIMIT: [{metadata.request_id}] Channel '{channel_id}' content suggests waiting {wait_time}s")
+                                                        # 修改错误信息以包含等待时间
+                                                        error_obj['retry_after'] = wait_time
+                                                        data['error'] = error_obj
+                                                        
+                                                        # 重新构造修改后的chunk
+                                                        modified_line = f"data: {json.dumps(data)}"
+                                                        chunk_str = chunk_str.replace(line, modified_line)
+                                                        chunk = chunk_str.encode('utf-8')
+                                                    else:
+                                                        logger.warning(f"🌊 CONTENT RATE LIMIT: [{metadata.request_id}] Channel '{channel_id}' rate limited in streaming content")
+                                        except (json.JSONDecodeError, KeyError):
+                                            pass
+                            
+                            # 提取token使用信息
                             if 'data: ' in chunk_str and '"usage"' in chunk_str:
                                 # 尝试提取最后usage信息
                                 lines = chunk_str.split('\\n')
@@ -849,6 +987,15 @@ class ChatCompletionHandler:
                     )
                     
                     aggregator.update_cost(metadata.request_id, cost_info['total_cost'], session.total_cost, session.total_requests)
+                    
+                    # 流式响应专用：计算准确的token生成时间
+                    if first_data_time and total_completion_tokens > 0:
+                        generation_time = time.time() - first_data_time  # 从第一个token到最后一个token的时间
+                        if generation_time > 0:
+                            tokens_per_second = total_completion_tokens / generation_time
+                            # 更新准确的token生成速度
+                            aggregator.update_performance(metadata.request_id, tokens_per_second=tokens_per_second)
+                            logger.info(f"🌊 TOKEN SPEED: [{metadata.request_id}] {total_completion_tokens} tokens in {generation_time:.3f}s = {tokens_per_second:.1f} tokens/sec")
                 
                 # 完成请求并生成汇总
                 final_metadata = aggregator.finish_request(metadata.request_id)

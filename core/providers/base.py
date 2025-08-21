@@ -268,9 +268,36 @@ class BaseAdapter(ABC):
         else:
             return ProviderError(f"未知错误 ({response.status_code}): {error_msg}")
 
-    def calculate_cost(self, usage: Dict[str, int], model_info: ModelInfo) -> float:
+    def calculate_cost(self, usage: Dict[str, int], model_info: ModelInfo, 
+                      currency_exchange: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
-        计算请求成本
+        计算请求成本，支持货币转换
+
+        Args:
+            usage: token使用量
+            model_info: 模型信息
+            currency_exchange: 货币转换配置
+
+        Returns:
+            包含成本详情的字典
+        """
+        from core.utils.token_counter import TokenCounter
+        
+        input_tokens = usage.get("prompt_tokens", 0)
+        output_tokens = usage.get("completion_tokens", 0)
+
+        # 构建定价字典
+        pricing = {
+            "input": model_info.input_cost_per_1k / 1000,  # 转换为每token成本
+            "output": model_info.output_cost_per_1k / 1000
+        }
+        
+        # 使用TokenCounter进行成本计算，支持货币转换
+        return TokenCounter.calculate_cost(input_tokens, output_tokens, pricing, currency_exchange)
+
+    def calculate_cost_legacy(self, usage: Dict[str, int], model_info: ModelInfo) -> float:
+        """
+        传统成本计算方法（保持向后兼容）
 
         Args:
             usage: token使用量
@@ -279,13 +306,8 @@ class BaseAdapter(ABC):
         Returns:
             成本（美元）
         """
-        input_tokens = usage.get("prompt_tokens", 0)
-        output_tokens = usage.get("completion_tokens", 0)
-
-        input_cost = (input_tokens / 1000) * model_info.input_cost_per_1k
-        output_cost = (output_tokens / 1000) * model_info.output_cost_per_1k
-
-        return input_cost + output_cost
+        result = self.calculate_cost(usage, model_info)
+        return result["actual_cost"]
 
 
 # 自定义异常类
