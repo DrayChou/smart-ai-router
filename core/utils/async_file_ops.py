@@ -11,11 +11,24 @@ from pathlib import Path
 from typing import Dict, Any, Optional, Union, List
 import logging
 import time
+from datetime import datetime, date
 
 import aiofiles
 import aiofiles.os
 
 logger = logging.getLogger(__name__)
+
+
+class DateTimeEncoder(json.JSONEncoder):
+    """自定义JSON编码器，支持datetime对象序列化"""
+    
+    def default(self, obj):
+        if isinstance(obj, (datetime, date)):
+            return obj.isoformat()
+        elif hasattr(obj, '__dict__'):
+            # 处理包含datetime的自定义对象
+            return obj.__dict__
+        return super().default(obj)
 
 
 class AsyncFileManager:
@@ -74,8 +87,8 @@ class AsyncFileManager:
             async with self._get_file_lock(path):
                 start_time = time.time()
                 
-                # 序列化数据
-                json_content = json.dumps(data, indent=indent, ensure_ascii=False)
+                # 序列化数据，使用自定义编码器支持datetime
+                json_content = json.dumps(data, indent=indent, ensure_ascii=False, cls=DateTimeEncoder)
                 
                 # 异步写入
                 async with aiofiles.open(path, 'w', encoding='utf-8') as f:

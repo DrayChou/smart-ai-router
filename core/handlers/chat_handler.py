@@ -258,7 +258,7 @@ class ChatCompletionHandler:
                     
             except httpx.HTTPStatusError as e:
                 last_error = e
-                self._handle_http_status_error(e, channel, attempt_num, failed_channels, routing_result.candidates)
+                await self._handle_http_status_error(e, channel, attempt_num, failed_channels, routing_result.candidates)
                 continue
             except httpx.RequestError as e:
                 last_error = e
@@ -394,7 +394,7 @@ class ChatCompletionHandler:
         except Exception as e:
             logger.warning(f"⚠️  CACHE INVALIDATION FAILED for channel '{channel_name}': {e}")
 
-    def _handle_http_status_error(self, error: httpx.HTTPStatusError, channel, attempt_num: int, failed_channels: set, total_candidates: List) -> None:
+    async def _handle_http_status_error(self, error: httpx.HTTPStatusError, channel, attempt_num: int, failed_channels: set, total_candidates: List) -> None:
         """处理HTTP状态错误"""
         error_text = error.response.text if hasattr(error.response, 'text') else str(error)
         logger.warning(f"❌ ATTEMPT #{attempt_num} FAILED: Channel '{channel.name}' returned HTTP {error.response.status_code}")
@@ -411,9 +411,16 @@ class ChatCompletionHandler:
             # 使相关缓存失效 - 永久性错误需要立即清除缓存
             self._invalidate_channel_cache(channel.id, channel.name, "permanent error")
         
-        # 对于临时错误（如429, 500），也使缓存失效但不永久拉黑
+        # 对于临时错误（如429, 500），也使缓存失效但不永久拉黑，并添加退避延迟
         elif error.response.status_code in [429, 500, 502, 503, 504]:
             self._invalidate_channel_cache(channel.id, channel.name, "temporary error")
+            
+            # 429错误需要特别处理 - 实施退避策略
+            if error.response.status_code == 429:
+                failed_channels.add(channel.id)  # 暂时拉黑，避免连续重试
+                backoff_time = min(2 ** (attempt_num - 1), 16)  # 指数退避，最大16秒
+                logger.warning(f"🔄 RATE LIMIT: Channel '{channel.name}' rate limited, applying {backoff_time}s backoff")
+                await asyncio.sleep(backoff_time)
         
         if attempt_num < len(total_candidates):
             logger.info(f"🔄 FAILOVER: Trying next channel (#{attempt_num + 1})")

@@ -1224,23 +1224,46 @@ class JSONRouter:
         return sorted_channels
     
     def _estimate_tokens(self, messages: List[Dict[str, Any]]) -> int:
-        """使用tiktoken估算prompt tokens"""
+        """智能估算prompt tokens"""
         try:
-            # 尝试从main模块获取已经初始化的encoder
-            import main
-            if hasattr(main, 'estimate_prompt_tokens'):
-                return main.estimate_prompt_tokens(messages)
-        except (ImportError, AttributeError):
-            pass
-
-        # 如果获取失败，使用简单回退方法
-        logger.warning("无法从main模块获取tiktoken编码器, token计算将使用简单方法")
+            # 尝试使用tiktoken库
+            import tiktoken
+            encoding = tiktoken.get_encoding("cl100k_base")  # GPT-4使用的编码
+            
+            total_tokens = 0
+            for message in messages:
+                content = message.get("content", "")
+                if isinstance(content, str):
+                    # 加上角色标记的开销
+                    role_overhead = 4  # 每条消息的role等结构开销
+                    content_tokens = len(encoding.encode(content))
+                    total_tokens += content_tokens + role_overhead
+                    
+            return max(1, total_tokens)
+            
+        except ImportError:
+            # tiktoken不可用时的智能回退
+            logger.debug("tiktoken不可用，使用改进的字符估算方法")
+            
+        # 改进的字符计算方法
         total_chars = 0
+        all_content = ""
         for message in messages:
             content = message.get("content", "")
             if isinstance(content, str):
+                # 角色标记开销
+                total_chars += len(f"role: {message.get('role', 'user')}")
+                # 内容字符数
                 total_chars += len(content)
-        return max(1, total_chars // 4)
+                all_content += content
+        
+        # 改进的字符到token转换比率（更准确）
+        # 中文字符通常1个字符=1个token，英文约4个字符=1个token
+        chinese_chars = sum(1 for char in all_content if '\u4e00' <= char <= '\u9fff')
+        english_chars = len(all_content) - chinese_chars
+        estimated_tokens = chinese_chars + (english_chars // 4) + (len(messages) * 4)  # 添加消息结构开销
+        
+        return max(1, estimated_tokens)
     
     def _estimate_cost_for_channel(self, channel: Channel, request: RoutingRequest) -> float:
         """估算特定渠道的请求成本"""

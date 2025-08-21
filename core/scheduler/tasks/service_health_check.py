@@ -195,6 +195,21 @@ class ServiceHealthChecker:
             else:
                 headers["Authorization"] = f"Bearer {api_key}"
         
+        # 检查base_url是否有效
+        if not base_url:
+            logger.warning(f"渠道 {channel_id} base_url为空，跳过健康检查")
+            return HealthCheckResult(
+                channel_id=channel_id,
+                provider=provider,
+                model_name=channel.get('model_name', 'unknown'),
+                test_model="invalid_url",
+                success=False,
+                latency_ms=None,
+                error_message="base_url为空或无效",
+                response_time=0,
+                timestamp=datetime.now()
+            )
+        
         try:
             async with httpx.AsyncClient(timeout=self.http_timeout) as client:
                 # 构建/models URL
@@ -255,6 +270,21 @@ class ServiceHealthChecker:
                 cached_result['timestamp'] = datetime.fromisoformat(cached_result['timestamp']) if isinstance(cached_result['timestamp'], str) else cached_result['timestamp']
                 return HealthCheckResult(**cached_result)
             return cached_result
+        
+        # 检查base_url是否有效
+        if not base_url:
+            logger.warning(f"渠道 {channel_id} base_url为空，跳过备用健康检查")
+            return HealthCheckResult(
+                channel_id=channel_id,
+                provider=provider,
+                model_name=channel.get('model_name', 'unknown'),
+                test_model="invalid_url",
+                success=False,
+                latency_ms=None,
+                error_message="base_url为空或无效",
+                response_time=0,
+                timestamp=datetime.now()
+            )
         
         start_time = time.time()
         
