@@ -102,6 +102,11 @@ class ModelDiscoveryTask:
                 indent=2
             )
             
+            # 同时写入各渠道单独缓存
+            for channel_id, cache_data in self.cached_models.items():
+                channel_cache_path = self.cache_dir / "channels" / f"{channel_id}.json"
+                await file_manager.write_json(channel_cache_path, cache_data, indent=2)
+            
             # 异步保存合并后的配置
             config_success = await file_manager.write_json(
                 self.merged_config_file, 
