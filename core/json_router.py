@@ -531,20 +531,26 @@ class JSONRouter:
         return filtered
     
     async def _score_channels(self, channels: List[ChannelCandidate], request: RoutingRequest) -> List[RoutingScore]:
-        """计算渠道评分 - 批量优化版本"""
-        logger.info(f"📊 SCORING: Evaluating {len(channels)} candidate channels for model '{request.model}'")
+        """计算渠道评分 - 批量优化版本，支持慢查询检测"""
+        start_time = time.time()
+        channel_count = len(channels)
+        
+        logger.info(f"📊 SCORING: Evaluating {channel_count} candidate channels for model '{request.model}'")
         
         # 如果渠道数量较少，使用原有的单个评分方式
-        if len(channels) < 5:
-            return await self._score_channels_individual(channels, request)
+        if channel_count < 5:
+            result = await self._score_channels_individual(channels, request)
+            elapsed_ms = (time.time() - start_time) * 1000
+            self._log_performance_metrics(channel_count, elapsed_ms, "individual")
+            return result
         
         # 使用批量评分器进行优化
         if not hasattr(self, '_batch_scorer'):
             from core.utils.batch_scorer import BatchScorer
             self._batch_scorer = BatchScorer(self)
         
-        # 批量计算所有评分
-        batch_result = await self._batch_scorer.batch_score_channels(channels, request)
+        # 批量计算所有评分，获取性能指标
+        batch_result, metrics = await self._batch_scorer.batch_score_channels(channels, request)
         
         # 构建评分结果
         scored_channels = []
@@ -586,7 +592,11 @@ class JSONRouter:
         # 使用分层优先级排序
         scored_channels = self._hierarchical_sort(scored_channels)
         
-        logger.info(f"🏆 SCORING RESULT: Channels ranked by score (computed in {batch_result.computation_time_ms:.1f}ms):")
+        # 记录性能指标
+        total_elapsed_ms = (time.time() - start_time) * 1000
+        self._log_performance_metrics(channel_count, total_elapsed_ms, "batch", metrics)
+        
+        logger.info(f"🏆 SCORING RESULT: Channels ranked by score (computed in {total_elapsed_ms:.1f}ms):")
         for i, scored in enumerate(scored_channels[:5]):  # 只显示前5个
             logger.info(f"🏆   #{i+1}: '{scored.channel.name}' (Score: {scored.total_score:.3f})")
         
@@ -1846,6 +1856,39 @@ class JSONRouter:
     def update_channel_health(self, channel_id: str, success: bool, latency: Optional[float] = None):
         """更新渠道健康状态"""
         self.config_loader.update_channel_health(channel_id, success, latency)
+    
+    def _log_performance_metrics(self, channel_count: int, elapsed_ms: float, 
+                                scoring_type: str, metrics=None):
+        """记录性能指标和慢查询检测"""
+        avg_time_per_channel = elapsed_ms / max(channel_count, 1)
+        
+        # 慢查询检测阈值
+        slow_threshold_ms = 1000  # 1秒
+        very_slow_threshold_ms = 2000  # 2秒
+        
+        if elapsed_ms > very_slow_threshold_ms:
+            logger.warning(f"🐌 VERY SLOW SCORING: {channel_count} channels took {elapsed_ms:.1f}ms "
+                          f"(avg: {avg_time_per_channel:.1f}ms/channel) - Consider optimization")
+        elif elapsed_ms > slow_threshold_ms:
+            logger.warning(f"⚠️ SLOW SCORING: {channel_count} channels took {elapsed_ms:.1f}ms "
+                          f"(avg: {avg_time_per_channel:.1f}ms/channel)")
+        else:
+            logger.info(f"⚡ SCORING PERFORMANCE: {channel_count} channels in {elapsed_ms:.1f}ms "
+                       f"(avg: {avg_time_per_channel:.1f}ms/channel)")
+        
+        # 如果是批量评分且有性能指标
+        if metrics and scoring_type == "batch":
+            if metrics.slow_threshold_exceeded:
+                logger.warning(f"🔍 BATCH SCORER ANALYSIS: {metrics.optimization_applied}")
+            
+            if metrics.cache_hit:
+                logger.info(f"💾 CACHE HIT: Scoring completed with cached results")
+        
+        # 优化建议
+        if channel_count > 50 and elapsed_ms > 1500:
+            logger.info(f"💡 OPTIMIZATION TIP: Consider implementing channel pre-filtering for {channel_count}+ channels")
+        elif channel_count > 20 and elapsed_ms > 800:
+            logger.info(f"💡 OPTIMIZATION TIP: Performance could benefit from caching strategies")
 
 # 全局路由器实例
 _router: Optional[JSONRouter] = None

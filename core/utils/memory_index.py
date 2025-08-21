@@ -48,13 +48,19 @@ class MemoryModelIndex:
         
         # 性能统计
         self._stats = IndexStats(0, 0, 0, 0.0, 0.0)
+        
+        # 智能重建控制
         self._last_build_time = 0.0
+        self._last_build_hash = None
+        self._min_rebuild_interval = 30  # 最小重建间隔30秒
+        self._build_count = 0
+        self._incremental_updates_count = 0
         
         logger.info("🚀 MemoryModelIndex initialized - ready for high-performance tag queries")
     
     def build_index_from_cache(self, model_cache: Dict[str, Dict]) -> IndexStats:
         """
-        从模型缓存构建内存索引
+        从模型缓存构建内存索引，支持智能重建控制
         
         Args:
             model_cache: 原始模型缓存数据
@@ -62,6 +68,18 @@ class MemoryModelIndex:
         Returns:
             索引构建统计信息
         """
+        current_time = time.time()
+        
+        # 计算缓存数据的哈希值来检测变化
+        import hashlib
+        cache_str = str(sorted(model_cache.items()))
+        cache_hash = hashlib.md5(cache_str.encode()).hexdigest()
+        
+        # 智能重建判断
+        if self._should_skip_rebuild(current_time, cache_hash):
+            logger.info(f"⚡ INDEX SKIP: Using existing index ({self._stats.total_models} models, {self._stats.total_tags} tags)")
+            return self._stats
+        
         start_time = time.time()
         
         with self._lock:
@@ -136,16 +154,9 @@ class MemoryModelIndex:
                 memory_usage_mb=self._estimate_memory_usage()
             )
             
-            self._last_build_time = time.time()
-            
-            # 保存缓存哈希值以避免重复重建
-            try:
-                import hashlib
-                # 🚀 优化：只对前50个缓存键计算哈希，与检查逻辑保持一致
-                sorted_keys = sorted(model_cache.keys())[:50]
-                self._cache_hash = hashlib.md5(str(sorted_keys).encode()).hexdigest()
-            except:
-                self._cache_hash = None
+            self._last_build_time = current_time
+            self._last_build_hash = cache_hash
+            self._build_count += 1
             
             logger.info(f"✅ INDEX BUILT: {total_models} models, {len(processed_channels)} channels, "
                        f"{len(self._tag_to_models)} tags in {build_time_ms:.1f}ms")
@@ -373,6 +384,88 @@ class MemoryModelIndex:
             
         return total_size / 1024 / 1024
 
+
+    def _should_skip_rebuild(self, current_time: float, cache_hash: str) -> bool:
+        """判断是否应该跳过重建"""
+        # 如果从未构建过，必须构建
+        if self._build_count == 0:
+            return False
+        
+        # 时间间隔检查：如果距离上次构建时间太短，跳过
+        time_since_last_build = current_time - self._last_build_time
+        if time_since_last_build < self._min_rebuild_interval:
+            logger.debug(f"INDEX SKIP: Too soon to rebuild ({time_since_last_build:.1f}s < {self._min_rebuild_interval}s)")
+            return True
+        
+        # 内容变化检查：如果缓存内容没有变化，跳过
+        if self._last_build_hash == cache_hash:
+            logger.debug(f"INDEX SKIP: Cache content unchanged (hash: {cache_hash[:8]}...)")
+            return True
+        
+        return False
+    
+    def add_incremental_model(self, channel_id: str, model_name: str, provider: str = "unknown"):
+        """增量添加单个模型（避免全量重建）"""
+        with self._lock:
+            tags = self._generate_model_tags(model_name, provider)
+            model_key = (channel_id, model_name)
+            
+            # 创建模型信息
+            model_info = ModelInfo(
+                channel_id=channel_id,
+                model_name=model_name,
+                provider=provider,
+                tags=tags
+            )
+            
+            # 更新索引
+            self._model_info[model_key] = model_info
+            self._channel_to_models[channel_id].add(model_name)
+            
+            # 更新标签索引
+            for tag in tags:
+                self._tag_to_models[tag].add(model_key)
+            
+            self._incremental_updates_count += 1
+            logger.debug(f"📈 INDEX INCREMENT: Added {model_name} to channel {channel_id}")
+    
+    def remove_channel_models(self, channel_id: str):
+        """移除某个渠道的所有模型"""
+        with self._lock:
+            models_to_remove = list(self._channel_to_models.get(channel_id, set()))
+            
+            for model_name in models_to_remove:
+                model_key = (channel_id, model_name)
+                
+                # 从模型信息中移除
+                if model_key in self._model_info:
+                    model_info = self._model_info[model_key]
+                    del self._model_info[model_key]
+                    
+                    # 从标签索引中移除
+                    for tag in model_info.tags:
+                        self._tag_to_models[tag].discard(model_key)
+                        # 如果标签没有任何模型了，删除标签
+                        if not self._tag_to_models[tag]:
+                            del self._tag_to_models[tag]
+            
+            # 清空渠道模型列表
+            if channel_id in self._channel_to_models:
+                del self._channel_to_models[channel_id]
+            
+            logger.debug(f"🗑️ INDEX REMOVE: Removed {len(models_to_remove)} models from channel {channel_id}")
+    
+    def get_build_stats(self) -> Dict[str, Any]:
+        """获取构建统计信息"""
+        return {
+            'total_builds': self._build_count,
+            'last_build_time': self._last_build_time,
+            'incremental_updates': self._incremental_updates_count,
+            'min_rebuild_interval': self._min_rebuild_interval,
+            'models_count': len(self._model_info),
+            'channels_count': len(self._channel_to_models),
+            'tags_count': len(self._tag_to_models)
+        }
 
 # 全局索引实例
 _memory_index: Optional[MemoryModelIndex] = None

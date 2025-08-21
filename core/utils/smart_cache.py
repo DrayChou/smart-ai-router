@@ -53,25 +53,27 @@ class SmartCache:
         self.memory_cache: Dict[str, CacheEntry] = {}
         self.cache_lock = asyncio.Lock()
         
-        # 缓存策略配置
+        # 分层缓存策略配置
         self.cache_configs = {
-            # 模型发现缓存 - 较长TTL，因为模型列表不常变
-            "model_discovery": {"ttl": 3600, "persistent": True},  # 1小时
+            # === 长期缓存层 (L1) - 数据相对稳定 ===
+            "model_discovery": {"ttl": 3600, "persistent": True, "priority": "high", "max_size": 1000},  # 1小时
+            "api_key_validation": {"ttl": 1800, "persistent": True, "priority": "high", "max_size": 500}, # 30分钟
+            "model_specs": {"ttl": 7200, "persistent": True, "priority": "medium", "max_size": 2000},    # 2小时
             
-            # 健康检查缓存 - 中等TTL，需要及时反映健康状态
-            "health_check": {"ttl": 300, "persistent": True},      # 5分钟
+            # === 中期缓存层 (L2) - 需要定期更新 ===
+            "health_check": {"ttl": 300, "persistent": True, "priority": "medium", "max_size": 200},      # 5分钟
+            "pricing_data": {"ttl": 600, "persistent": True, "priority": "medium", "max_size": 500},     # 10分钟
+            "channel_stats": {"ttl": 180, "persistent": True, "priority": "low", "max_size": 100},       # 3分钟
             
-            # API密钥验证缓存 - 较长TTL，密钥验证结果相对稳定
-            "api_key_validation": {"ttl": 1800, "persistent": True}, # 30分钟
+            # === 短期缓存层 (L3) - 实时性要求高 ===
+            "channel_availability": {"ttl": 60, "persistent": False, "priority": "high", "max_size": 100}, # 1分钟
+            "model_routing": {"ttl": 120, "persistent": False, "priority": "medium", "max_size": 500},     # 2分钟
+            "batch_scores": {"ttl": 180, "persistent": False, "priority": "medium", "max_size": 300},     # 3分钟
             
-            # 渠道可用性快速检查 - 短TTL，需要快速反映可用性变化
-            "channel_availability": {"ttl": 60, "persistent": False}, # 1分钟
-            
-            # 模型路由缓存 - 短TTL，路由决策需要考虑实时状态
-            "model_routing": {"ttl": 120, "persistent": False},    # 2分钟
-            
-            # 错误缓存 - 短TTL，避免错误状态被长时间缓存
-            "error_cache": {"ttl": 30, "persistent": False},      # 30秒
+            # === 临时缓存层 (L4) - 极短TTL ===
+            "error_cache": {"ttl": 30, "persistent": False, "priority": "low", "max_size": 50},          # 30秒
+            "rate_limit": {"ttl": 60, "persistent": False, "priority": "high", "max_size": 100},         # 1分钟
+            "hot_queries": {"ttl": 300, "persistent": False, "priority": "high", "max_size": 200},       # 5分钟（热点查询）
         }
         
         # 文件缓存路径
@@ -79,6 +81,9 @@ class SmartCache:
         
         # 加载持久化缓存
         self._load_persistent_cache()
+        
+        # 缓存大小管理
+        self.cache_size_by_type: Dict[str, int] = defaultdict(int)
         
         # 启动清理任务
         self._start_cleanup_task()
@@ -114,15 +119,19 @@ class SmartCache:
             return entry.data
     
     async def set(self, cache_type: str, key: str, data: Any) -> None:
-        """设置缓存数据"""
+        """设置缓存数据，支持分层策略和大小限制"""
         cache_key = self._get_cache_key(cache_type, key)
         config = self._get_cache_config(cache_type)
         
         async with self.cache_lock:
+            # 检查缓存大小限制
+            await self._enforce_size_limit(cache_type, config)
+            
             entry = CacheEntry(data, config["ttl"])
             self.memory_cache[cache_key] = entry
+            self.cache_size_by_type[cache_type] += 1
             
-            logger.debug(f"缓存设置: {cache_type}:{key} (TTL: {config['ttl']}s)")
+            logger.debug(f"缓存设置: {cache_type}:{key} (TTL: {config['ttl']}s, Size: {self.cache_size_by_type[cache_type]}/{config.get('max_size', '∞')})")
             
             # 如果需要持久化，保存到文件
             if config.get("persistent", False):
@@ -383,6 +392,79 @@ class SmartCache:
                 type_stats['avg_access'] = type_stats['total_access'] / type_stats['count']
         
         return stats
+
+    async def _enforce_size_limit(self, cache_type: str, config: Dict[str, Any]):
+        """强制执行缓存大小限制"""
+        max_size = config.get("max_size")
+        if not max_size:
+            return
+        
+        current_size = self.cache_size_by_type[cache_type]
+        if current_size >= max_size:
+            # 需要清理，采用LRU策略
+            await self._evict_lru_entries(cache_type, max_size // 4)  # 清理25%的空间
+    
+    async def _evict_lru_entries(self, cache_type: str, evict_count: int):
+        """驱逐LRU缓存条目"""
+        prefix = f"{cache_type}:"
+        
+        # 收集该类型的所有缓存条目
+        entries_to_sort = []
+        for cache_key, entry in self.memory_cache.items():
+            if cache_key.startswith(prefix):
+                entries_to_sort.append((cache_key, entry.last_accessed))
+        
+        # 按最后访问时间排序，最久未访问的在前
+        entries_to_sort.sort(key=lambda x: x[1])
+        
+        # 驱逐最久未访问的条目
+        evicted_count = 0
+        for cache_key, _ in entries_to_sort[:evict_count]:
+            if cache_key in self.memory_cache:
+                del self.memory_cache[cache_key]
+                self.cache_size_by_type[cache_type] -= 1
+                evicted_count += 1
+        
+        if evicted_count > 0:
+            logger.debug(f"缓存LRU清理: {cache_type} 驱逐了 {evicted_count} 个条目")
+    
+    async def preload_hot_queries(self, hot_patterns: List[str]):
+        """预加载热点查询模式"""
+        for pattern in hot_patterns:
+            # 这里可以根据pattern预生成一些常用查询的缓存
+            cache_key = f"preload_{pattern}"
+            await self.set("hot_queries", cache_key, {"pattern": pattern, "preloaded": True})
+        
+        logger.info(f"预加载热点查询: {len(hot_patterns)} 个模式")
+    
+    def get_cache_layer_stats(self) -> Dict[str, Any]:
+        """获取分层缓存统计信息"""
+        layer_stats = {
+            "L1_long_term": {"types": [], "total_entries": 0, "total_size_mb": 0},
+            "L2_medium_term": {"types": [], "total_entries": 0, "total_size_mb": 0},
+            "L3_short_term": {"types": [], "total_entries": 0, "total_size_mb": 0},
+            "L4_temporary": {"types": [], "total_entries": 0, "total_size_mb": 0}
+        }
+        
+        # 根据TTL分层统计
+        for cache_type, config in self.cache_configs.items():
+            ttl = config["ttl"]
+            entry_count = self.cache_size_by_type[cache_type]
+            
+            if ttl >= 1800:  # L1: >= 30分钟
+                layer_stats["L1_long_term"]["types"].append(cache_type)
+                layer_stats["L1_long_term"]["total_entries"] += entry_count
+            elif ttl >= 300:  # L2: 5-30分钟
+                layer_stats["L2_medium_term"]["types"].append(cache_type)
+                layer_stats["L2_medium_term"]["total_entries"] += entry_count
+            elif ttl >= 60:   # L3: 1-5分钟
+                layer_stats["L3_short_term"]["types"].append(cache_type)
+                layer_stats["L3_short_term"]["total_entries"] += entry_count
+            else:             # L4: < 1分钟
+                layer_stats["L4_temporary"]["types"].append(cache_type)
+                layer_stats["L4_temporary"]["total_entries"] += entry_count
+        
+        return layer_stats
 
 # 全局缓存实例
 _global_cache: Optional[SmartCache] = None

@@ -31,6 +31,16 @@ class BatchedScoreComponents:
     local_scores: Dict[str, float]
     computation_time_ms: float
 
+@dataclass
+class PerformanceMetrics:
+    """性能监控指标"""
+    channel_count: int
+    total_time_ms: float
+    avg_time_per_channel: float
+    cache_hit: bool
+    slow_threshold_exceeded: bool = False
+    optimization_applied: str = "none"
+
 
 class BatchScorer:
     """批量评分器 - 优化模型筛选性能"""
@@ -41,6 +51,15 @@ class BatchScorer:
         self.cache = {}
         self.cache_timeout = 300  # 5分钟缓存
         self.thread_pool = ThreadPoolExecutor(max_workers=4)
+        
+        # 性能监控配置
+        self.slow_threshold_ms = 1000  # 慢查询阈值：1秒
+        self.performance_stats = {
+            'total_requests': 0,
+            'slow_requests': 0,
+            'cache_hits': 0,
+            'optimizations_applied': defaultdict(int)
+        }
     
     def _get_cache_key(self, channels: List[ChannelCandidate], request) -> str:
         """生成缓存键"""
@@ -359,16 +378,28 @@ class BatchScorer:
         self, 
         channels: List[ChannelCandidate], 
         request
-    ) -> BatchedScoreComponents:
-        """批量评分渠道列表"""
+    ) -> Tuple[BatchedScoreComponents, PerformanceMetrics]:
+        """批量评分渠道列表，返回评分结果和性能指标"""
         start_time = time.time()
+        channel_count = len(channels)
+        self.performance_stats['total_requests'] += 1
         
         # 检查缓存
         cache_key = self._get_cache_key(channels, request)
         cached_result = self._check_cache(cache_key)
         if cached_result:
-            logger.info(f"BATCH_SCORER: Using cached scores for {len(channels)} channels")
-            return cached_result
+            elapsed_ms = (time.time() - start_time) * 1000
+            self.performance_stats['cache_hits'] += 1
+            logger.info(f"BATCH_SCORER: Using cached scores for {channel_count} channels ({elapsed_ms:.1f}ms)")
+            
+            metrics = PerformanceMetrics(
+                channel_count=channel_count,
+                total_time_ms=elapsed_ms,
+                avg_time_per_channel=elapsed_ms / max(channel_count, 1),
+                cache_hit=True,
+                optimization_applied="cache_hit"
+            )
+            return cached_result, metrics
         
         logger.info(f"BATCH_SCORER: Computing scores for {len(channels)} channels")
         
@@ -432,9 +463,32 @@ class BatchScorer:
         # 缓存结果
         self._store_cache(cache_key, result)
         
-        logger.info(f"BATCH_SCORER: Computed {len(channels)} scores in {result.computation_time_ms:.1f}ms (avg: {result.computation_time_ms/len(channels):.1f}ms/channel)")
+        # 性能监控和优化建议
+        elapsed_ms = (time.time() - start_time) * 1000
+        avg_time_per_channel = elapsed_ms / max(channel_count, 1)
+        is_slow = elapsed_ms > self.slow_threshold_ms
         
-        return result
+        if is_slow:
+            self.performance_stats['slow_requests'] += 1
+            logger.warning(f"⚠️ SLOW BATCH SCORING: {channel_count} channels took {elapsed_ms:.1f}ms (avg: {avg_time_per_channel:.1f}ms/channel)")
+        
+        # 应用优化策略
+        optimization = self._determine_optimization(channel_count, elapsed_ms)
+        if optimization != "none":
+            self.performance_stats['optimizations_applied'][optimization] += 1
+        
+        logger.info(f"BATCH_SCORER: Computed {channel_count} scores in {elapsed_ms:.1f}ms (avg: {avg_time_per_channel:.1f}ms/channel)")
+        
+        metrics = PerformanceMetrics(
+            channel_count=channel_count,
+            total_time_ms=elapsed_ms,
+            avg_time_per_channel=avg_time_per_channel,
+            cache_hit=False,
+            slow_threshold_exceeded=is_slow,
+            optimization_applied=optimization
+        )
+        
+        return result, metrics
     
     def get_score_for_channel(
         self, 
@@ -456,6 +510,56 @@ class BatchScorer:
             'free_score': batch_result.free_scores.get(key, 0.1),
             'local_score': batch_result.local_scores.get(key, 0.1)
         }
+    
+    def _determine_optimization(self, channel_count: int, elapsed_ms: float) -> str:
+        """确定应用的优化策略"""
+        if channel_count > 50 and elapsed_ms > 2000:
+            return "large_batch_optimization"
+        elif elapsed_ms > 1000:
+            return "slow_query_optimization"
+        elif channel_count > 20 and elapsed_ms > 500:
+            return "medium_batch_optimization"
+        return "none"
+    
+    def get_performance_stats(self) -> Dict[str, Any]:
+        """获取性能统计信息"""
+        total_requests = self.performance_stats['total_requests']
+        if total_requests == 0:
+            return {"message": "No requests processed yet"}
+        
+        cache_hit_rate = (self.performance_stats['cache_hits'] / total_requests) * 100
+        slow_request_rate = (self.performance_stats['slow_requests'] / total_requests) * 100
+        
+        return {
+            'total_requests': total_requests,
+            'cache_hit_rate': f"{cache_hit_rate:.1f}%",
+            'slow_request_rate': f"{slow_request_rate:.1f}%",
+            'slow_threshold_ms': self.slow_threshold_ms,
+            'optimizations_applied': dict(self.performance_stats['optimizations_applied']),
+            'recommendations': self._generate_performance_recommendations()
+        }
+    
+    def _generate_performance_recommendations(self) -> List[str]:
+        """生成性能优化建议"""
+        recommendations = []
+        stats = self.performance_stats
+        
+        cache_hit_rate = stats['cache_hits'] / max(stats['total_requests'], 1)
+        slow_rate = stats['slow_requests'] / max(stats['total_requests'], 1)
+        
+        if cache_hit_rate < 0.5:
+            recommendations.append("缓存命中率较低，考虑增加缓存TTL或优化缓存键策略")
+        
+        if slow_rate > 0.1:
+            recommendations.append("慢查询比例较高，考虑实施渠道预过滤或分批处理")
+        
+        if stats['optimizations_applied'].get('large_batch_optimization', 0) > 5:
+            recommendations.append("大批量查询频繁，建议实施分层缓存策略")
+        
+        if len(recommendations) == 0:
+            recommendations.append("性能表现良好，无需特别优化")
+        
+        return recommendations
     
     def cleanup_cache(self):
         """清理过期缓存"""
