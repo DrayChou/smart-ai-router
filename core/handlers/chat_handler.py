@@ -46,6 +46,8 @@ class ChatCompletionRequest(BaseModel):
     function_call: Optional[Union[str, Dict[str, str]]] = None
     tools: Optional[List[Dict[str, Any]]] = None
     tool_choice: Optional[Union[str, Dict[str, Any]]] = None
+    system: Optional[str] = None
+    extra_params: Optional[Dict[str, Any]] = None
 
 @dataclass
 class RoutingResult:
@@ -78,8 +80,8 @@ class ChatCompletionHandler:
         start_time = time.time()
         request_id = f"req_{uuid.uuid4().hex[:8]}"
         
-        logger.info(f"🌐 API REQUEST: [{request_id}] Received chat completion request for model '{request.model}' (stream: {request.stream})")
-        logger.info(f"🌐 REQUEST DETAILS: [{request_id}] {len(request.messages)} messages, max_tokens: {request.max_tokens}, temperature: {request.temperature}")
+        logger.info(f"API REQUEST: [{request_id}] Received chat completion request for model '{request.model}' (stream: {request.stream})")
+        logger.info(f"REQUEST DETAILS: [{request_id}] {len(request.messages)} messages, max_tokens: {request.max_tokens}, temperature: {request.temperature}")
         
         try:
             # 步骤1: 路由请求获取候选渠道
@@ -100,6 +102,100 @@ class ChatCompletionHandler:
         except Exception as e:
             return self._handle_unexpected_error(e, request.model, time.time() - start_time)
     
+    async def handle_stream_request(self, request: ChatCompletionRequest):
+        """处理流式请求"""
+        request_id = str(uuid.uuid4())
+        start_time = time.time()
+        
+        logger.info(f"ANTHROPIC STREAM: [{request_id}] Starting stream request for model '{request.model}'")
+        
+        try:
+            # 步骤1: 路由请求获取候选渠道
+            routing_result = await self._route_request_with_fallback(request, start_time)
+            if not routing_result.candidates:
+                # 返回错误流
+                return StreamingResponse(
+                    self._error_stream_generator("no_channels_available", "No available channels"),
+                    media_type="text/event-stream"
+                )
+            
+            # 步骤2: 执行流式请求
+            return StreamingResponse(
+                self._execute_stream_request_with_retry(request, routing_result, start_time, request_id),
+                media_type="text/event-stream"
+            )
+                
+        except Exception as e:
+            logger.error(f"Stream error: {e}")
+            return StreamingResponse(
+                self._error_stream_generator("stream_error", str(e)),
+                media_type="text/event-stream"
+            )
+    
+    async def _execute_stream_request_with_retry(self, request: ChatCompletionRequest, routing_result: RoutingResult, start_time: float, request_id: str):
+        """执行流式请求并处理重试逻辑"""
+        last_error = None
+        failed_channels = set()
+        
+        for attempt_num, routing_score in enumerate(routing_result.candidates, 1):
+            channel = routing_score.channel
+            provider = self.config.get_provider(channel.provider)
+            
+            if channel.id in failed_channels:
+                continue
+            
+            if not provider:
+                continue
+            
+            try:
+                channel_info = self._prepare_channel_request_info(channel, provider, request, routing_score.matched_model)
+                
+                # 创建请求元数据
+                aggregator = get_response_aggregator()
+                metadata = aggregator.create_request_metadata(
+                    request_id=request_id,
+                    model_requested=request.model,
+                    model_used=channel_info.request_data['model'],
+                    channel_name=channel.name,
+                    channel_id=channel.id,
+                    provider=channel.provider,
+                    attempt_count=attempt_num,
+                    is_streaming=True,
+                    routing_strategy=getattr(self.router, 'current_strategy', 'balanced'),
+                    routing_score=routing_score.total_score,
+                    routing_reason=routing_score.reason
+                )
+                
+                # 执行流式请求 - 直接yield流式响应的内容
+                async for chunk in self._stream_channel_api_with_summary(channel_info.url, channel_info.headers, channel_info.request_data, channel_info.channel.id, metadata):
+                    yield chunk
+                
+                return  # 成功则退出
+                
+            except Exception as e:
+                last_error = e
+                failed_channels.add(channel.id)
+                logger.error(f"Stream attempt {attempt_num} failed: {e}")
+                continue
+        
+        # 所有渠道都失败
+        yield self._create_stream_error("all_channels_failed", str(last_error or "All channels failed"))
+    
+    def _create_stream_error(self, error_type: str, message: str) -> str:
+        """创建流式错误消息"""
+        error_data = {
+            "type": "error",
+            "error": {
+                "type": error_type,
+                "message": message
+            }
+        }
+        return f"data: {json.dumps(error_data)}\n\n"
+    
+    async def _error_stream_generator(self, error_type: str, message: str):
+        """错误流生成器"""
+        yield self._create_stream_error(error_type, message)
+    
     async def _route_request_with_fallback(self, request: ChatCompletionRequest, start_time: float) -> RoutingResult:
         """执行路由请求和智能预检"""
         routing_request = RoutingRequest(
@@ -110,13 +206,13 @@ class ChatCompletionHandler:
             data=request.dict()  # 传递完整的请求数据用于能力检测
         )
         
-        logger.info(f"🔄 CHANNEL ROUTING: Starting routing process for model '{request.model}'")
+        logger.info(f"CHANNEL ROUTING: Starting routing process for model '{request.model}'")
         candidate_channels = await self.router.route_request(routing_request)
         
         if not candidate_channels:
             return RoutingResult(candidates=[], execution_time=time.time() - start_time, total_candidates=0)
         
-        logger.info(f"🔄 CHANNEL SELECTION: Processing {len(candidate_channels)} channels with intelligent routing")
+        logger.info(f"CHANNEL SELECTION: Processing {len(candidate_channels)} channels with intelligent routing")
         
         # 智能渠道预检 - 如果有多个渠道，先并发检查前3个
         if len(candidate_channels) > 1:
@@ -179,7 +275,7 @@ class ChatCompletionHandler:
     
     async def _perform_concurrent_channel_check(self, candidate_channels: List[RoutingScore]) -> None:
         """执行并发渠道可用性检查"""
-        logger.info(f"⚡ FAST CHECK: Pre-checking availability of top {min(3, len(candidate_channels))} channels")
+        logger.info(f"FAST CHECK: Pre-checking availability of top {min(3, len(candidate_channels))} channels")
         
         check_tasks = []
         for i, routing_score in enumerate(candidate_channels[:3]):
@@ -197,12 +293,12 @@ class ChatCompletionHandler:
                 if i < len(check_results) and not isinstance(check_results[i], Exception):
                     is_available, status_code, message = check_results[i]
                     if is_available:
-                        logger.info(f"⚡ FAST CHECK: Channel '{channel.name}' is available (HTTP {status_code}), prioritizing")
+                        logger.info(f"FAST CHECK: Channel '{channel.name}' is available (HTTP {status_code}), prioritizing")
                         priority_channel = candidate_channels.pop(original_index)
                         candidate_channels.insert(0, priority_channel)
                         break
                     else:
-                        logger.info(f"⚡ FAST CHECK: Channel '{channel.name}' unavailable ({status_code}: {message})")
+                        logger.info(f"FAST CHECK: Channel '{channel.name}' unavailable ({status_code}: {message})")
     
     async def _execute_request_with_retry(self, request: ChatCompletionRequest, routing_result: RoutingResult, start_time: float, request_id: str, cost_preview: Optional[Dict[str, Any]] = None) -> Union[JSONResponse, StreamingResponse]:
         """执行请求并处理重试逻辑"""
@@ -219,11 +315,11 @@ class ChatCompletionHandler:
                 continue
             
             if not provider:
-                logger.warning(f"❌ ATTEMPT #{attempt_num}: Provider '{channel.provider}' for channel '{channel.name}' not found, skipping")
+                logger.warning(f"ATTEMPT #{attempt_num}: Provider '{channel.provider}' for channel '{channel.name}' not found, skipping")
                 continue
             
-            logger.info(f"🚀 ATTEMPT #{attempt_num}: [{request_id}] Trying channel '{channel.name}' (ID: {channel.id}) with score {routing_score.total_score:.3f}")
-            logger.info(f"🚀 ATTEMPT #{attempt_num}: [{request_id}] Score breakdown - {routing_score.reason}")
+            logger.info(f"ATTEMPT #{attempt_num}: [{request_id}] Trying channel '{channel.name}' (ID: {channel.id}) with score {routing_score.total_score:.3f}")
+            logger.info(f"ATTEMPT #{attempt_num}: [{request_id}] Score breakdown - {routing_score.reason}")
             
             try:
                 channel_info = self._prepare_channel_request_info(channel, provider, request, routing_score.matched_model)
@@ -252,7 +348,7 @@ class ChatCompletionHandler:
                 setattr(request, '_metadata', metadata)
                 
                 if request.stream:
-                    return await self._handle_streaming_request(request, channel_info, routing_score, attempt_num, metadata)
+                    return self._handle_streaming_request(request, channel_info, routing_score, attempt_num, metadata)
                 else:
                     return await self._handle_regular_request(request, channel_info, routing_score, attempt_num, start_time, metadata)
                     
@@ -268,18 +364,14 @@ class ChatCompletionHandler:
         # 所有渠道都失败了
         return self._create_all_channels_failed_error(request.model, routing_result.candidates, last_error, time.time() - start_time)
     
-    async def _handle_streaming_request(self, request: ChatCompletionRequest, channel_info: ChannelRequestInfo, routing_score: RoutingScore, attempt_num: int, metadata: RequestMetadata) -> StreamingResponse:
+    def _handle_streaming_request(self, request: ChatCompletionRequest, channel_info: ChannelRequestInfo, routing_score: RoutingScore, attempt_num: int, metadata: RequestMetadata):
         """处理流式请求"""
-        logger.info(f"🌊 STREAMING: [{metadata.request_id}] Starting streaming response for channel '{channel_info.channel.name}'")
+        logger.info(f"STREAMING: [{metadata.request_id}] Starting streaming response for channel '{channel_info.channel.name}'")
         
-        # 获取响应汇总器并添加HTTP头信息
-        aggregator = get_response_aggregator()
-        debug_headers = aggregator.get_headers_summary(metadata.request_id)
-        
+        # 返回StreamingResponse对象
         return StreamingResponse(
             self._stream_channel_api_with_summary(channel_info.url, channel_info.headers, channel_info.request_data, channel_info.channel.id, metadata),
-            media_type="text/event-stream",
-            headers=debug_headers
+            media_type="text/event-stream"
         )
     
     async def _handle_regular_request(self, request: ChatCompletionRequest, channel_info: ChannelRequestInfo, routing_score: RoutingScore, attempt_num: int, start_time: float, metadata: RequestMetadata) -> JSONResponse:
@@ -292,10 +384,10 @@ class ChatCompletionHandler:
         latency = time.time() - start_time
         self.router.update_channel_health(channel_info.channel.id, True, latency)
         
-        logger.info(f"✅ SUCCESS: [{metadata.request_id}] Channel '{channel_info.channel.name}' responded successfully (latency: {latency:.3f}s)")
-        logger.info(f"✅ TIMING: [{metadata.request_id}] TTFB: {ttfb*1000:.1f}ms, Total: {latency*1000:.1f}ms")
-        logger.info(f"✅ RESPONSE: [{metadata.request_id}] Model used -> {response_json.get('model', 'unknown')}")
-        logger.info(f"✅ RESPONSE: [{metadata.request_id}] Usage -> {response_json.get('usage', {})}")
+        logger.info(f"SUCCESS: [{metadata.request_id}] Channel '{channel_info.channel.name}' responded successfully (latency: {latency:.3f}s)")
+        logger.info(f"TIMING: [{metadata.request_id}] TTFB: {ttfb*1000:.1f}ms, Total: {latency*1000:.1f}ms")
+        logger.info(f"RESPONSE: [{metadata.request_id}] Model used -> {response_json.get('model', 'unknown')}")
+        logger.info(f"RESPONSE: [{metadata.request_id}] Usage -> {response_json.get('usage', {})}")
         
         # 更新元数据
         aggregator = get_response_aggregator()
@@ -393,13 +485,13 @@ class ChatCompletionHandler:
             cache.invalidate_channel(channel_id)
             logger.info(f"🗑️  CACHE INVALIDATED: Cleared cached selections for channel '{channel_name}' due to {reason}")
         except Exception as e:
-            logger.warning(f"⚠️  CACHE INVALIDATION FAILED for channel '{channel_name}': {e}")
+            logger.warning(f"CACHE INVALIDATION FAILED for channel '{channel_name}': {e}")
 
     async def _handle_http_status_error(self, error: httpx.HTTPStatusError, channel, attempt_num: int, failed_channels: set, total_candidates: List) -> None:
         """处理HTTP状态错误"""
         error_text = error.response.text if hasattr(error.response, 'text') else str(error)
-        logger.warning(f"❌ ATTEMPT #{attempt_num} FAILED: Channel '{channel.name}' returned HTTP {error.response.status_code}")
-        logger.warning(f"❌ ERROR DETAILS: {error_text[:200]}...")
+        logger.warning(f"ATTEMPT #{attempt_num} FAILED: Channel '{channel.name}' returned HTTP {error.response.status_code}")
+        logger.warning(f"ERROR DETAILS: {error_text[:200]}...")
         
         self.router.update_channel_health(channel.id, False)
         
@@ -407,7 +499,7 @@ class ChatCompletionHandler:
         if error.response.status_code in [401, 403]:
             failed_channels.add(channel.id)
             logger.warning(f"🚫 CHANNEL BLACKLISTED: Channel '{channel.name}' (ID: {channel.id}) blacklisted due to HTTP {error.response.status_code}")
-            logger.info(f"⚡ SKIP OPTIMIZATION: Will skip all remaining models from channel '{channel.name}'")
+            logger.info(f"SKIP OPTIMIZATION: Will skip all remaining models from channel '{channel.name}'")
             
             # 使相关缓存失效 - 永久性错误需要立即清除缓存
             self._invalidate_channel_cache(channel.id, channel.name, "permanent error")
@@ -424,15 +516,15 @@ class ChatCompletionHandler:
                 wait_time = self._extract_rate_limit_wait_time(error_text)
                 if wait_time:
                     backoff_time = min(wait_time, 60)  # 最大等待60秒
-                    logger.warning(f"🔄 SMART RATE LIMIT: Channel '{channel.name}' suggests waiting {wait_time}s, applying {backoff_time}s backoff")
+                    logger.warning(f"SMART RATE LIMIT: Channel '{channel.name}' suggests waiting {wait_time}s, applying {backoff_time}s backoff")
                 else:
                     backoff_time = min(2 ** (attempt_num - 1), 16)  # 指数退避，最大16秒
-                    logger.warning(f"🔄 RATE LIMIT: Channel '{channel.name}' rate limited, applying {backoff_time}s backoff")
+                    logger.warning(f"RATE LIMIT: Channel '{channel.name}' rate limited, applying {backoff_time}s backoff")
                 
                 await asyncio.sleep(backoff_time)
         
         if attempt_num < len(total_candidates):
-            logger.info(f"🔄 FAILOVER: Trying next channel (#{attempt_num + 1})")
+            logger.info(f"FAILOVER: Trying next channel (#{attempt_num + 1})")
     
     def _extract_rate_limit_wait_time(self, error_text: str) -> Optional[int]:
         """从错误信息中提取建议的等待时间（秒）"""
@@ -501,14 +593,14 @@ class ChatCompletionHandler:
     
     def _handle_request_error(self, error: httpx.RequestError, channel, attempt_num: int, total_candidates: List) -> None:
         """处理请求错误"""
-        logger.warning(f"❌ ATTEMPT #{attempt_num} FAILED: Channel '{channel.name}' network error: {str(error)}")
+        logger.warning(f"ATTEMPT #{attempt_num} FAILED: Channel '{channel.name}' network error: {str(error)}")
         self.router.update_channel_health(channel.id, False)
         
         # 网络错误也可能是渠道问题，清除相关缓存
         self._invalidate_channel_cache(channel.id, channel.name, "network error")
         
         if attempt_num < len(total_candidates):
-            logger.info(f"🔄 FAILOVER: Trying next channel (#{attempt_num + 1})")
+            logger.info(f"FAILOVER: Trying next channel (#{attempt_num + 1})")
     
     def _infer_capabilities(self, request: ChatCompletionRequest) -> List[str]:
         """推断请求所需的能力"""
@@ -527,7 +619,7 @@ class ChatCompletionHandler:
     
     def _create_no_channels_error(self, model: str, execution_time: float) -> JSONResponse:
         """创建无可用渠道错误响应"""
-        logger.error(f"❌ ROUTING FAILED: No available channels found for model '{model}'")
+        logger.error(f"ROUTING FAILED: No available channels found for model '{model}'")
         
         headers = {
             "X-Router-Status": "no-channels-found",
@@ -543,7 +635,7 @@ class ChatCompletionHandler:
     
     def _handle_tag_not_found_error(self, error: TagNotFoundError, model: str, execution_time: float) -> JSONResponse:
         """处理标签未找到错误"""
-        logger.error(f"❌ TAG NOT FOUND: {error} (after {execution_time:.3f}s)")
+        logger.error(f"TAG NOT FOUND: {error} (after {execution_time:.3f}s)")
         
         headers = {
             "X-Router-Status": "tag-not-found",
@@ -652,7 +744,7 @@ class ChatCompletionHandler:
         ttfb = None
         first_token_received = False
         
-        logger.info(f"🌊 STREAM START: Initiating optimized streaming request to channel '{channel_id}'")
+        logger.info(f"STREAM START: Initiating optimized streaming request to channel '{channel_id}'")
         
         try:
             http_pool = get_http_pool()
@@ -663,16 +755,16 @@ class ChatCompletionHandler:
                     error_body = await response.aread()
                     if len(error_body) > 1024:
                         error_body = error_body[:1024]
-                    logger.error(f"🌊 STREAM ERROR: Channel '{channel_id}' returned status {response.status_code}")
+                    logger.error(f"STREAM ERROR: Channel '{channel_id}' returned status {response.status_code}")
                     
                     error_text = error_body.decode('utf-8', errors='ignore')[:200]
-                    logger.error(f"🌊 STREAM ERROR DETAILS: {error_text}")
+                    logger.error(f"STREAM ERROR DETAILS: {error_text}")
                     self.router.update_channel_health(channel_id, False)
                     
                     yield f"data: {json.dumps({'error': {'message': f'Upstream API error: {error_text}', 'code': response.status_code}})}\n\n"
                     return
 
-                logger.info(f"🌊 STREAM CONNECTED: Successfully connected to channel '{channel_id}', starting optimized data flow")
+                logger.info(f"STREAM CONNECTED: Successfully connected to channel '{channel_id}', starting optimized data flow")
                 
                 async for chunk in response.aiter_bytes(chunk_size=8192):
                     if chunk:
@@ -682,24 +774,24 @@ class ChatCompletionHandler:
                         if not first_token_received:
                             ttfb = time.time() - stream_start_time
                             first_token_received = True
-                            logger.info(f"🌊 FIRST TOKEN: Received first token from channel '{channel_id}' in {ttfb:.3f}s")
+                            logger.info(f"FIRST TOKEN: Received first token from channel '{channel_id}' in {ttfb:.3f}s")
                         
                         if chunk_count % 20 == 0:
-                            logger.debug(f"🌊 STREAMING: Received {chunk_count} chunks from channel '{channel_id}'")
+                            logger.debug(f"STREAMING: Received {chunk_count} chunks from channel '{channel_id}'")
                     yield chunk
                         
             stream_duration = time.time() - stream_start_time
             self.router.update_channel_health(channel_id, True, stream_duration)
-            logger.info(f"🌊 STREAM COMPLETE: Channel '{channel_id}' completed optimized streaming {chunk_count} chunks in {stream_duration:.3f}s")
+            logger.info(f"STREAM COMPLETE: Channel '{channel_id}' completed optimized streaming {chunk_count} chunks in {stream_duration:.3f}s")
             
         except httpx.HTTPStatusError as e:
             error_text = e.response.text if hasattr(e.response, 'text') else str(e)
-            logger.error(f"🌊 STREAM FAILED: Channel '{channel_id}' HTTP error {e.response.status_code}: {error_text[:200]}...")
+            logger.error(f"STREAM FAILED: Channel '{channel_id}' HTTP error {e.response.status_code}: {error_text[:200]}...")
             self.router.update_channel_health(channel_id, False)
             yield f"data: {json.dumps({'error': {'message': f'Upstream API error: {error_text}', 'code': e.response.status_code}})}\n\n"
             
         except Exception as e:
-            logger.error(f"🌊 STREAM EXCEPTION: Streaming request for channel '{channel_id}' failed: {e}", exc_info=True)
+            logger.error(f"STREAM EXCEPTION: Streaming request for channel '{channel_id}' failed: {e}", exc_info=True)
             self.router.update_channel_health(channel_id, False)
             yield f"data: {json.dumps({'error': {'message': str(e), 'code': 500}})}\n\n"
 
@@ -851,7 +943,7 @@ class ChatCompletionHandler:
         stream_start_time = time.time()
         aggregator = get_response_aggregator()
         
-        logger.info(f"🌊 STREAM START: [{metadata.request_id}] Initiating optimized streaming request to channel '{channel_id}'")
+        logger.info(f"STREAM START: [{metadata.request_id}] Initiating optimized streaming request to channel '{channel_id}'")
         
         try:
             http_pool = get_http_pool()
@@ -862,17 +954,17 @@ class ChatCompletionHandler:
                     error_body = await response.aread()
                     if len(error_body) > 1024:
                         error_body = error_body[:1024]
-                    logger.error(f"🌊 STREAM ERROR: [{metadata.request_id}] Channel '{channel_id}' returned status {response.status_code}")
+                    logger.error(f"STREAM ERROR: [{metadata.request_id}] Channel '{channel_id}' returned status {response.status_code}")
                     
                     error_text = error_body.decode('utf-8', errors='ignore')
-                    logger.error(f"🌊 STREAM ERROR DETAILS: [{metadata.request_id}] {error_text[:200]}")
+                    logger.error(f"STREAM ERROR DETAILS: [{metadata.request_id}] {error_text[:200]}")
                     self.router.update_channel_health(channel_id, False)
                     
                     # 检测流式响应中的速率限制错误
                     if response.status_code == 429:
                         wait_time = self._extract_rate_limit_wait_time(error_text)
                         if wait_time:
-                            logger.warning(f"🌊 STREAM RATE LIMIT: [{metadata.request_id}] Channel '{channel_id}' suggests waiting {wait_time}s")
+                            logger.warning(f"STREAM RATE LIMIT: [{metadata.request_id}] Channel '{channel_id}' suggests waiting {wait_time}s")
                             # 在错误响应中包含等待时间信息
                             yield f"data: {json.dumps({'error': {'message': f'Rate limited: retry after {wait_time}s - {error_text[:100]}', 'code': response.status_code, 'retry_after': wait_time}})}\\n\\n"
                         else:
@@ -889,7 +981,7 @@ class ChatCompletionHandler:
                     yield "data: [DONE]\\n\\n"
                     return
 
-                logger.info(f"🌊 STREAM CONNECTED: [{metadata.request_id}] Successfully connected to channel '{channel_id}', starting optimized data flow")
+                logger.info(f"STREAM CONNECTED: [{metadata.request_id}] Successfully connected to channel '{channel_id}', starting optimized data flow")
                 
                 # 记录TTFB时间 - 修正：连接建立后的第一个数据块时间
                 ttfb_recorded = False
@@ -910,7 +1002,7 @@ class ChatCompletionHandler:
                             ttfb = first_data_time - stream_start_time
                             aggregator.update_performance(metadata.request_id, ttfb=ttfb)
                             ttfb_recorded = True
-                            logger.info(f"🌊 TTFB: [{metadata.request_id}] First data received in {ttfb:.3f}s")
+                            logger.info(f"TTFB: [{metadata.request_id}] First data received in {ttfb:.3f}s")
                         
                         # 解析响应以提取token信息并检测流式错误（简化版）
                         try:
@@ -932,7 +1024,7 @@ class ChatCompletionHandler:
                                                 if error_code == 429 or 'rate limit' in error_message.lower() or 'temporarily rate-limited' in error_message.lower():
                                                     wait_time = self._extract_rate_limit_wait_time(error_message)
                                                     if wait_time:
-                                                        logger.warning(f"🌊 CONTENT RATE LIMIT: [{metadata.request_id}] Channel '{channel_id}' content suggests waiting {wait_time}s")
+                                                        logger.warning(f"CONTENT RATE LIMIT: [{metadata.request_id}] Channel '{channel_id}' content suggests waiting {wait_time}s")
                                                         # 修改错误信息以包含等待时间
                                                         error_obj['retry_after'] = wait_time
                                                         data['error'] = error_obj
@@ -942,7 +1034,7 @@ class ChatCompletionHandler:
                                                         chunk_str = chunk_str.replace(line, modified_line)
                                                         chunk = chunk_str.encode('utf-8')
                                                     else:
-                                                        logger.warning(f"🌊 CONTENT RATE LIMIT: [{metadata.request_id}] Channel '{channel_id}' rate limited in streaming content")
+                                                        logger.warning(f"CONTENT RATE LIMIT: [{metadata.request_id}] Channel '{channel_id}' rate limited in streaming content")
                                         except (json.JSONDecodeError, KeyError):
                                             pass
                             
@@ -965,7 +1057,7 @@ class ChatCompletionHandler:
                             pass  # 忽略解析错误
                         
                         if chunk_count % 20 == 0:
-                            logger.debug(f"🌊 STREAMING: [{metadata.request_id}] Received {chunk_count} chunks from channel '{channel_id}'")
+                            logger.debug(f"STREAMING: [{metadata.request_id}] Received {chunk_count} chunks from channel '{channel_id}'")
                     
                     yield chunk
                 
@@ -995,14 +1087,14 @@ class ChatCompletionHandler:
                             tokens_per_second = total_completion_tokens / generation_time
                             # 更新准确的token生成速度
                             aggregator.update_performance(metadata.request_id, tokens_per_second=tokens_per_second)
-                            logger.info(f"🌊 TOKEN SPEED: [{metadata.request_id}] {total_completion_tokens} tokens in {generation_time:.3f}s = {tokens_per_second:.1f} tokens/sec")
+                            logger.info(f"TOKEN SPEED: [{metadata.request_id}] {total_completion_tokens} tokens in {generation_time:.3f}s = {tokens_per_second:.1f} tokens/sec")
                 
                 # 完成请求并生成汇总
                 final_metadata = aggregator.finish_request(metadata.request_id)
                         
             stream_duration = time.time() - stream_start_time
             self.router.update_channel_health(channel_id, True, stream_duration)
-            logger.info(f"🌊 STREAM COMPLETE: [{metadata.request_id}] Channel '{channel_id}' completed optimized streaming {chunk_count} chunks in {stream_duration:.3f}s")
+            logger.info(f"STREAM COMPLETE: [{metadata.request_id}] Channel '{channel_id}' completed optimized streaming {chunk_count} chunks in {stream_duration:.3f}s")
             
             # 在[DONE]之前发送汇总信息
             yield aggregator.create_sse_summary_event(final_metadata)
@@ -1010,7 +1102,7 @@ class ChatCompletionHandler:
             
         except httpx.HTTPStatusError as e:
             error_text = e.response.text if hasattr(e.response, 'text') else str(e)
-            logger.error(f"🌊 STREAM FAILED: [{metadata.request_id}] Channel '{channel_id}' HTTP error {e.response.status_code}: {error_text[:200]}...")
+            logger.error(f"STREAM FAILED: [{metadata.request_id}] Channel '{channel_id}' HTTP error {e.response.status_code}: {error_text[:200]}...")
             self.router.update_channel_health(channel_id, False)
             
             # 设置错误信息并完成请求
@@ -1022,7 +1114,7 @@ class ChatCompletionHandler:
             yield "data: [DONE]\\n\\n"
             
         except Exception as e:
-            logger.error(f"🌊 STREAM EXCEPTION: [{metadata.request_id}] Streaming request for channel '{channel_id}' failed: {e}", exc_info=True)
+            logger.error(f"STREAM EXCEPTION: [{metadata.request_id}] Streaming request for channel '{channel_id}' failed: {e}", exc_info=True)
             self.router.update_channel_health(channel_id, False)
             
             # 设置错误信息并完成请求

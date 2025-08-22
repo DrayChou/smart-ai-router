@@ -57,6 +57,9 @@ class AnthropicAdapter(BaseAdapter):
 
         # 转换请求格式
         payload = self.transform_request(request)
+        
+        # 记录请求信息
+        logger.info(f"Anthropic API请求 - 模型: {request.model}, 消息数: {len(request.messages)}")
 
         try:
             response = await self.client.post(
@@ -64,14 +67,19 @@ class AnthropicAdapter(BaseAdapter):
             )
 
             if not response.is_success:
+                logger.error(f"Anthropic API错误响应: {response.status_code} - {response.text}")
                 raise await self.handle_error(response)
 
             data = response.json()
+            logger.info(f"Anthropic API成功响应 - 模型: {data.get('model')}, 消耗token: {data.get('usage', {}).get('total_tokens', 0)}")
             return self.transform_response(data)
 
         except httpx.HTTPError as e:
-            logger.error(f"Anthropic API请求失败: {e}")
+            logger.error(f"Anthropic API网络请求失败: {e}")
             raise ProviderError(f"网络请求失败: {e}")
+        except Exception as e:
+            logger.error(f"Anthropic API未知错误: {e}")
+            raise ProviderError(f"请求失败: {e}")
 
     async def chat_completions_stream(
         self, request: ChatRequest, api_key: str, **kwargs
@@ -83,6 +91,8 @@ class AnthropicAdapter(BaseAdapter):
         # 转换请求格式，确保stream=True
         payload = self.transform_request(request)
         payload["stream"] = True
+        
+        logger.info(f"Anthropic流式API请求 - 模型: {request.model}")
 
         try:
             async with self.client.stream(
@@ -90,6 +100,7 @@ class AnthropicAdapter(BaseAdapter):
             ) as response:
 
                 if not response.is_success:
+                    logger.error(f"Anthropic流式API错误响应: {response.status_code} - {response.text}")
                     raise await self.handle_error(response)
 
                 async for chunk in response.aiter_lines():
@@ -104,13 +115,18 @@ class AnthropicAdapter(BaseAdapter):
                                 delta = chunk_data.get("delta", {})
                                 if "text" in delta:
                                     yield delta["text"]
+                            elif chunk_data.get("type") == "message_stop":
+                                logger.info("Anthropic流式响应完成")
 
                         except json.JSONDecodeError:
                             continue
 
         except httpx.HTTPError as e:
-            logger.error(f"Anthropic流式API请求失败: {e}")
+            logger.error(f"Anthropic流式API网络请求失败: {e}")
             raise ProviderError(f"流式网络请求失败: {e}")
+        except Exception as e:
+            logger.error(f"Anthropic流式API未知错误: {e}")
+            raise ProviderError(f"流式请求失败: {e}")
 
     async def list_models(self, api_key: str) -> List[ModelInfo]:
         """获取Anthropic模型列表"""
@@ -148,6 +164,18 @@ class AnthropicAdapter(BaseAdapter):
                 output_cost_per_1k=0.075,
                 speed_score=0.7,
                 quality_score=0.98,
+            ),
+            # 添加Claude 3 Haiku (旧版本)
+            ModelInfo(
+                id="claude-3-haiku-20240307",
+                name="Claude 3 Haiku",
+                provider=self.provider_name,
+                capabilities=["text", "vision", "function_calling"],
+                context_length=200000,
+                input_cost_per_1k=0.00025,
+                output_cost_per_1k=0.00125,
+                speed_score=0.9,
+                quality_score=0.75,
             ),
         ]
 

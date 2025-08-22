@@ -101,7 +101,7 @@ class JSONRouter:
         - 基于请求指纹的智能缓存键生成
         - 自动故障转移和缓存失效
         """
-        logger.info(f"🚀 ROUTING START: Processing request for model '{request.model}'")
+        logger.info(f"ROUTING START: Processing request for model '{request.model}'")
         
         # 生成请求指纹用于缓存
         fingerprint = RequestFingerprint(
@@ -122,13 +122,13 @@ class JSONRouter:
         # 检查缓存
         cache = get_request_cache()
         cache_key = fingerprint.to_cache_key()
-        logger.debug(f"🔍 CACHE LOOKUP: Key={cache_key}, Model={request.model}")
+        logger.debug(f"CACHE LOOKUP: Key={cache_key}, Model={request.model}")
         
         cached_result = await cache.get_cached_selection(fingerprint)
         
         if cached_result:
             # 缓存命中，转换为RoutingScore列表
-            logger.info(f"⚡ CACHE HIT: Using cached selection for '{request.model}' "
+            logger.info(f"CACHE HIT: Using cached selection for '{request.model}' "
                        f"(cost: ${cached_result.cost_estimate:.4f})")
             
             # 构建RoutingScore列表
@@ -169,49 +169,49 @@ class JSONRouter:
             return scores
         
         # 缓存未命中，执行正常路由逻辑
-        logger.info(f"⏱️  CACHE MISS: Computing fresh routing for '{request.model}'")
+        logger.info(f"CACHE MISS: Computing fresh routing for '{request.model}'")
         try:
             # 第一步：获取候选渠道
-            logger.info(f"🔍 STEP 1: Finding candidate channels...")
+            logger.info(f"STEP 1: Finding candidate channels...")
             candidates = self._get_candidate_channels(request)
             if not candidates:
-                logger.warning(f"❌ ROUTING FAILED: No suitable channels found for model '{request.model}'")
+                logger.warning(f"ROUTING FAILED: No suitable channels found for model '{request.model}'")
                 return []
             
-            logger.info(f"✅ STEP 1 COMPLETE: Found {len(candidates)} candidate channels")
+            logger.info(f"STEP 1 COMPLETE: Found {len(candidates)} candidate channels")
             
             # 第二步：过滤渠道
-            logger.info(f"🔧 STEP 2: Filtering channels by health and availability...")
+            logger.info(f"STEP 2: Filtering channels by health and availability...")
             filtered_candidates = self._filter_channels(candidates, request)
             if not filtered_candidates:
-                logger.warning(f"❌ ROUTING FAILED: No available channels after filtering for model '{request.model}'")
+                logger.warning(f"ROUTING FAILED: No available channels after filtering for model '{request.model}'")
                 return []
             
             # 第2.5步：能力检测过滤（仅对本地模型）
-            logger.info(f"🧠 STEP 2.5: Checking model capabilities...")
+            logger.info(f"STEP 2.5: Checking model capabilities...")
             capability_filtered = await self._filter_by_capabilities(filtered_candidates, request)
             if not capability_filtered:
-                logger.warning(f"❌ ROUTING FAILED: No channels with required capabilities for model '{request.model}'")
+                logger.warning(f"ROUTING FAILED: No channels with required capabilities for model '{request.model}'")
                 return []
             
-            logger.info(f"✅ STEP 2.5 COMPLETE: {len(capability_filtered)} channels passed capability check (filtered out {len(filtered_candidates) - len(capability_filtered)})")
+            logger.info(f"STEP 2.5 COMPLETE: {len(capability_filtered)} channels passed capability check (filtered out {len(filtered_candidates) - len(capability_filtered)})")
             filtered_candidates = capability_filtered
             
             # 第2.7步：预筛选（性能优化）- 限制参与详细评分的渠道数量
             if len(filtered_candidates) > 20:  # 仅在渠道数量过多时预筛选
-                logger.info(f"⚡ STEP 2.7: Pre-filtering {len(filtered_candidates)} channels to reduce scoring overhead...")
+                logger.info(f"STEP 2.7: Pre-filtering {len(filtered_candidates)} channels to reduce scoring overhead...")
                 pre_filtered = await self._pre_filter_channels(filtered_candidates, request, max_channels=20)
-                logger.info(f"✅ STEP 2.7 COMPLETE: Pre-filtered to {len(pre_filtered)} channels for detailed scoring")
+                logger.info(f"STEP 2.7 COMPLETE: Pre-filtered to {len(pre_filtered)} channels for detailed scoring")
                 filtered_candidates = pre_filtered
             
             # 第三步：评分和排序
             logger.info(f"🎯 STEP 3: Scoring and ranking channels...")
             scored_channels = await self._score_channels(filtered_candidates, request)
             if not scored_channels:
-                logger.warning(f"❌ ROUTING FAILED: Failed to score any channels for model '{request.model}'")
+                logger.warning(f"ROUTING FAILED: Failed to score any channels for model '{request.model}'")
                 return []
             
-            logger.info(f"✅ STEP 3 COMPLETE: Scored {len(scored_channels)} channels")
+            logger.info(f"STEP 3 COMPLETE: Scored {len(scored_channels)} channels")
             
             # 缓存结果（异步执行，不阻塞主流程）
             if scored_channels:
@@ -251,7 +251,7 @@ class JSONRouter:
             # 让ParameterComparisonError传播出去，以便上层处理
             raise
         except Exception as e:
-            logger.error(f"❌ ROUTING ERROR: Request failed for model '{request.model}': {e}", exc_info=True)
+            logger.error(f"ROUTING ERROR: Request failed for model '{request.model}': {e}", exc_info=True)
             return []
     
     def _get_candidate_channels(self, request: RoutingRequest) -> List[ChannelCandidate]:
@@ -262,19 +262,19 @@ class JSONRouter:
             logger.info(f"🔢 PARAMETER COMPARISON: Processing query '{request.model}'")
             comparison = self.parameter_comparator.parse_comparison(request.model)
             if not comparison:
-                logger.error(f"❌ PARAM PARSE FAILED: Could not parse parameter comparison '{request.model}'")
+                logger.error(f"PARAM PARSE FAILED: Could not parse parameter comparison '{request.model}'")
                 raise ParameterComparisonError(request.model)
             
             # 获取所有模型缓存
             model_cache = self.config_loader.get_model_cache()
             if not model_cache:
-                logger.error(f"❌ NO MODEL CACHE: Model cache is empty for parameter comparison")
+                logger.error(f"NO MODEL CACHE: Model cache is empty for parameter comparison")
                 raise ParameterComparisonError(request.model, "模型缓存为空，无法进行参数量比较")
             
             # 按参数量比较筛选模型
             matching_models = self.parameter_comparator.filter_models_by_comparison(comparison, model_cache)
             if not matching_models:
-                logger.error(f"❌ PARAM COMPARISON FAILED: No models found matching '{request.model}'")
+                logger.error(f"PARAM COMPARISON FAILED: No models found matching '{request.model}'")
                 raise ParameterComparisonError(request.model)
             else:
                 logger.info(f"📝 First 5 matched models:")
@@ -286,7 +286,7 @@ class JSONRouter:
             disabled_count = 0
             not_found_count = 0
             
-            logger.debug(f"🔍 Processing {len(matching_models)} matching models for channel lookup...")
+            logger.debug(f"Processing {len(matching_models)} matching models for channel lookup...")
             
             for channel_id, model_name, model_params in matching_models:
                 # 从 API key-level cache key 中提取真实的 channel ID
@@ -301,7 +301,7 @@ class JSONRouter:
                         if len(potential_hash) == 8 and all(c in '0123456789abcdef' for c in potential_hash.lower()):
                             real_channel_id = '_'.join(parts[:-1])
                 
-                logger.debug(f"🔍 Channel ID mapping: '{channel_id}' -> '{real_channel_id}'")
+                logger.debug(f"Channel ID mapping: '{channel_id}' -> '{real_channel_id}'")
                 
                 # 查找对应的渠道对象
                 channel = self.config_loader.get_channel_by_id(real_channel_id)
@@ -311,18 +311,18 @@ class JSONRouter:
                             channel=channel,
                             matched_model=model_name
                         ))
-                        logger.debug(f"✅ Added channel: {channel.name} -> {model_name} ({model_params:.3f}B)")
+                        logger.debug(f"Added channel: {channel.name} -> {model_name} ({model_params:.3f}B)")
                     else:
                         disabled_count += 1
-                        logger.debug(f"❌ Disabled channel: {real_channel_id} -> {model_name}")
+                        logger.debug(f"Disabled channel: {real_channel_id} -> {model_name}")
                 else:
                     not_found_count += 1
-                    logger.debug(f"❌ Channel not found: {real_channel_id} (from {channel_id}) -> {model_name}")
+                    logger.debug(f"Channel not found: {real_channel_id} (from {channel_id}) -> {model_name}")
             
-            logger.info(f"🔍 CHANNEL LOOKUP: Found {len(candidates)} enabled channels, "
+            logger.info(f"CHANNEL LOOKUP: Found {len(candidates)} enabled channels, "
                        f"disabled: {disabled_count}, not_found: {not_found_count}")
             
-            logger.info(f"✅ PARAMETER COMPARISON: Found {len(candidates)} candidate channels "
+            logger.info(f"PARAMETER COMPARISON: Found {len(candidates)} candidate channels "
                        f"for '{comparison.model_prefix}' models {comparison.operator} {comparison.target_params}B")
             
             # 显示前几个匹配的渠道
@@ -350,12 +350,12 @@ class JSONRouter:
                         # 正标签：free, qwen3
                         positive_tags.append(tag_part.lower())
                 
-                logger.info(f"🏷️  TAG ROUTING: Processing multi-tag query '{request.model}' -> positive: {positive_tags}, negative: {negative_tags}")
+                logger.info(f"TAG ROUTING: Processing multi-tag query '{request.model}' -> positive: {positive_tags}, negative: {negative_tags}")
                 candidates = self._get_candidate_channels_by_auto_tags(positive_tags, negative_tags)
                 if not candidates:
-                    logger.error(f"❌ TAG NOT FOUND: No models found matching tags {positive_tags} excluding {negative_tags}")
+                    logger.error(f"TAG NOT FOUND: No models found matching tags {positive_tags} excluding {negative_tags}")
                     raise TagNotFoundError(positive_tags + [f"!{tag}" for tag in negative_tags])
-                logger.info(f"🏷️  TAG ROUTING: Multi-tag query found {len(candidates)} candidate channels")
+                logger.info(f"TAG ROUTING: Multi-tag query found {len(candidates)} candidate channels")
                 return candidates
             else:
                 # 单标签查询 - 支持负标签：tag:!local
@@ -363,18 +363,18 @@ class JSONRouter:
                 if tag_part.startswith("!"):
                     # 负标签单独查询：tag:!local (匹配所有不包含local的模型)
                     negative_tag = tag_part[1:].lower()
-                    logger.info(f"🏷️  TAG ROUTING: Processing negative tag query '{request.model}' -> excluding: '{negative_tag}'")
+                    logger.info(f"TAG ROUTING: Processing negative tag query '{request.model}' -> excluding: '{negative_tag}'")
                     candidates = self._get_candidate_channels_by_auto_tags([], [negative_tag])
                 else:
                     # 正常单标签查询
                     tag = tag_part.lower()
-                    logger.info(f"🏷️  TAG ROUTING: Processing single tag query '{request.model}' -> tag: '{tag}'")
+                    logger.info(f"TAG ROUTING: Processing single tag query '{request.model}' -> tag: '{tag}'")
                     candidates = self._get_candidate_channels_by_auto_tags([tag], [])
                 
                 if not candidates:
-                    logger.error(f"❌ TAG NOT FOUND: No models found for query '{request.model}'")
+                    logger.error(f"TAG NOT FOUND: No models found for query '{request.model}'")
                     raise TagNotFoundError([tag_query])
-                logger.info(f"🏷️  TAG ROUTING: Found {len(candidates)} candidate channels")
+                logger.info(f"TAG ROUTING: Found {len(candidates)} candidate channels")
                 return candidates
         
         # 非tag:前缀的模型名称 - 首先尝试物理模型，然后尝试自动标签化
@@ -397,7 +397,7 @@ class JSONRouter:
                         model_info = models_data[request.model]
                         real_model_id = model_info.get("id", request.model)
                     
-                    logger.debug(f"🔍 PHYSICAL MODEL: Found '{request.model}' -> '{real_model_id}' in channel '{channel.name}'")
+                    logger.debug(f"PHYSICAL MODEL: Found '{request.model}' -> '{real_model_id}' in channel '{channel.name}'")
                     physical_candidates.append(ChannelCandidate(
                         channel=channel,
                         matched_model=real_model_id  # 使用真实的模型ID
@@ -405,15 +405,15 @@ class JSONRouter:
         
         # 2. 同时尝试自动标签化查找（免费模型优先考虑）
         auto_tag_candidates = []
-        logger.info(f"🔄 AUTO TAGGING: Extracting tags from model name '{request.model}' for comprehensive search")
+        logger.info(f"AUTO TAGGING: Extracting tags from model name '{request.model}' for comprehensive search")
         auto_tags = self._extract_tags_from_model_name(request.model)
         if auto_tags:
-            logger.info(f"🏷️  AUTO TAGGING: Extracted tags {auto_tags} from model name '{request.model}'")
+            logger.info(f"AUTO TAGGING: Extracted tags {auto_tags} from model name '{request.model}'")
             auto_tag_candidates = self._get_candidate_channels_by_auto_tags(auto_tags)
             if auto_tag_candidates:
-                logger.info(f"🏷️  AUTO TAGGING: Found {len(auto_tag_candidates)} candidate channels using auto-extracted tags")
+                logger.info(f"AUTO TAGGING: Found {len(auto_tag_candidates)} candidate channels using auto-extracted tags")
             else:
-                logger.warning(f"🏷️  AUTO TAGGING: No channels found for auto-extracted tags {auto_tags}")
+                logger.warning(f"AUTO TAGGING: No channels found for auto-extracted tags {auto_tags}")
         
         # 3. 合并物理模型和自动标签化的结果，去重
         all_candidates = physical_candidates.copy()
@@ -435,14 +435,14 @@ class JSONRouter:
             physical_count = len(physical_candidates)
             tag_count = len(auto_tag_candidates)
             total_count = len(all_candidates)
-            logger.info(f"🔍 COMPREHENSIVE SEARCH: Found {total_count} total candidates "
+            logger.info(f"COMPREHENSIVE SEARCH: Found {total_count} total candidates "
                        f"(physical: {physical_count}, auto-tag: {tag_count}, merged without duplicates)")
             return all_candidates
         
         # 4. 最后尝试从配置中查找
         config_channels = self.config_loader.get_channels_by_model(request.model)
         if config_channels:
-            logger.info(f"📋 CONFIG FALLBACK: Found {len(config_channels)} channels in configuration for model '{request.model}'")
+            logger.info(f"CONFIG FALLBACK: Found {len(config_channels)} channels in configuration for model '{request.model}'")
             # 对于配置查找，尝试获取真实的模型ID
             config_candidates = []
             for ch in config_channels:
@@ -458,7 +458,7 @@ class JSONRouter:
             return config_candidates
         
         # 如果都没找到，返回空列表
-        logger.warning(f"❌ NO MATCH: No channels found for model '{request.model}' (tried physical, auto-tag, and config)")
+        logger.warning(f"NO MATCH: No channels found for model '{request.model}' (tried physical, auto-tag, and config)")
         return []
     
     def _filter_channels(self, channels: List[ChannelCandidate], request: RoutingRequest) -> List[ChannelCandidate]:
@@ -1388,11 +1388,11 @@ class JSONRouter:
         normalized_positive = [tag.lower().strip() for tag in positive_tags if tag and isinstance(tag, str)]
         normalized_negative = [tag.lower().strip() for tag in negative_tags if tag and isinstance(tag, str)]
         
-        logger.info(f"🔍 TAG MATCHING: Searching for channels with positive tags: {normalized_positive}, excluding: {normalized_negative}")
+        logger.info(f"TAG MATCHING: Searching for channels with positive tags: {normalized_positive}, excluding: {normalized_negative}")
         
         model_cache = self.config_loader.get_model_cache()
         if not model_cache:
-            logger.warning("🔍 TAG MATCHING: Model cache is empty, cannot perform tag routing")
+            logger.warning("TAG MATCHING: Model cache is empty, cannot perform tag routing")
             return []
         
         # 🚀 性能优化：检查缓存是否包含API Key级别的格式
@@ -1400,12 +1400,12 @@ class JSONRouter:
         # 旧格式: {"channel_id": {...}}
         has_api_key_format = any('_' in key and len(key.split('_')[-1]) == 8 for key in model_cache.keys())
         if has_api_key_format:
-            logger.info(f"🔍 TAG MATCHING: Using API key-level cache format with {len(model_cache)} entries")
+            logger.info(f"TAG MATCHING: Using API key-level cache format with {len(model_cache)} entries")
             # API Key级别缓存格式需要特殊处理，但可以继续路由
         else:
-            logger.info(f"🔍 TAG MATCHING: Using legacy cache format with {len(model_cache)} entries")
+            logger.info(f"TAG MATCHING: Using legacy cache format with {len(model_cache)} entries")
         
-        logger.info(f"🔍 TAG MATCHING: Searching through {len(model_cache)} cached channels")
+        logger.info(f"TAG MATCHING: Searching through {len(model_cache)} cached channels")
         
         # 🚀 性能优化：使用内存索引进行超高速标签查询
         try:
@@ -1423,16 +1423,16 @@ class JSONRouter:
             if needs_rebuild:
                 logger.info(f"🔨 REBUILDING MEMORY INDEX: Cache structure changed or index empty (cache: {cache_size}, indexed: {current_stats.total_channels})")
                 stats = rebuild_index_if_needed(model_cache, force_rebuild=True)
-                logger.info(f"✅ INDEX REBUILT: {stats.total_models} models, {stats.total_tags} tags in {stats.build_time_ms:.1f}ms")
+                logger.info(f"INDEX REBUILT: {stats.total_models} models, {stats.total_tags} tags in {stats.build_time_ms:.1f}ms")
             else:
-                logger.debug("⚡ MEMORY INDEX: Using existing index (no rebuild needed)")
+                logger.debug("MEMORY INDEX: Using existing index (no rebuild needed)")
             
             # 使用内存索引进行超高速查询
             start_time = time.time()
             matching_models = memory_index.find_models_by_tags(normalized_positive, normalized_negative)
             index_time_ms = (time.time() - start_time) * 1000
             
-            logger.info(f"⚡ MEMORY INDEX QUERY: Found {len(matching_models)} models in {index_time_ms:.2f}ms")
+            logger.info(f"MEMORY INDEX QUERY: Found {len(matching_models)} models in {index_time_ms:.2f}ms")
             
             # 将结果转换为 ChannelCandidate 格式
             memory_candidates = []
@@ -1443,7 +1443,7 @@ class JSONRouter:
                     memory_candidates.append(ChannelCandidate(
                         channel=channel, matched_model=model_name
                     ))
-                    logger.debug(f"✅ FOUND: {channel.name} -> {model_name}")
+                    logger.debug(f"FOUND: {channel.name} -> {model_name}")
             
             logger.info(f"🎯 MEMORY INDEX RESULT: {len(memory_candidates)} enabled channels found")
             return memory_candidates
@@ -1464,7 +1464,7 @@ class JSONRouter:
             logger.info(f"🎯 STRICT MATCH: Found {len(exact_candidates)} channels matching positive: {normalized_positive}, excluding: {normalized_negative}")
             return exact_candidates
         
-        logger.warning(f"❌ NO MATCH: No channels found matching positive: {normalized_positive}, excluding: {normalized_negative}")
+        logger.warning(f"NO MATCH: No channels found matching positive: {normalized_positive}, excluding: {normalized_negative}")
         return []
     
     def _find_channels_with_all_tags(self, tags: List[str], model_cache: dict) -> List[ChannelCandidate]:
@@ -1493,7 +1493,7 @@ class JSONRouter:
             if not models:
                 continue
             
-            logger.debug(f"🔍 TAG MATCHING: Checking channel {channel.id} ({channel.name}) with {len(models)} models")
+            logger.debug(f"TAG MATCHING: Checking channel {channel.id} ({channel.name}) with {len(models)} models")
             
             # 统一的标签合并匹配：渠道标签 + 模型标签
             channel_tags = getattr(channel, 'tags', []) or []
@@ -1517,10 +1517,10 @@ class JSONRouter:
                         free_score = self._calculate_free_score(channel, model_name)
                         # 只有真正免费的渠道才会被匹配 (free_score >= 0.9)
                         if free_score < 0.9:
-                            logger.debug(f"❌ FREE TAG VALIDATION FAILED: Channel '{channel.name}' model '{model_name}' has free_score={free_score:.2f} < 0.9, not truly free")
+                            logger.debug(f"FREE TAG VALIDATION FAILED: Channel '{channel.name}' model '{model_name}' has free_score={free_score:.2f} < 0.9, not truly free")
                             continue
                         else:
-                            logger.debug(f"✅ FREE TAG VALIDATED: Channel '{channel.name}' model '{model_name}' confirmed as truly free (score={free_score:.2f})")
+                            logger.debug(f"FREE TAG VALIDATED: Channel '{channel.name}' model '{model_name}' confirmed as truly free (score={free_score:.2f})")
                     
                     # 过滤掉不适合chat的模型类型
                     if self._is_suitable_for_chat(model_name):
@@ -1530,7 +1530,7 @@ class JSONRouter:
                         ))
                         matched_models.append(model_name)
                         channel_matches += 1
-                        logger.debug(f"✅ MERGED TAG MATCH: Channel '{channel.name}' model '{model_name}' -> tags: {combined_tags}")
+                        logger.debug(f"MERGED TAG MATCH: Channel '{channel.name}' model '{model_name}' -> tags: {combined_tags}")
                     else:
                         logger.debug(f"⚠️ FILTERED: Model '{model_name}' not suitable for chat (appears to be embedding/vision model)")
             
@@ -1567,7 +1567,7 @@ class JSONRouter:
             if not models:
                 continue
             
-            logger.debug(f"🔍 POSITIVE/NEGATIVE TAG MATCHING: Checking channel {channel.id} ({channel.name}) with {len(models)} models")
+            logger.debug(f"POSITIVE/NEGATIVE TAG MATCHING: Checking channel {channel.id} ({channel.name}) with {len(models)} models")
             
             # 统一的标签合并匹配：渠道标签 + 模型标签
             channel_tags = getattr(channel, 'tags', []) or []
@@ -1605,14 +1605,14 @@ class JSONRouter:
                         ))
                         matched_models.append(model_name)
                         channel_matches += 1
-                        logger.debug(f"✅ POSITIVE/NEGATIVE TAG MATCH: Channel '{channel.name}' model '{model_name}' -> tags: {combined_tags}")
+                        logger.debug(f"POSITIVE/NEGATIVE TAG MATCH: Channel '{channel.name}' model '{model_name}' -> tags: {combined_tags}")
                     else:
                         logger.debug(f"⚠️ FILTERED: Model '{model_name}' not suitable for chat (appears to be embedding/vision model)")
                 else:
                     if not positive_match:
-                        logger.debug(f"❌ POSITIVE MISMATCH: Model '{model_name}' missing required tags from {positive_tags}")
+                        logger.debug(f"POSITIVE MISMATCH: Model '{model_name}' missing required tags from {positive_tags}")
                     if not negative_match:
-                        logger.debug(f"❌ NEGATIVE MISMATCH: Model '{model_name}' contains excluded tags from {negative_tags}")
+                        logger.debug(f"NEGATIVE MISMATCH: Model '{model_name}' contains excluded tags from {negative_tags}")
             
             if channel_matches > 0:
                 logger.info(f"🎯 CHANNEL SUMMARY: Found {channel_matches} matching models in channel '{channel.name}' via positive/negative tag filtering")
@@ -1686,7 +1686,7 @@ class JSONRouter:
             logger.debug("Request doesn't require special capabilities, skipping capability check")
             return channels
         
-        logger.info(f"📋 CAPABILITY REQUIREMENTS: {capability_requirements}")
+        logger.info(f"CAPABILITY REQUIREMENTS: {capability_requirements}")
         
         capability_filtered = []
         fallback_channels = []
@@ -1709,14 +1709,14 @@ class JSONRouter:
                 
                 if can_handle:
                     capability_filtered.append(candidate)
-                    logger.debug(f"✅ CAPABILITY MATCH: {channel.name} can handle request")
+                    logger.debug(f"CAPABILITY MATCH: {channel.name} can handle request")
                 else:
                     # 如果是本地模型不支持，记录为备用选项
                     if capabilities.is_local:
                         fallback_channels.append((candidate, capabilities))
                         logger.debug(f"⚠️ LOCAL LIMITATION: {channel.name} lacks required capabilities, marked for fallback")
                     else:
-                        logger.debug(f"❌ CAPABILITY MISMATCH: {channel.name} cannot handle request")
+                        logger.debug(f"CAPABILITY MISMATCH: {channel.name} cannot handle request")
                 
             except Exception as e:
                 logger.warning(f"Error checking capabilities for {channel.name}: {e}")
@@ -1725,7 +1725,7 @@ class JSONRouter:
         
         # 如果没有合适的渠道且有本地模型无法处理，尝试添加云端备用渠道
         if not capability_filtered and fallback_channels:
-            logger.info("🔄 FALLBACK SEARCH: Looking for cloud alternatives for local model limitations...")
+            logger.info("FALLBACK SEARCH: Looking for cloud alternatives for local model limitations...")
             
             # 获取所有可用渠道进行备用搜索
             all_channels = []
@@ -1751,7 +1751,7 @@ class JSONRouter:
                 )
                 
                 if fallback_candidates:
-                    logger.info(f"🔄 FOUND FALLBACK: {len(fallback_candidates)} alternative channels for {failed_candidate.channel.name}")
+                    logger.info(f"FOUND FALLBACK: {len(fallback_candidates)} alternative channels for {failed_candidate.channel.name}")
                     
                     # 将前3个备用渠道转换为ChannelCandidate
                     for fallback_channel_config in fallback_candidates[:3]:
@@ -1792,7 +1792,7 @@ class JSONRouter:
         if len(channels) <= max_channels:
             return channels
         
-        logger.info(f"⚡ PRE-FILTER: Fast pre-filtering {len(channels)} channels to top {max_channels}")
+        logger.info(f"PRE-FILTER: Fast pre-filtering {len(channels)} channels to top {max_channels}")
         
         # 使用快速启发式评分
         channel_scores = []
@@ -1830,11 +1830,11 @@ class JSONRouter:
         
         # 记录预筛选结果
         if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f"⚡ PRE-FILTER RESULTS:")
+            logger.debug(f"PRE-FILTER RESULTS:")
             for i, (score, candidate) in enumerate(channel_scores[:max_channels]):
                 logger.debug(f"  #{i+1}: {candidate.channel.name} (score: {score:.1f})")
         
-        logger.info(f"⚡ PRE-FILTER COMPLETE: Selected {len(selected)}/{len(channels)} channels for detailed scoring")
+        logger.info(f"PRE-FILTER COMPLETE: Selected {len(selected)}/{len(channels)} channels for detailed scoring")
         return selected
 
     def _is_free_channel(self, channel: Channel, model_name: str) -> bool:
@@ -1884,13 +1884,13 @@ class JSONRouter:
             logger.warning(f"⚠️ SLOW SCORING: {channel_count} channels took {elapsed_ms:.1f}ms "
                           f"(avg: {avg_time_per_channel:.1f}ms/channel)")
         else:
-            logger.info(f"⚡ SCORING PERFORMANCE: {channel_count} channels in {elapsed_ms:.1f}ms "
+            logger.info(f"SCORING PERFORMANCE: {channel_count} channels in {elapsed_ms:.1f}ms "
                        f"(avg: {avg_time_per_channel:.1f}ms/channel)")
         
         # 如果是批量评分且有性能指标
         if metrics and scoring_type == "batch":
             if metrics.slow_threshold_exceeded:
-                logger.warning(f"🔍 BATCH SCORER ANALYSIS: {metrics.optimization_applied}")
+                logger.warning(f"BATCH SCORER ANALYSIS: {metrics.optimization_applied}")
             
             if metrics.cache_hit:
                 logger.info(f"💾 CACHE HIT: Scoring completed with cached results")
