@@ -4,14 +4,14 @@ Models API endpoints
 """
 
 import time
-import json
-from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, HTTPException
+from typing import List, Optional
+
+from fastapi import APIRouter
 from pydantic import BaseModel
 
-from core.yaml_config import YAMLConfigLoader
 from core.json_router import JSONRouter
 from core.utils.logger import get_logger
+from core.yaml_config import YAMLConfigLoader
 
 logger = get_logger(__name__)
 
@@ -56,7 +56,7 @@ router = APIRouter(prefix="/v1", tags=["models"])
 
 def create_models_router(config_loader: YAMLConfigLoader, json_router: JSONRouter) -> APIRouter:
     """创建模型相关的API路由"""
-    
+
     @router.get("/models", response_model=ModelsResponse)
     async def list_models() -> ModelsResponse:
         """返回所有可用的模型"""
@@ -83,20 +83,20 @@ def create_models_router(config_loader: YAMLConfigLoader, json_router: JSONRoute
         # 3. 构建响应
         models_data = []
         current_time = int(time.time())
-        
+
         # 获取渠道映射
         channels_list = config_loader.config.channels or []
         channels = {channel.id: channel for channel in channels_list}
-        
+
         for model_id in sorted(list(all_models)):
             # 获取模型支持的所有渠道
             channel_list = []
             channel_ids = model_channels_map.get(model_id, [])
-            
+
             for channel_id in channel_ids:
                 if channel_id in channels:
                     channel = channels[channel_id]
-                    
+
                     # 构建成本信息
                     cost_info = None
                     if hasattr(channel, 'cost_per_token') and channel.cost_per_token:
@@ -104,7 +104,7 @@ def create_models_router(config_loader: YAMLConfigLoader, json_router: JSONRoute
                             input=channel.cost_per_token.get('input'),
                             output=channel.cost_per_token.get('output')
                         )
-                    
+
                     channel_list.append(ChannelInfo(
                         id=channel.id,
                         name=channel.name,
@@ -114,7 +114,7 @@ def create_models_router(config_loader: YAMLConfigLoader, json_router: JSONRoute
                         capabilities=getattr(channel, 'capabilities', None),
                         cost_per_token=cost_info
                     ))
-            
+
             models_data.append(ModelInfo(
                 id=model_id,
                 created=current_time,
@@ -127,5 +127,5 @@ def create_models_router(config_loader: YAMLConfigLoader, json_router: JSONRoute
             ))
 
         return ModelsResponse(data=models_data, total_models=len(models_data))
-    
+
     return router
