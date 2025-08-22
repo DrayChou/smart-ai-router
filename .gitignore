@@ -111,6 +111,22 @@ coverage.xml
 *.py,cover
 .hypothesis/
 
+# Test result files
+*_results.json
+performance_*.json
+api_test_*.json
+professional_*.json
+
+# Large cache and model files
+models.json
+*.db
+*.sqlite
+*.sqlite3
+
+# Runtime generated files
+server.log
+server_output.log
+
 # Documentation builds
 docs/_build/
 site/
