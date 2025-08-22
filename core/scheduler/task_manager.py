@@ -12,6 +12,7 @@ from .tasks.model_discovery import run_model_discovery, get_model_discovery_task
 from .tasks.pricing_discovery import run_pricing_discovery, get_pricing_discovery_task
 from .tasks.service_health_check import run_health_check_task, ServiceHealthChecker
 from .tasks.siliconflow_pricing import run_siliconflow_pricing_update, get_siliconflow_pricing_task
+from .tasks.doubao_pricing import run_doubao_pricing_update, get_doubao_pricing_task
 from ..utils.api_key_validator import run_api_key_validation_task
 
 logger = logging.getLogger(__name__)
@@ -117,7 +118,21 @@ class TaskManager:
             )
             logger.info(f"已添加SiliconFlow定价任务，间隔 {interval/3600}h")
         
-        # 6. 统计报告任务
+        # 6. 豆包定价抓取任务
+        doubao_pricing_config = task_config.get('doubao_pricing', {})
+        if doubao_pricing_config.get('enabled', True):
+            interval = doubao_pricing_config.get('interval_hours', 24) * 3600  # 每天更新一次
+            run_immediately = doubao_pricing_config.get('run_on_startup', True)
+            
+            add_task(
+                name='doubao_pricing',
+                func=self._run_doubao_pricing_task,
+                interval_seconds=interval,
+                run_immediately=run_immediately
+            )
+            logger.info(f"已添加豆包定价任务，间隔 {interval/3600}h")
+        
+        # 7. 统计报告任务
         stats_config = task_config.get('stats_report', {})
         if stats_config.get('enabled', False):  # 默认禁用
             interval = stats_config.get('interval_hours', 12) * 3600
@@ -279,6 +294,21 @@ class TaskManager:
             
         except Exception as e:
             logger.error(f"SiliconFlow定价任务异常: {e}", exc_info=True)
+            return {'success': False, 'error': str(e)}
+    
+    async def _run_doubao_pricing_task(self):
+        """运行豆包定价抓取任务"""
+        logger.info("开始执行豆包定价抓取任务")
+        
+        try:
+            # 运行定价抓取
+            result = await run_doubao_pricing_update(force=False)
+            
+            logger.info(f"豆包定价任务完成: {result}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"豆包定价任务异常: {e}", exc_info=True)
             return {'success': False, 'error': str(e)}
     
     async def _run_stats_report_task(self):

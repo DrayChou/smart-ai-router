@@ -63,6 +63,7 @@ class CostEstimator:
             # 尝试从不同的定价源获取信息
             pricing_sources = [
                 self._get_pricing_from_siliconflow,
+                self._get_pricing_from_doubao,
                 self._get_pricing_from_openai,
                 self._get_pricing_from_anthropic,
                 self._get_pricing_from_fallback
@@ -101,6 +102,38 @@ class CostEstimator:
             
         except Exception as e:
             logger.debug(f"SiliconFlow定价获取失败: {e}")
+            return None
+    
+    def _get_pricing_from_doubao(self, channel, model_name: str) -> Optional[Dict[str, float]]:
+        """从豆包获取定价"""
+        try:
+            if 'doubao' not in channel.provider_name.lower() and 'bytedance' not in channel.provider_name.lower():
+                return None
+                
+            from ..scheduler.tasks.doubao_pricing import get_doubao_pricing_task
+            pricing_task = get_doubao_pricing_task()
+            
+            # 尝试从缓存获取定价
+            pricing_info = pricing_task.get_model_pricing(model_name)
+            if pricing_info:
+                return {
+                    "input": float(pricing_info.get("prompt", 0.0)) / 1000,  # 转换为每token价格
+                    "output": float(pricing_info.get("completion", 0.0)) / 1000,
+                }
+            
+            # 尝试通过别名匹配
+            all_models = pricing_task.get_all_models()
+            for cached_model_name, model_info in all_models.items():
+                if model_name.lower() in cached_model_name.lower() or cached_model_name.lower() in model_name.lower():
+                    return {
+                        "input": model_info.get("input_price", 0.0) / 1000,
+                        "output": model_info.get("output_price", 0.0) / 1000,
+                    }
+                
+            return None
+            
+        except Exception as e:
+            logger.debug(f"豆包定价获取失败: {e}")
             return None
     
     def _get_pricing_from_openai(self, channel, model_name: str) -> Optional[Dict[str, float]]:

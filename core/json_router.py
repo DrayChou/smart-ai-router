@@ -989,18 +989,35 @@ class JSONRouter:
 
     def _calculate_cost_score(self, channel: Channel, request: RoutingRequest) -> float:
         """计算成本评分(0-1，越低成本越高分)"""
-        pricing = channel.pricing
-        if not pricing:
-            return 0.5
-
-        # 估算token数量
-        input_tokens = self._estimate_tokens(request.messages)
-        max_output_tokens = request.max_tokens or 1000
-
-        # 计算成本
-        input_cost = pricing.get("input_cost_per_1k", 0.001) * input_tokens / 1000
-        output_cost = pricing.get("output_cost_per_1k", 0.002) * max_output_tokens / 1000
-        total_cost = (input_cost + output_cost) * pricing.get("effective_multiplier", 1.0)
+        # 优先尝试使用动态成本估算器获取精确定价
+        try:
+            from core.utils.cost_estimator import CostEstimator
+            estimator = CostEstimator(self.config_loader.config)
+            
+            # 估算token数量
+            input_tokens = self._estimate_tokens(request.messages)
+            max_output_tokens = request.max_tokens or 1000
+            
+            # 尝试使用成本估算器获取准确定价
+            cost_result = estimator.estimate_cost(
+                channel=channel,
+                model_name=request.model,
+                messages=request.messages,
+                max_output_tokens=max_output_tokens
+            )
+            
+            if cost_result and cost_result.total_cost > 0:
+                total_cost = cost_result.total_cost
+                logger.debug(f"COST SCORE: Using dynamic pricing for {request.model}: ${total_cost:.6f}")
+            else:
+                # 回退到原有的channel-level定价逻辑
+                logger.debug(f"COST SCORE: Fallback to channel pricing for {request.model}")
+                total_cost = self._calculate_fallback_cost(channel, input_tokens, max_output_tokens)
+            
+        except Exception as e:
+            logger.debug(f"COST SCORE: Dynamic pricing failed ({e}), using fallback")
+            # 出错时回退到原有逻辑
+            total_cost = self._calculate_fallback_cost(channel, self._estimate_tokens(request.messages), request.max_tokens or 1000)
 
         # 转换为评分 (成本越低分数越高)
         # 假设最高成本为0.1美元
@@ -1008,6 +1025,19 @@ class JSONRouter:
         score = max(0, 1 - (total_cost / max_cost))
 
         return min(1.0, score)
+    
+    def _calculate_fallback_cost(self, channel: Channel, input_tokens: int, max_output_tokens: int) -> float:
+        """回退成本计算逻辑（使用channel-level定价）"""
+        pricing = channel.pricing
+        if not pricing:
+            return 0.001  # 默认低成本
+            
+        # 计算成本
+        input_cost = pricing.get("input_cost_per_1k", 0.001) * input_tokens / 1000
+        output_cost = pricing.get("output_cost_per_1k", 0.002) * max_output_tokens / 1000
+        total_cost = (input_cost + output_cost) * pricing.get("effective_multiplier", 1.0)
+        
+        return total_cost
 
     # 内置模型质量排名 (分数越高越好, 满分100)
     MODEL_QUALITY_RANKING = {
