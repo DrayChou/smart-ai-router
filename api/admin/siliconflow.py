@@ -1,14 +1,15 @@
-# -*- coding: utf-8 -*-
 """
 SiliconFlow管理API - 定价抓取和管理功能
 """
-from typing import Dict, Any, Optional
 import logging
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 
-from ...core.scheduler.tasks.siliconflow_pricing import get_siliconflow_pricing_task, run_siliconflow_pricing_update
+from ...core.scheduler.tasks.siliconflow_pricing import (
+    get_siliconflow_pricing_task,
+    run_siliconflow_pricing_update,
+)
 from ...core.utils.auth_manager import verify_api_key_dependency
 
 logger = logging.getLogger(__name__)
@@ -28,10 +29,10 @@ async def refresh_siliconflow_pricing(
     """
     try:
         logger.info(f"开始手动刷新SiliconFlow定价 (force={force})")
-        
+
         # 执行定价抓取
         result = await run_siliconflow_pricing_update(force=force)
-        
+
         return JSONResponse(
             status_code=200,
             content={
@@ -40,7 +41,7 @@ async def refresh_siliconflow_pricing(
                 "data": result
             }
         )
-        
+
     except Exception as e:
         logger.error(f"SiliconFlow定价刷新失败: {e}")
         raise HTTPException(
@@ -56,7 +57,7 @@ async def get_siliconflow_pricing_status(
     try:
         pricing_task = get_siliconflow_pricing_task()
         stats = pricing_task.get_pricing_stats()
-        
+
         return JSONResponse(
             status_code=200,
             content={
@@ -71,7 +72,7 @@ async def get_siliconflow_pricing_status(
                 }
             }
         )
-        
+
     except Exception as e:
         logger.error(f"获取SiliconFlow定价状态失败: {e}")
         raise HTTPException(
@@ -87,7 +88,7 @@ async def get_siliconflow_pricing_models(
     try:
         pricing_task = get_siliconflow_pricing_task()
         all_pricing = pricing_task.get_all_pricing()
-        
+
         return JSONResponse(
             status_code=200,
             content={
@@ -98,7 +99,7 @@ async def get_siliconflow_pricing_models(
                 }
             }
         )
-        
+
     except Exception as e:
         logger.error(f"获取SiliconFlow模型定价失败: {e}")
         raise HTTPException(
@@ -115,7 +116,7 @@ async def get_siliconflow_model_pricing(
     try:
         pricing_task = get_siliconflow_pricing_task()
         pricing = await pricing_task.get_model_pricing(model_name)
-        
+
         if pricing:
             return JSONResponse(
                 status_code=200,
@@ -135,7 +136,7 @@ async def get_siliconflow_model_pricing(
                     "message": f"未找到模型 '{model_name}' 的定价信息"
                 }
             )
-        
+
     except Exception as e:
         logger.error(f"获取模型 '{model_name}' 定价失败: {e}")
         raise HTTPException(

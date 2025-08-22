@@ -1,17 +1,15 @@
-# -*- coding: utf-8 -*-
 """
 日志管理API - 提供日志查询、分析和管理功能
 """
 from datetime import datetime, timedelta
-from typing import List, Optional, Dict, Any
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Depends, Query, Body
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from core.utils.log_analyzer import LogAnalyzer, LogQuery, LogDashboard
 from core.auth import get_admin_auth_dependency
-
+from core.utils.log_analyzer import LogAnalyzer, LogDashboard, LogQuery
 
 # --- Pydantic Models ---
 
@@ -122,16 +120,16 @@ async def search_logs(
             limit=request.limit,
             offset=request.offset
         )
-        
+
         results = await analyzer.search_logs(query)
-        
+
         return {
             "total": len(results),
             "limit": request.limit,
             "offset": request.offset,
             "entries": results
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"搜索日志失败: {str(e)}")
 
@@ -151,13 +149,13 @@ async def get_recent_errors(
     """
     try:
         error_logs = await analyzer.get_error_logs(hours=hours, limit=limit)
-        
+
         return {
             "time_range": f"最近 {hours} 小时",
             "total_errors": len(error_logs),
             "errors": error_logs
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取错误日志失败: {str(e)}")
 
@@ -183,7 +181,7 @@ async def get_slow_requests(
             hours=hours,
             limit=limit
         )
-        
+
         return {
             "criteria": {
                 "min_duration": min_duration,
@@ -192,7 +190,7 @@ async def get_slow_requests(
             "total_slow_requests": len(slow_requests),
             "requests": slow_requests
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取慢请求日志失败: {str(e)}")
 
@@ -212,16 +210,16 @@ async def get_request_timeline(
     """
     try:
         timeline = await analyzer.get_request_timeline(request_id)
-        
+
         if not timeline:
             raise HTTPException(status_code=404, detail=f"未找到请求ID {request_id} 的日志")
-        
+
         return {
             "request_id": request_id,
             "total_entries": len(timeline),
             "timeline": timeline
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -244,7 +242,7 @@ async def export_logs(
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"logs_export_{timestamp}.{request.format}"
         output_path = Path("exports") / filename
-        
+
         query = LogQuery(
             start_time=request.query.start_time,
             end_time=request.query.end_time,
@@ -256,16 +254,16 @@ async def export_logs(
             limit=request.query.limit,
             offset=request.query.offset
         )
-        
+
         exported_count = await analyzer.export_logs(query, output_path, request.format)
-        
+
         return {
             "export_file": str(output_path),
             "exported_entries": exported_count,
             "format": request.format,
             "created_at": datetime.now().isoformat()
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"导出日志失败: {str(e)}")
 
@@ -282,12 +280,12 @@ async def check_log_alerts(
     """
     try:
         alerts = await dashboard.check_alerts()
-        
+
         return AlertCheckResponse(
             alerts=alerts,
             checked_at=datetime.now()
         )
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"检查日志警报失败: {str(e)}")
 
@@ -310,15 +308,15 @@ async def generate_log_report(
     try:
         if end_time <= start_time:
             raise HTTPException(status_code=400, detail="结束时间必须晚于开始时间")
-        
+
         # 检查时间范围是否过大（最多30天）
         if (end_time - start_time).days > 30:
             raise HTTPException(status_code=400, detail="时间范围不能超过30天")
-        
+
         report = await dashboard.generate_report(start_time, end_time)
-        
+
         return report
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -341,10 +339,10 @@ async def cleanup_old_logs(
         logs_dir = Path("logs")
         if not logs_dir.exists():
             return {"message": "日志目录不存在", "deleted_files": []}
-        
+
         cutoff_time = datetime.now() - timedelta(days=days)
         deleted_files = []
-        
+
         for log_file in logs_dir.glob("*.log.*"):
             try:
                 file_mtime = datetime.fromtimestamp(log_file.stat().st_mtime)
@@ -353,13 +351,13 @@ async def cleanup_old_logs(
                     deleted_files.append(str(log_file))
             except Exception as e:
                 print(f"Failed to delete {log_file}: {e}")
-        
+
         return {
             "message": f"清理完成，删除了 {len(deleted_files)} 个旧日志文件",
             "cutoff_date": cutoff_time.isoformat(),
             "deleted_files": deleted_files
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"清理日志失败: {str(e)}")
 
@@ -384,26 +382,26 @@ async def get_logging_health(
             "logs_directory_size": 0,
             "backup_files_count": 0
         }
-        
+
         if log_file.exists():
             stat = log_file.stat()
             health_info.update({
                 "log_file_size": stat.st_size,
                 "log_file_modified": datetime.fromtimestamp(stat.st_mtime).isoformat()
             })
-        
+
         # 检查日志目录
         logs_dir = log_file.parent
         if logs_dir.exists():
             total_size = sum(f.stat().st_size for f in logs_dir.glob("*") if f.is_file())
             backup_count = len(list(logs_dir.glob("*.log.*")))
-            
+
             health_info.update({
                 "logs_directory_size": total_size,
                 "backup_files_count": backup_count
             })
-        
+
         return health_info
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取日志健康状态失败: {str(e)}")

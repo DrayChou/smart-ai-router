@@ -1,18 +1,18 @@
-# -*- coding: utf-8 -*-
 """
 审计日志管理API - 提供审计事件查询、分析和报告功能
 """
 from datetime import datetime, timedelta
-from typing import List, Optional, Dict, Any
 from pathlib import Path
+from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Depends, Query, Body
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from core.utils.log_analyzer import LogAnalyzer
-from core.utils.audit_analyzer import AuditAnalyzer, AuditSummary, SecurityReport, UserActivityReport
 from core.auth import get_admin_auth_dependency
-
+from core.utils.audit_analyzer import (
+    AuditAnalyzer,
+)
+from core.utils.log_analyzer import LogAnalyzer
 
 # --- Pydantic Models ---
 
@@ -85,7 +85,7 @@ async def get_audit_events(
         # 构建过滤条件
         event_types = [event_type] if event_type else None
         user_ids = [user_id] if user_id else None
-        
+
         events = await analyzer.get_audit_events(
             start_time=start_time,
             end_time=end_time,
@@ -93,7 +93,7 @@ async def get_audit_events(
             user_ids=user_ids,
             limit=limit
         )
-        
+
         # 应用额外过滤
         if ip_address:
             events = [e for e in events if e.get('ip_address') == ip_address]
@@ -101,7 +101,7 @@ async def get_audit_events(
             events = [e for e in events if e.get('level') == level]
         if outcome:
             events = [e for e in events if e.get('outcome') == outcome]
-        
+
         return {
             "total": len(events),
             "filters": {
@@ -115,7 +115,7 @@ async def get_audit_events(
             },
             "events": events[:limit]  # 确保不超过限制
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取审计事件失败: {str(e)}")
 
@@ -136,9 +136,9 @@ async def get_audit_summary(
     try:
         end_time = datetime.now()
         start_time = end_time - timedelta(hours=hours)
-        
+
         summary = await analyzer.generate_audit_summary(start_time, end_time)
-        
+
         return {
             "period": {
                 "start": start_time.isoformat(),
@@ -160,7 +160,7 @@ async def get_audit_summary(
                 "ips": summary.top_ips
             }
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取审计摘要失败: {str(e)}")
 
@@ -183,17 +183,17 @@ async def get_security_analysis(
     try:
         end_time = datetime.now()
         start_time = end_time - timedelta(hours=hours)
-        
+
         security_report = await analyzer.generate_security_report(start_time, end_time)
-        
+
         # 过滤低级别事件（如果需要）
         violations = security_report.security_violations
         if not include_low_severity:
             violations = [
-                v for v in violations 
+                v for v in violations
                 if v.get('severity', 'low') in ['medium', 'high', 'critical']
             ]
-        
+
         return {
             "period": {
                 "start": start_time.isoformat(),
@@ -212,7 +212,7 @@ async def get_security_analysis(
                 "user_risks": security_report.user_risk_analysis
             }
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取安全分析失败: {str(e)}")
 
@@ -235,11 +235,11 @@ async def get_user_activity(
     try:
         end_time = datetime.now()
         start_time = end_time - timedelta(days=days)
-        
+
         activity_report = await analyzer.generate_user_activity_report(
             user_id, start_time, end_time
         )
-        
+
         return {
             "user_id": user_id,
             "period": {
@@ -259,7 +259,7 @@ async def get_user_activity(
                 "peak_times": activity_report.peak_activity_times
             }
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取用户活动报告失败: {str(e)}")
 
@@ -280,15 +280,15 @@ async def detect_anomalies(
     try:
         end_time = datetime.now()
         start_time = end_time - timedelta(hours=hours)
-        
+
         anomalies = await analyzer.detect_anomalies(start_time, end_time)
-        
+
         # 按严重程度分组
         critical_anomalies = [a for a in anomalies if a.get('severity') == 'critical']
         high_anomalies = [a for a in anomalies if a.get('severity') == 'high']
         medium_anomalies = [a for a in anomalies if a.get('severity') == 'medium']
         low_anomalies = [a for a in anomalies if a.get('severity') == 'low']
-        
+
         return {
             "detection_period": {
                 "start": start_time.isoformat(),
@@ -309,7 +309,7 @@ async def detect_anomalies(
                 "low": low_anomalies
             }
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"异常检测失败: {str(e)}")
 
@@ -329,16 +329,16 @@ async def generate_audit_report(
         # 验证时间范围
         if request.end_time <= request.start_time:
             raise HTTPException(status_code=400, detail="结束时间必须晚于开始时间")
-        
+
         # 检查时间范围是否过大（最多30天）
         if (request.end_time - request.start_time).days > 30:
             raise HTTPException(status_code=400, detail="时间范围不能超过30天")
-        
+
         # 生成报告文件名
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"audit_report_{timestamp}.{request.format}"
         output_path = Path("exports/audit") / filename
-        
+
         # 导出报告
         export_result = await analyzer.export_audit_report(
             request.start_time,
@@ -346,7 +346,7 @@ async def generate_audit_report(
             output_path,
             request.format
         )
-        
+
         return {
             "report_generated": True,
             "report_file": export_result["output_file"],
@@ -363,7 +363,7 @@ async def generate_audit_report(
             },
             "created_at": datetime.now().isoformat()
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -386,20 +386,20 @@ async def get_compliance_summary(
     try:
         end_time = datetime.now()
         start_time = end_time - timedelta(hours=hours)
-        
+
         # 获取审计摘要
         summary = await analyzer.generate_audit_summary(start_time, end_time)
-        
+
         # 计算合规指标
         total_events = summary.total_events
         auth_events = summary.event_type_counts.get('auth.login.success', 0) + \
                      summary.event_type_counts.get('auth.login.failure', 0)
         api_events = summary.event_type_counts.get('api.request', 0)
         config_events = summary.event_type_counts.get('config.updated', 0)
-        
+
         # 合规性评分（简化实现）
         compliance_score = 85  # 基础分数
-        
+
         if total_events == 0:
             compliance_score = 0
         else:
@@ -410,9 +410,9 @@ async def get_compliance_summary(
                 compliance_score += 5
             if config_events > 0:
                 compliance_score += 5
-        
+
         compliance_score = min(100, compliance_score)
-        
+
         return {
             "compliance_period": {
                 "start": start_time.isoformat(),
@@ -440,7 +440,7 @@ async def get_compliance_summary(
                 "保持审计配置更新"
             ]
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取合规性摘要失败: {str(e)}")
 
@@ -459,21 +459,21 @@ async def get_audit_health(
         # 检查最近1小时的审计事件
         end_time = datetime.now()
         start_time = end_time - timedelta(hours=1)
-        
+
         recent_events = await analyzer.get_audit_events(
             start_time=start_time,
             end_time=end_time,
             limit=10
         )
-        
+
         # 健康状态评估
         health_status = "healthy"
         issues = []
-        
+
         if len(recent_events) == 0:
             health_status = "warning"
             issues.append("最近1小时内没有审计事件记录")
-        
+
         # 检查日志文件
         log_file = analyzer.log_analyzer.log_file
         log_file_status = {
@@ -481,11 +481,11 @@ async def get_audit_health(
             "size": log_file.stat().st_size if log_file.exists() else 0,
             "modified": datetime.fromtimestamp(log_file.stat().st_mtime).isoformat() if log_file.exists() else None
         }
-        
+
         if not log_file.exists():
             health_status = "error"
             issues.append("审计日志文件不存在")
-        
+
         return {
             "health_status": health_status,
             "checked_at": datetime.now().isoformat(),
@@ -501,6 +501,6 @@ async def get_audit_health(
                 "验证日志轮换配置"
             ] if issues else []
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取审计健康状态失败: {str(e)}")
