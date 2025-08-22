@@ -7,6 +7,7 @@
 import asyncio
 import json
 import time
+import re
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Any
@@ -215,20 +216,41 @@ class ModelDiscoveryTask:
                 
                 if response.status_code == 200:
                     data = response.json()
-                    models = []
                     
-                    # 解析不同格式的响应
+                    # 解析不同格式的响应并提取详细信息
+                    models = []
+                    models_data = {}
+                    
                     if 'data' in data and isinstance(data['data'], list):
                         # OpenAI标准格式
-                        models = [model.get('id') for model in data['data'] if model.get('id')]
+                        for model in data['data']:
+                            model_id = model.get('id')
+                            if model_id:
+                                models.append(model_id)
+                                # 提取详细的模型信息
+                                models_data[model_id] = self._extract_model_info(model)
                     elif isinstance(data, list):
                         # 直接是模型列表
-                        models = [model.get('id') if isinstance(model, dict) else str(model) for model in data]
+                        for model in data:
+                            if isinstance(model, dict):
+                                model_id = model.get('id')
+                                if model_id:
+                                    models.append(model_id)
+                                    models_data[model_id] = self._extract_model_info(model)
+                            else:
+                                models.append(str(model))
                     elif 'models' in data:
                         # 其他格式
-                        models_data = data['models']
-                        if isinstance(models_data, list):
-                            models = [model.get('id') if isinstance(model, dict) else str(model) for model in models_data]
+                        models_list = data['models']
+                        if isinstance(models_list, list):
+                            for model in models_list:
+                                if isinstance(model, dict):
+                                    model_id = model.get('id')
+                                    if model_id:
+                                        models.append(model_id)
+                                        models_data[model_id] = self._extract_model_info(model)
+                                else:
+                                    models.append(str(model))
                     
                     # 生成API Key级别的缓存键
                     cache_key = self.api_key_cache_manager.generate_cache_key(channel_id, api_key)
@@ -239,6 +261,7 @@ class ModelDiscoveryTask:
                         'base_url': base_url,
                         'models_url': models_url,
                         'models': models,
+                        'models_data': models_data,  # 添加详细的模型数据
                         'model_count': len(models),
                         'last_updated': datetime.now().isoformat(),
                         'status': 'success',
@@ -458,6 +481,130 @@ class ModelDiscoveryTask:
             return None
         
         return self.cached_models
+    
+    def _extract_model_info(self, model_data: Dict[str, Any]) -> Dict[str, Any]:
+        """从模型数据中提取详细信息
+        
+        Args:
+            model_data: 模型的原始数据
+            
+        Returns:
+            包含详细信息的字典
+        """
+        model_info = {
+            'id': model_data.get('id'),
+            'object': model_data.get('object', 'model'),
+            'created': model_data.get('created'),
+            'owned_by': model_data.get('owned_by'),
+        }
+        
+        # 提取上下文长度信息
+        context_length = None
+        if 'context_length' in model_data:
+            context_length = model_data['context_length']
+        elif 'top_provider' in model_data and 'context_length' in model_data['top_provider']:
+            context_length = model_data['top_provider']['context_length']
+        
+        if context_length:
+            model_info['context_length'] = context_length
+            model_info['max_input_tokens'] = context_length
+        
+        # 提取最大输出令牌数
+        max_completion_tokens = None
+        if 'max_completion_tokens' in model_data:
+            max_completion_tokens = model_data['max_completion_tokens']
+        elif 'top_provider' in model_data and 'max_completion_tokens' in model_data['top_provider']:
+            max_completion_tokens = model_data['top_provider']['max_completion_tokens']
+        
+        if max_completion_tokens:
+            model_info['max_output_tokens'] = max_completion_tokens
+        
+        # 提取参数信息（从描述或其他字段）
+        parameter_info = self._extract_parameter_info(model_data)
+        if parameter_info:
+            model_info.update(parameter_info)
+        
+        # 提取定价信息
+        if 'pricing' in model_data:
+            pricing = model_data['pricing']
+            model_info['pricing'] = {
+                'prompt': pricing.get('prompt'),
+                'completion': pricing.get('completion'),
+                'request': pricing.get('request'),
+            }
+        
+        # 提取架构信息
+        if 'architecture' in model_data:
+            model_info['architecture'] = model_data['architecture']
+        
+        return model_info
+    
+    def _extract_parameter_info(self, model_data: Dict[str, Any]) -> Dict[str, Any]:
+        """从模型数据中提取参数信息
+        
+        Args:
+            model_data: 模型的原始数据
+            
+        Returns:
+            包含参数信息的字典
+        """
+        # 从描述中提取参数信息
+        description = model_data.get('description', '')
+        name = model_data.get('name', '')
+        id = model_data.get('id', '')
+        
+        # 合并所有可能的文本来源
+        all_texts = [description, name, id]
+        
+        # 参数大小模式
+        param_patterns = [
+            r'(\d+\.?\d*)\s*[Bb](?:illion)?\s*(?:parameter|mixture-of-experts)?',
+            r'(\d+\.?\d*)\s*[Mm](?:illion)?\s*parameter',
+            r'(\d+\.?\d*)\s*[Bb]\s*param',
+            r'(\d+\.?\d*)[Bb](?![A-Za-z])',  # 避免匹配 "bit", "byte"
+        ]
+        
+        for text in all_texts:
+            for pattern in param_patterns:
+                match = re.search(pattern, text, re.IGNORECASE)
+                if match:
+                    try:
+                        param_value = float(match.group(1))
+                        # 根据单位转换
+                        if 'b' in match.group(0).lower() and 'm' not in match.group(0).lower():
+                            # billions
+                            param_count = int(param_value * 1000)  # 转换为百万单位
+                        else:
+                            # millions
+                            param_count = int(param_value)
+                        
+                        return {
+                            'parameter_count': param_count,
+                            'parameter_size_text': match.group(0)
+                        }
+                    except (ValueError, IndexError):
+                        continue
+        
+        # 从模型ID中提取参数信息
+        id_patterns = [
+            r'-(\d+\.?\d*)[Bb]-',
+            r'_(\d+\.?\d*)[Bb]_',
+            r'(\d+\.?\d*)[Bb](?![A-Za-z])',
+        ]
+        
+        for pattern in id_patterns:
+            match = re.search(pattern, id)
+            if match:
+                try:
+                    param_value = float(match.group(1))
+                    return {
+                        'parameter_count': int(param_value * 1000),  # 转换为百万单位
+                        'parameter_size_text': f"{param_value}b"
+                    }
+                except (ValueError, IndexError):
+                    continue
+        
+        return {}
     
     def get_merged_config(self) -> Dict[str, Any]:
         """获取合并后的配置"""

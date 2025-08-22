@@ -2,10 +2,11 @@
 基于JSON配置的轻量路由引擎
 """
 import random
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from dataclasses import dataclass
 import time
 import logging
+import re
 
 from .yaml_config import YAMLConfigLoader, get_yaml_config_loader
 from .config_models import Channel
@@ -36,6 +37,240 @@ class ParameterComparisonError(Exception):
         if message is None:
             message = f"没有找到满足参数量比较 '{query}' 的模型"
         super().__init__(message)
+
+@dataclass
+class SizeFilter:
+    """大小过滤器"""
+    operator: str  # >, <, >=, <=, =
+    value: float
+    unit: str  # b, m, k for parameters; ki, ko, mi, mo for context
+    type: str  # 'params', 'input_context', 'output_context'
+    
+    def matches(self, target_value: float) -> bool:
+        """检查目标值是否匹配过滤条件"""
+        if self.operator == ">":
+            return target_value > self.value
+        elif self.operator == "<":
+            return target_value < self.value
+        elif self.operator == ">=":
+            return target_value >= self.value
+        elif self.operator == "<=":
+            return target_value <= self.value
+        elif self.operator == "=":
+            return target_value == self.value
+        return False
+
+def parse_size_filter(tag: str) -> Optional[SizeFilter]:
+    """解析大小过滤标签
+    
+    Args:
+        tag: 标签字符串，如 ">20b", "<8ko", ">=10ki"
+    
+    Returns:
+        SizeFilter 对象，如果解析失败则返回 None
+    """
+    # 参数大小过滤模式：>20b, <7b, >=1.5b
+    param_pattern = r'^([><=]+)(\d+\.?\d*)([bmk])$'
+    # 上下文大小过滤模式：>10ki, <8ko, >=32mi
+    context_pattern = r'^([><=]+)(\d+\.?\d*)([kK]?[iI]|[mM]?[oO])$'
+    
+    # 先尝试参数大小过滤
+    match = re.match(param_pattern, tag, re.IGNORECASE)
+    if match:
+        operator, value_str, unit = match.groups()
+        try:
+            value = float(value_str)
+            # 转换单位到基本单位
+            if unit.lower() == 'b':
+                multiplier = 1e9  # 1b = 1 billion parameters
+            elif unit.lower() == 'm':
+                multiplier = 1e6  # 1m = 1 million parameters
+            elif unit.lower() == 'k':
+                multiplier = 1e3  # 1k = 1 thousand parameters
+            else:
+                return None
+            
+            return SizeFilter(
+                operator=operator,
+                value=value,
+                unit=unit,
+                type='params'
+            )
+        except ValueError:
+            return None
+    
+    # 再尝试上下文大小过滤
+    match = re.match(context_pattern, tag, re.IGNORECASE)
+    if match:
+        operator, value_str, unit = match.groups()
+        try:
+            value = float(value_str)
+            # 转换单位到基本单位 (tokens)
+            unit_lower = unit.lower()
+            if unit_lower in ['ki', 'i']:
+                multiplier = 1000  # 1ki = 1000 tokens
+            elif unit_lower in ['ko', 'o']:
+                multiplier = 1000  # 1ko = 1000 tokens
+            elif unit_lower in ['mi', 'm']:
+                multiplier = 1000000  # 1mi = 1M tokens
+            elif unit_lower in ['mo']:
+                multiplier = 1000000  # 1mo = 1M tokens
+            else:
+                return None
+            
+            context_type = 'input_context' if unit_lower in ['ki', 'i', 'mi', 'm'] else 'output_context'
+            
+            return SizeFilter(
+                operator=operator,
+                value=value,
+                unit=unit,
+                type=context_type
+            )
+        except ValueError:
+            return None
+    
+    return None
+
+
+def apply_size_filters(candidates: List['ChannelCandidate'], size_filters: List[SizeFilter]) -> List['ChannelCandidate']:
+    """应用大小过滤器到候选渠道
+    
+    Args:
+        candidates: 候选渠道列表
+        size_filters: 大小过滤器列表
+    
+    Returns:
+        过滤后的候选渠道列表
+    """
+    if not size_filters:
+        return candidates
+    
+    filtered_candidates = []
+    model_analyzer = get_model_analyzer()
+    
+    logger.info(f"SIZE FILTERS: Applying {len(size_filters)} filters to {len(candidates)} candidates")
+    
+    for candidate in candidates:
+        match = True
+        model_name = candidate.matched_model
+        logger.info(f"SIZE FILTER DEBUG: Processing candidate {candidate.channel.id} -> {model_name}")
+        
+        # 获取模型详细信息
+        config_loader = get_yaml_config_loader()
+        channel_id = candidate.channel.id
+        model_data = None
+        
+        # 🔥 修复：使用API Key级别缓存查找方法
+        discovered_info = config_loader.get_model_cache_by_channel(channel_id)
+        if isinstance(discovered_info, dict):
+            # 首先尝试从 models_data 获取模型详情（新格式）
+            models_data = discovered_info.get("models_data", {})
+            if model_name in models_data:
+                model_data = models_data[model_name]
+                logger.info(f"SIZE FILTER DEBUG: Found model_data for {model_name} in models_data")
+            else:
+                # 🔥 修复：如果 models_data 为空，从 response_data.data 查找（OpenRouter格式）
+                response_data = discovered_info.get("response_data", {})
+                data_list = response_data.get("data", [])
+                model_data = None
+                for model_info in data_list:
+                    if model_info.get("id") == model_name:
+                        model_data = model_info
+                        logger.info(f"SIZE FILTER DEBUG: Found model_data for {model_name} in response_data: context_length={model_info.get('context_length')}")
+                        break
+                if not model_data:
+                    logger.info(f"SIZE FILTER DEBUG: No model_data found for {model_name} in channel {channel_id}")
+                    logger.info(f"SIZE FILTER DEBUG: Available models in models_data: {list(models_data.keys())[:5]}")
+                    logger.info(f"SIZE FILTER DEBUG: Available models in response_data: {len(data_list)} models")
+        else:
+            logger.info(f"SIZE FILTER DEBUG: No discovered_info found for channel {channel_id}")
+        
+        # 使用模型分析器分析模型
+        try:
+            specs = model_analyzer.analyze_model(model_name, model_data)
+            if specs:
+                logger.info(f"SIZE FILTER DEBUG: Model analysis for {model_name}: context_length={specs.context_length}, parameter_count={specs.parameter_count}")
+            else:
+                logger.info(f"SIZE FILTER DEBUG: Model analysis returned None for {model_name}")
+        except Exception as e:
+            logger.warning(f"Failed to analyze model {model_name}: {e}")
+            specs = None
+        
+        # 应用每个过滤器
+        for size_filter in size_filters:
+            if size_filter.type == 'params':
+                # 参数大小过滤
+                if specs and specs.parameter_count:
+                    # parameter_count 以百万为单位，需要转换为 billion 进行比较
+                    param_count_billions = specs.parameter_count / 1000.0
+                    logger.debug(f"Model {model_name}: {specs.parameter_count}M params = {param_count_billions}B")
+                    
+                    if not size_filter.matches(param_count_billions):
+                        logger.debug(f"SIZE FILTER: {model_name} filtered out - {param_count_billions}B params does not match {size_filter.operator}{size_filter.value}b")
+                        match = False
+                        break
+                else:
+                    logger.debug(f"SIZE FILTER: {model_name} filtered out - no parameter count available")
+                    match = False
+                    break
+                    
+            elif size_filter.type == 'input_context':
+                # 输入上下文大小过滤
+                context_size = None
+                if specs and specs.context_length:
+                    context_size = specs.context_length
+                elif model_data and model_data.get("max_input_tokens"):
+                    context_size = model_data["max_input_tokens"]
+                elif model_data and model_data.get("context_length"):
+                    context_size = model_data["context_length"]
+                
+                if context_size:
+                    # 转换为千为单位进行比较
+                    context_size_k = context_size / 1000.0
+                    logger.info(f"SIZE FILTER DEBUG: Model {model_name}: {context_size} input tokens = {context_size_k}k")
+                    
+                    if not size_filter.matches(context_size_k):
+                        logger.info(f"SIZE FILTER DEBUG: {model_name} filtered out - {context_size_k}ki does not match {size_filter.operator}{size_filter.value}ki")
+                        match = False
+                        break
+                    else:
+                        logger.info(f"SIZE FILTER DEBUG: {model_name} PASSED - {context_size_k}ki matches {size_filter.operator}{size_filter.value}ki")
+                else:
+                    logger.info(f"SIZE FILTER DEBUG: {model_name} filtered out - no input context size available")
+                    match = False
+                    break
+                    
+            elif size_filter.type == 'output_context':
+                # 输出上下文大小过滤
+                context_size = None
+                if model_data and model_data.get("max_output_tokens"):
+                    context_size = model_data["max_output_tokens"]
+                elif specs and specs.context_length:
+                    # 如果没有专门的输出限制，使用总上下文长度作为近似
+                    context_size = specs.context_length
+                elif model_data and model_data.get("context_length"):
+                    context_size = model_data["context_length"]
+                
+                if context_size:
+                    # 转换为千为单位进行比较
+                    context_size_k = context_size / 1000.0
+                    logger.debug(f"Model {model_name}: {context_size} output tokens = {context_size_k}k")
+                    
+                    if not size_filter.matches(context_size_k):
+                        logger.debug(f"SIZE FILTER: {model_name} filtered out - {context_size_k}ko does not match {size_filter.operator}{size_filter.value}ko")
+                        match = False
+                        break
+                else:
+                    logger.debug(f"SIZE FILTER: {model_name} filtered out - no output context size available")
+                    match = False
+                    break
+        
+        if match:
+            filtered_candidates.append(candidate)
+            logger.debug(f"SIZE FILTER: {model_name} passed all filters")
+    
+    logger.info(f"SIZE FILTERS: Filtered from {len(candidates)} to {len(filtered_candidates)} candidates")
+    return filtered_candidates
 
 @dataclass
 class RoutingScore:
@@ -333,7 +568,9 @@ class JSONRouter:
             return candidates
         
         # 2. 检查是否为标签查询
-        if request.model.startswith("tag:"):
+        if request.model.startswith("tag:") or request.model.startswith("tags:"):
+            # 统一处理 tag: 和 tags: 前缀
+            prefix = "tag:" if request.model.startswith("tag:") else "tags:"
             tag_query = request.model.split(":", 1)[1]
             
             # 支持多标签查询，用逗号分隔：tag:qwen,free,!local
@@ -347,14 +584,39 @@ class JSONRouter:
                         # 负标签：!local
                         negative_tags.append(tag_part[1:].lower())
                     else:
-                        # 正标签：free, qwen3
-                        positive_tags.append(tag_part.lower())
+                        # 检查是否为大小过滤标签
+                        size_filter = parse_size_filter(tag_part)
+                        if size_filter:
+                            # 这是大小过滤标签，但也要当作正标签处理查找候选者
+                            pass  # Size filter will be applied later
+                        else:
+                            # 正标签：free, qwen3
+                            positive_tags.append(tag_part.lower())
                 
-                logger.info(f"TAG ROUTING: Processing multi-tag query '{request.model}' -> positive: {positive_tags}, negative: {negative_tags}")
+                logger.info(f"TAG ROUTING: Processing multi-tag query '{request.model}' -> positive: {positive_tags}, negative: {negative_tags} (prefix: {prefix})")
                 candidates = self._get_candidate_channels_by_auto_tags(positive_tags, negative_tags)
                 if not candidates:
                     logger.error(f"TAG NOT FOUND: No models found matching tags {positive_tags} excluding {negative_tags}")
                     raise TagNotFoundError(positive_tags + [f"!{tag}" for tag in negative_tags])
+                
+                # 提取并应用大小过滤器
+                size_filters = []
+                for tag_part in tag_parts:
+                    if not tag_part.startswith("!"):
+                        size_filter = parse_size_filter(tag_part)
+                        if size_filter:
+                            size_filters.append(size_filter)
+                
+                if size_filters:
+                    logger.info(f"SIZE FILTERS: Applying {len(size_filters)} size filters: {[f'{sf.operator}{sf.value}{sf.unit}' for sf in size_filters]}")
+                    filtered_candidates = apply_size_filters(candidates, size_filters)
+                    logger.info(f"SIZE FILTERS: Filtered from {len(candidates)} to {len(filtered_candidates)} candidates")
+                    candidates = filtered_candidates
+                
+                if not candidates:
+                    logger.error(f"SIZE FILTERS: No candidates left after applying size filters")
+                    raise TagNotFoundError(positive_tags + [f"!{tag}" for tag in negative_tags])
+                
                 logger.info(f"TAG ROUTING: Multi-tag query found {len(candidates)} candidate channels")
                 return candidates
             else:
@@ -363,13 +625,24 @@ class JSONRouter:
                 if tag_part.startswith("!"):
                     # 负标签单独查询：tag:!local (匹配所有不包含local的模型)
                     negative_tag = tag_part[1:].lower()
-                    logger.info(f"TAG ROUTING: Processing negative tag query '{request.model}' -> excluding: '{negative_tag}'")
+                    logger.info(f"TAG ROUTING: Processing negative tag query '{request.model}' -> excluding: '{negative_tag}' (prefix: {prefix})")
                     candidates = self._get_candidate_channels_by_auto_tags([], [negative_tag])
                 else:
-                    # 正常单标签查询
-                    tag = tag_part.lower()
-                    logger.info(f"TAG ROUTING: Processing single tag query '{request.model}' -> tag: '{tag}'")
-                    candidates = self._get_candidate_channels_by_auto_tags([tag], [])
+                    # 检查是否为大小过滤标签
+                    size_filter = parse_size_filter(tag_part)
+                    if size_filter:
+                        # 这是大小过滤标签，需要特殊处理
+                        logger.info(f"TAG ROUTING: Processing size filter query '{request.model}' -> filter: '{tag_part}' (prefix: {prefix})")
+                        # 获取所有候选渠道，然后应用大小过滤器
+                        candidates = self._get_candidate_channels_by_auto_tags([], [])
+                        filtered_candidates = apply_size_filters(candidates, [size_filter])
+                        logger.info(f"SIZE FILTERS: Filtered from {len(candidates)} to {len(filtered_candidates)} candidates")
+                        candidates = filtered_candidates
+                    else:
+                        # 正常单标签查询
+                        tag = tag_part.lower()
+                        logger.info(f"TAG ROUTING: Processing single tag query '{request.model}' -> tag: '{tag}' (prefix: {prefix})")
+                        candidates = self._get_candidate_channels_by_auto_tags([tag], [])
                 
                 if not candidates:
                     logger.error(f"TAG NOT FOUND: No models found for query '{request.model}'")

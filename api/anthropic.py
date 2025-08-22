@@ -8,9 +8,9 @@ import json
 import uuid
 from typing import Any, Dict, List, Optional, Union
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Body
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from core.exceptions import RouterException
 from core.handlers.chat_handler import ChatCompletionHandler, ChatCompletionRequest
@@ -33,6 +33,19 @@ class AnthropicTool(BaseModel):
     description: str = Field(..., description="工具描述")
     input_schema: Dict[str, Any] = Field(..., description="输入参数schema")
 
+class AnthropicSystemContent(BaseModel):
+    """Anthropic系统内容块"""
+    type: str = Field("text", description="内容类型")
+    text: str = Field(..., description="文本内容")
+    cache_control: Optional[Dict[str, Any]] = Field(None, description="缓存控制")
+    
+    @classmethod
+    def validate_input(cls, data: Any) -> bool:
+        """验证输入数据是否符合Anthropic系统内容格式"""
+        if isinstance(data, dict):
+            return data.get('type') == 'text' and 'text' in data
+        return False
+
 class AnthropicMessagesRequest(BaseModel):
     """Anthropic Messages API请求格式"""
     model: str = Field(..., description="模型ID")
@@ -43,7 +56,34 @@ class AnthropicMessagesRequest(BaseModel):
     top_k: Optional[int] = Field(None, description="Top-k参数", ge=0)
     stop_sequences: Optional[List[str]] = Field(None, description="停止序列")
     stream: Optional[bool] = Field(False, description="是否流式输出")
-    system: Optional[str] = Field(None, description="系统提示")
+    system: Optional[Union[str, List[Dict[str, Any]]]] = Field(None, description="系统提示")
+    
+    @field_validator('system', mode='before')
+    @classmethod
+    def validate_system(cls, v):
+        """验证system字段，支持字符串和复杂格式"""
+        if v is None:
+            return None
+        
+        # 如果是字符串，直接返回
+        if isinstance(v, str):
+            return v
+            
+        # 如果是列表，验证每个元素
+        if isinstance(v, list):
+            validated_list = []
+            for item in v:
+                if isinstance(item, dict):
+                    # 验证字典格式
+                    if item.get('type') == 'text' and 'text' in item:
+                        validated_list.append(item)
+                    else:
+                        raise ValueError(f"Invalid system content format: {item}")
+                else:
+                    raise ValueError(f"Unsupported system content type: {type(item)}")
+            return validated_list
+            
+        raise ValueError(f"System must be string or list, got {type(v)}")
     tools: Optional[List[AnthropicTool]] = Field(None, description="工具列表")
     tool_choice: Optional[Union[str, Dict[str, Any]]] = Field(None, description="工具选择")
 
@@ -82,12 +122,29 @@ def create_anthropic_router(
 
     @router.post("/messages")
     async def create_message(
-        request: AnthropicMessagesRequest,
+        request_data: Dict[str, Any] = Body(...),
         authorization: Optional[str] = Header(None, alias="Authorization"),
         x_api_key: Optional[str] = Header(None, alias="x-api-key"),
         anthropic_version: str = Header("2023-06-01", alias="anthropic-version")
     ):
         """创建消息 - Anthropic Messages API"""
+
+        # 手动验证请求数据
+        try:
+            request_obj = AnthropicMessagesRequest(**request_data)
+        except Exception as e:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "type": "invalid_request_error",
+                    "error": {
+                        "type": "invalid_request",
+                        "message": f"Invalid request format: {e}"
+                    }
+                }
+            )
+
+        logger.info(f"Anthropic request received: {request_obj}")
 
         # 验证API版本
         if anthropic_version != "2023-06-01":
@@ -125,7 +182,7 @@ def create_anthropic_router(
             )
 
         # 验证必需参数
-        if not request.max_tokens or request.max_tokens < 1:
+        if not request_obj.max_tokens or request_obj.max_tokens < 1:
             raise HTTPException(
                 status_code=400,
                 detail={
@@ -138,7 +195,7 @@ def create_anthropic_router(
             )
 
         # 验证消息列表
-        if not request.messages or len(request.messages) == 0:
+        if not request_obj.messages or len(request_obj.messages) == 0:
             raise HTTPException(
                 status_code=400,
                 detail={
@@ -151,7 +208,7 @@ def create_anthropic_router(
             )
 
         # 验证最后一条消息是用户消息
-        if request.messages[-1].role != "user":
+        if request_obj.messages[-1].role != "user":
             raise HTTPException(
                 status_code=400,
                 detail={
@@ -165,7 +222,7 @@ def create_anthropic_router(
 
         try:
             # 转换为内部ChatCompletionRequest格式
-            chat_request = convert_to_chat_request(request)
+            chat_request = convert_to_chat_request(request_obj)
 
             # 设置认证头（通过extra_params传递）
             if not chat_request.extra_params:
@@ -246,6 +303,24 @@ def convert_to_chat_request(request: AnthropicMessagesRequest) -> ChatCompletion
                 }
             })
 
+    # 处理system字段 - 支持字符串和复杂格式
+    system_text = None
+    if request.system:
+        if isinstance(request.system, str):
+            system_text = request.system
+        elif isinstance(request.system, list):
+            # 提取所有文本内容块
+            text_parts = []
+            for content_block in request.system:
+                # 处理字典格式的输入（来自JSON）
+                if isinstance(content_block, dict) and content_block.get('type') == 'text' and 'text' in content_block:
+                    text_parts.append(content_block['text'])
+                # 处理Pydantic模型格式
+                elif hasattr(content_block, 'text') and content_block.text:
+                    text_parts.append(content_block.text)
+            if text_parts:
+                system_text = "\n".join(text_parts)
+    
     # 创建ChatCompletionRequest
     chat_request = ChatCompletionRequest(
         model=request.model,
@@ -254,7 +329,7 @@ def convert_to_chat_request(request: AnthropicMessagesRequest) -> ChatCompletion
         max_tokens=request.max_tokens,
         stream=request.stream,
         top_p=request.top_p,
-        system=request.system,
+        system=system_text,
         tools=tools,
         tool_choice=request.tool_choice
     )
