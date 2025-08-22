@@ -1,0 +1,21 @@
+{
+  "model": "yi-vision-v2",
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "这张图片里有什么？"
+        },
+        {
+          "type": "image_url",
+          "image_url": {
+            "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAI/hQCKXwAAAABJRU5ErkJggg=="
+          }
+        }
+      ]
+    }
+  ],
+  "max_tokens": 50
+}
