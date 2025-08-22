@@ -110,8 +110,8 @@ class CostEstimator:
             if 'doubao' not in channel.provider_name.lower() and 'bytedance' not in channel.provider_name.lower():
                 return None
                 
-            from ..scheduler.tasks.doubao_pricing import get_doubao_pricing_task
-            pricing_task = get_doubao_pricing_task()
+            from ..scheduler.tasks.doubao_pricing_fixed import get_doubao_enhanced_pricing_task
+            pricing_task = get_doubao_enhanced_pricing_task()
             
             # 尝试从缓存获取定价
             pricing_info = pricing_task.get_model_pricing(model_name)

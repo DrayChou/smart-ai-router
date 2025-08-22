@@ -6,11 +6,11 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 
-from ...core.scheduler.tasks.siliconflow_pricing import (
+from core.scheduler.tasks.siliconflow_pricing import (
     get_siliconflow_pricing_task,
     run_siliconflow_pricing_update,
 )
-from ...core.utils.auth_manager import verify_api_key_dependency
+from core.auth import get_admin_auth_dependency
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/admin/siliconflow", tags=["SiliconFlow Admin"])
 @router.post("/pricing/refresh")
 async def refresh_siliconflow_pricing(
     force: bool = False,
-    api_key_valid: bool = Depends(verify_api_key_dependency)
+    _auth: bool = Depends(get_admin_auth_dependency)
 ) -> JSONResponse:
     """
     手动刷新SiliconFlow定价信息
@@ -51,7 +51,7 @@ async def refresh_siliconflow_pricing(
 
 @router.get("/pricing/status")
 async def get_siliconflow_pricing_status(
-    api_key_valid: bool = Depends(verify_api_key_dependency)
+    _auth: bool = Depends(get_admin_auth_dependency)
 ) -> JSONResponse:
     """获取SiliconFlow定价状态"""
     try:
@@ -82,7 +82,7 @@ async def get_siliconflow_pricing_status(
 
 @router.get("/pricing/models")
 async def get_siliconflow_pricing_models(
-    api_key_valid: bool = Depends(verify_api_key_dependency)
+    _auth: bool = Depends(get_admin_auth_dependency)
 ) -> JSONResponse:
     """获取所有SiliconFlow模型的定价信息"""
     try:
@@ -110,7 +110,7 @@ async def get_siliconflow_pricing_models(
 @router.get("/pricing/model/{model_name}")
 async def get_siliconflow_model_pricing(
     model_name: str,
-    api_key_valid: bool = Depends(verify_api_key_dependency)
+    _auth: bool = Depends(get_admin_auth_dependency)
 ) -> JSONResponse:
     """获取特定模型的定价信息"""
     try:

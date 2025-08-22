@@ -12,7 +12,7 @@ from .tasks.model_discovery import run_model_discovery, get_model_discovery_task
 from .tasks.pricing_discovery import run_pricing_discovery, get_pricing_discovery_task
 from .tasks.service_health_check import run_health_check_task, ServiceHealthChecker
 from .tasks.siliconflow_pricing import run_siliconflow_pricing_update, get_siliconflow_pricing_task
-from .tasks.doubao_pricing import run_doubao_pricing_update, get_doubao_pricing_task
+from .tasks.doubao_pricing_fixed import run_doubao_enhanced_pricing_update, get_doubao_enhanced_pricing_task
 from ..utils.api_key_validator import run_api_key_validation_task
 
 logger = logging.getLogger(__name__)
@@ -302,7 +302,7 @@ class TaskManager:
         
         try:
             # 运行定价抓取
-            result = await run_doubao_pricing_update(force=False)
+            result = await run_doubao_enhanced_pricing_update(force=False)
             
             logger.info(f"豆包定价任务完成: {result}")
             return result
