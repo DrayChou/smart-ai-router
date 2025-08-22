@@ -1,11 +1,11 @@
 """
 Google Gemini API 兼容接口
 完美复刻 Google Gemini API 的接口服务
-支持最新的参数和返回值结构，包括vision、tools等功能
+让客户端可以像使用官方API一样使用Smart AI Router
 """
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import StreamingResponse
@@ -23,74 +23,47 @@ logger = get_logger(__name__)
 
 class GeminiContent(BaseModel):
     """Gemini内容块"""
-    parts: List[Dict[str, Any]] = Field(..., description="内容部分")
+    parts: list[dict[str, Any]] = Field(..., description="内容部分列表")
+    role: str = Field(..., description="消息角色")
 
 class GeminiMessage(BaseModel):
     """Gemini消息格式"""
-    role: str = Field(..., description="消息角色: user or model")
-    parts: List[Dict[str, Any]] = Field(..., description="消息部分")
+    role: str = Field(..., description="消息角色")
+    parts: list[dict[str, Any]] = Field(..., description="消息部分")
 
 class GeminiTool(BaseModel):
     """Gemini工具定义"""
-    function_declarations: Optional[List[Dict[str, Any]]] = Field(None, description="函数声明")
+    function_declarations: list[dict[str, Any]] = Field(..., description="函数声明列表")
 
 class GeminiToolConfig(BaseModel):
     """Gemini工具配置"""
-    function_calling_config: Dict[str, Any] = Field(..., description="函数调用配置")
+    function_calling_config: Optional[dict[str, Any]] = Field(None, description="函数调用配置")
 
 class GeminiGenerationConfig(BaseModel):
     """Gemini生成配置"""
-    temperature: Optional[float] = Field(0.7, description="温度参数", ge=0.0, le=2.0)
-    top_p: Optional[float] = Field(1.0, description="Top-p参数", ge=0.0, le=1.0)
-    top_k: Optional[int] = Field(40, description="Top-k参数", ge=1)
-    candidate_count: Optional[int] = Field(1, description="候选数量", ge=1, le=8)
-    max_output_tokens: Optional[int] = Field(8192, description="最大输出token数", ge=1)
-    stop_sequences: Optional[List[str]] = Field(None, description="停止序列")
-    response_mime_type: Optional[str] = Field("text/plain", description="响应MIME类型")
-    response_schema: Optional[Dict[str, Any]] = Field(None, description="响应schema")
-    presence_penalty: Optional[float] = Field(0.0, description="存在惩罚", ge=-1.0, le=1.0)
-    frequency_penalty: Optional[float] = Field(0.0, description="频率惩罚", ge=-1.0, le=1.0)
-    response_logprobs: Optional[bool] = Field(False, description="是否返回log概率")
-    logprobs: Optional[int] = Field(None, description="log概率数量", ge=1, le=5)
+    temperature: Optional[float] = Field(None, description="温度参数", ge=0.0, le=2.0)
+    top_p: Optional[float] = Field(None, description="Top-p参数", ge=0.0, le=1.0)
+    top_k: Optional[int] = Field(None, description="Top-k参数", ge=1)
+    max_output_tokens: Optional[int] = Field(None, description="最大输出token数", ge=1)
+    stop_sequences: Optional[list[str]] = Field(None, description="停止序列")
+    presence_penalty: Optional[float] = Field(None, description="存在惩罚", ge=-2.0, le=2.0)
+    frequency_penalty: Optional[float] = Field(None, description="频率惩罚", ge=-2.0, le=2.0)
+    response_mime_type: Optional[str] = Field(None, description="响应MIME类型")
+    response_schema: Optional[dict[str, Any]] = Field(None, description="响应模式")
 
 class GeminiSafetySetting(BaseModel):
     """Gemini安全设置"""
     category: str = Field(..., description="安全类别")
-    threshold: str = Field(..., description="安全阈值")
+    threshold: str = Field(..., description="阈值")
 
 class GeminiRequest(BaseModel):
     """Gemini API请求格式"""
-    contents: List[GeminiMessage] = Field(..., description="消息内容")
-    tools: Optional[List[GeminiTool]] = Field(None, description="工具列表")
+    contents: list[GeminiMessage] = Field(..., description="对话内容")
+    tools: Optional[list[GeminiTool]] = Field(None, description="工具列表")
     tool_config: Optional[GeminiToolConfig] = Field(None, description="工具配置")
+    safety_settings: Optional[list[GeminiSafetySetting]] = Field(None, description="安全设置")
+    system_instruction: Optional[GeminiMessage] = Field(None, description="系统指令")
     generation_config: Optional[GeminiGenerationConfig] = Field(None, description="生成配置")
-    safety_settings: Optional[List[GeminiSafetySetting]] = Field(None, description="安全设置")
-    system_instruction: Optional[GeminiContent] = Field(None, description="系统指令")
-
-class GeminiCandidate(BaseModel):
-    """Gemini候选结果"""
-    index: int = Field(0, description="候选索引")
-    content: GeminiContent = Field(..., description="候选内容")
-    finish_reason: Optional[str] = Field(None, description="完成原因")
-    safety_ratings: Optional[List[Dict[str, Any]]] = Field(None, description="安全评级")
-    token_logprobs: Optional[List[Dict[str, Any]]] = Field(None, description="Token log概率")
-
-class GeminiUsageMetadata(BaseModel):
-    """Gemini使用量统计"""
-    prompt_token_count: int = Field(0, description="输入token数")
-    candidates_token_count: int = Field(0, description="候选token数")
-    total_token_count: int = Field(0, description="总token数")
-
-class GeminiResponse(BaseModel):
-    """Gemini API响应格式"""
-    candidates: List[GeminiCandidate] = Field(..., description="候选结果")
-    usage_metadata: GeminiUsageMetadata = Field(..., description="使用量统计")
-    model_version: str = Field(..., description="模型版本")
-
-class GeminiStreamChunk(BaseModel):
-    """Gemini流式响应块"""
-    candidates: Optional[List[GeminiCandidate]] = Field(None, description="候选结果")
-    usage_metadata: Optional[GeminiUsageMetadata] = Field(None, description="使用量统计")
 
 # --- Router Factory ---
 
@@ -101,14 +74,14 @@ def create_gemini_router(
 ) -> APIRouter:
     """创建Google Gemini API兼容路由 - 同时支持v1和v1beta版本"""
 
-    # 创建主路由器
-    main_router = APIRouter(prefix="/v1", tags=["gemini"])
-    
-    # 创建v1beta路由器
-    v1beta_router = APIRouter(prefix="/v1beta", tags=["gemini-v1beta"])
+    # 创建主路由器（无前缀，用于包含不同版本）
+    main_router = APIRouter(tags=["gemini"])
     
     # 创建v1路由器
     v1_router = APIRouter(prefix="/v1", tags=["gemini-v1"])
+    
+    # 创建v1beta路由器
+    v1beta_router = APIRouter(prefix="/v1beta", tags=["gemini-v1beta"])
     
     # 为v1和v1beta创建路由处理器
     def _register_routes(router_instance: APIRouter, version: str):
@@ -260,146 +233,6 @@ def create_gemini_router(
     
     return main_router
 
-    @router.post("/v1/models/{model}:generateContent")
-    @router.post("/v1beta/models/{model}:generateContent")
-    async def generate_content(
-        model: str,
-        request: GeminiRequest,
-        authorization: Optional[str] = Header(None, alias="Authorization"),
-        x_goog_api_key: Optional[str] = Header(None, alias="x-goog-api-key")
-    ):
-        """Gemini Generate Content API - 完全兼容"""
-
-        # 验证认证 - 支持多种方式
-        api_key = None
-        if authorization:
-            if authorization.startswith("Bearer "):
-                api_key = authorization[7:]
-            else:
-                api_key = authorization
-        elif x_goog_api_key:
-            api_key = x_goog_api_key  # Gemini原生的x-goog-api-key方式
-
-        if not api_key:
-            raise HTTPException(
-                status_code=401,
-                detail={
-                    "error": {
-                        "code": 401,
-                        "message": "Missing authentication headers (Authorization or x-goog-api-key)",
-                        "status": "UNAUTHENTICATED"
-                    }
-                }
-            )
-
-        # 转换为内部ChatCompletionRequest格式
-        chat_request = convert_to_chat_request(request, model, api_key)
-
-        try:
-            response = await chat_handler.handle_request(chat_request)
-            return convert_to_gemini_response(response, model, request)
-
-        except RouterException as e:
-            logger.error(f"Router error: {e}")
-            raise HTTPException(
-                status_code=e.status_code,
-                detail={
-                    "error": {
-                        "code": e.status_code,
-                        "message": e.message,
-                        "status": "FAILED"
-                    }
-                }
-            )
-        except Exception as e:
-            logger.error(f"Unexpected error in Gemini generateContent: {e}", exc_info=True)
-            raise HTTPException(
-                status_code=500,
-                detail={
-                    "error": {
-                        "code": 500,
-                        "message": "Internal server error",
-                        "status": "FAILED"
-                    }
-                }
-            )
-
-    @router.post("/v1/models/{model}:streamGenerateContent")
-    @router.post("/v1beta/models/{model}:streamGenerateContent")
-    async def stream_generate_content(
-        model: str,
-        request: GeminiRequest,
-        authorization: Optional[str] = Header(None, alias="Authorization"),
-        x_goog_api_key: Optional[str] = Header(None, alias="x-goog-api-key")
-    ):
-        """Gemini Stream Generate Content API - 完全兼容"""
-
-        # 验证认证 - 支持多种方式
-        api_key = None
-        if authorization:
-            if authorization.startswith("Bearer "):
-                api_key = authorization[7:]
-            else:
-                api_key = authorization
-        elif x_goog_api_key:
-            api_key = x_goog_api_key  # Gemini原生的x-goog-api-key方式
-
-        if not api_key:
-            raise HTTPException(
-                status_code=401,
-                detail={
-                    "error": {
-                        "code": 401,
-                        "message": "Missing authentication headers (Authorization or x-goog-api-key)",
-                        "status": "UNAUTHENTICATED"
-                    }
-                }
-            )
-
-        # 转换为内部ChatCompletionRequest格式
-        chat_request = convert_to_chat_request(request, model, api_key)
-        chat_request.stream = True
-
-        try:
-            # 流式响应
-            return StreamingResponse(
-                stream_gemini_response(chat_handler, chat_request, model),
-                media_type="text/event-stream",
-                headers={
-                    "Cache-Control": "no-cache",
-                    "Connection": "keep-alive",
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Headers": "*"
-                }
-            )
-
-        except RouterException as e:
-            logger.error(f"Router error: {e}")
-            raise HTTPException(
-                status_code=e.status_code,
-                detail={
-                    "error": {
-                        "code": e.status_code,
-                        "message": e.message,
-                        "status": "FAILED"
-                    }
-                }
-            )
-        except Exception as e:
-            logger.error(f"Unexpected error in Gemini streamGenerateContent: {e}", exc_info=True)
-            raise HTTPException(
-                status_code=500,
-                detail={
-                    "error": {
-                        "code": 500,
-                        "message": "Internal server error",
-                        "status": "FAILED"
-                    }
-                }
-            )
-
-    return router
-
 
 def convert_to_chat_request(request: GeminiRequest, model: str, api_key: Optional[str]) -> ChatCompletionRequest:
     """将Gemini请求转换为内部ChatCompletionRequest格式"""
@@ -491,7 +324,7 @@ def convert_to_chat_request(request: GeminiRequest, model: str, api_key: Optiona
     return chat_request
 
 
-def convert_to_gemini_response(response: Dict[str, Any], model: str, request: GeminiRequest) -> Dict[str, Any]:
+def convert_to_gemini_response(response: dict[str, Any], model: str, request: GeminiRequest) -> dict[str, Any]:
     """将内部响应转换为Gemini格式"""
 
     # 处理响应，可能是JSONResponse或字典
@@ -624,7 +457,7 @@ class GeminiAPIError(Exception):
         self.status_code = status_code
         super().__init__(message)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为错误响应格式"""
         return {
             "error": {

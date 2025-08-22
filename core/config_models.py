@@ -36,6 +36,10 @@ class Channel(BaseModel):
     # Cost per token
     cost_per_token: Optional[Dict[str, float]] = Field(default_factory=dict)
     
+    # Model name aliases mapping: standard_name -> channel_specific_name
+    # Example: {"deepseek-v3.1": "deepseek-chat", "doubao-1.5-pro-256k": "ep-20250203083646-2szv9"}
+    model_aliases: Optional[Dict[str, str]] = Field(default=None)
+    
     # performance and pricing are optional dictionaries  
     performance: Dict[str, float] = Field(default_factory=dict)
     pricing: Dict[str, Any] = Field(default_factory=dict)
