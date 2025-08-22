@@ -40,7 +40,7 @@ class YAMLConfigLoader:
         # API Key缓存管理器
         self.api_key_cache_manager = get_api_key_cache_manager()
         
-        # 🚀 迁移状态标志，防止重复迁移
+        # 迁移状态标志，防止重复迁移
         self._migration_completed = False
         self._migration_in_progress = False
         
@@ -183,7 +183,7 @@ class YAMLConfigLoader:
                     
                     # 检查是否需要迁移缓存格式
                     if self._needs_cache_migration(raw_cache) and not self._migration_completed and not self._migration_in_progress:
-                        logger.info("🔄 CACHE MIGRATION: Detected legacy cache format, using as-is and scheduling background migration")
+                        logger.info("CACHE MIGRATION: Detected legacy cache format, using as-is and scheduling background migration")
                         # 🚀 优化：先使用现有缓存，避免阻塞启动
                         self.model_cache = raw_cache  # 临时使用原始缓存
                         
@@ -248,18 +248,18 @@ class YAMLConfigLoader:
         """构建内存索引（启动时预加载）"""
         try:
             if not self.model_cache:
-                logger.warning("⚠️ MEMORY INDEX: No model cache to index")
+                logger.warning("MEMORY INDEX: No model cache to index")
                 return
                 
             from core.utils.memory_index import get_memory_index
             memory_index = get_memory_index()
             stats = memory_index.build_index_from_cache(self.model_cache)
             
-            logger.info(f"🚀 MEMORY INDEX READY: {stats.total_models} models, {stats.total_tags} tags, "
+            logger.info(f"MEMORY INDEX READY: {stats.total_models} models, {stats.total_tags} tags, "
                        f"{stats.memory_usage_mb:.1f}MB memory in {stats.build_time_ms:.1f}ms")
                        
         except Exception as e:
-            logger.error(f"❌ MEMORY INDEX BUILD FAILED: {e}")
+            logger.error(f"MEMORY INDEX BUILD FAILED: {e}")
             # 不影响系统启动，继续运行
 
     def _needs_cache_migration(self, cache: Dict[str, Any]) -> bool:
@@ -312,7 +312,7 @@ class YAMLConfigLoader:
     async def _migrate_cache_background(self, raw_cache: Dict[str, Any]):
         """后台迁移缓存格式（不阻塞主线程）"""
         try:
-            logger.info("🔄 BACKGROUND MIGRATION: Starting cache migration in background")
+            logger.info("BACKGROUND MIGRATION: Starting cache migration in background")
             
             # 执行迁移
             migrated_cache = self.api_key_cache_manager.migrate_legacy_cache(
@@ -335,10 +335,10 @@ class YAMLConfigLoader:
             # 🚀 重建内存索引以使用新缓存（一次性操作）
             self._build_memory_index()
             
-            logger.info("✅ BACKGROUND MIGRATION: Cache migration completed successfully")
+            logger.info("BACKGROUND MIGRATION: Cache migration completed successfully")
             
         except Exception as e:
-            logger.error(f"❌ BACKGROUND MIGRATION: Failed to migrate cache in background: {e}")
+            logger.error(f"BACKGROUND MIGRATION: Failed to migrate cache in background: {e}")
             # 🚀 迁移失败时重置状态，允许重试
             self._migration_in_progress = False
     

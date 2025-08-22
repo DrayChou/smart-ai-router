@@ -21,6 +21,9 @@ from api.chat import create_chat_router
 from api.models import create_models_router
 from api.health import create_health_router
 from api.admin import create_admin_router
+from api.anthropic import create_anthropic_router
+from api.chatgpt import create_chatgpt_router
+from api.gemini import create_gemini_router
 
 import uvicorn
 import sys
@@ -164,6 +167,18 @@ def create_minimal_app() -> FastAPI:
     # 管理功能路由
     admin_router = create_admin_router(config_loader)
     app.include_router(admin_router)
+    
+    # Anthropic Claude API 兼容路由
+    anthropic_router = create_anthropic_router(config_loader, router, chat_handler)
+    app.include_router(anthropic_router)
+    
+    # OpenAI ChatGPT API 兼容路由
+    chatgpt_router = create_chatgpt_router(config_loader, router, chat_handler)
+    app.include_router(chatgpt_router)
+    
+    # Google Gemini API 兼容路由
+    gemini_router = create_gemini_router(config_loader, router, chat_handler)
+    app.include_router(gemini_router)
 
     logger.info("[MINIMAL] Smart AI Router initialized with 8 core endpoints")
     return app
@@ -172,7 +187,7 @@ def main():
     """主函数"""
     parser = argparse.ArgumentParser(description="Smart AI Router - Minimal Mode")
     parser.add_argument("--host", default="0.0.0.0", help="Host to bind to")
-    parser.add_argument("--port", type=int, default=7602, help="Port to bind to")
+    parser.add_argument("--port", type=int, default=7601, help="Port to bind to")
     parser.add_argument("--reload", action="store_true", help="Enable auto-reload")
     
     args = parser.parse_args()

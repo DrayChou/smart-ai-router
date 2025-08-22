@@ -1,16 +1,25 @@
 {
   "vision_models": [
     "llava:latest",
-    "llava:7b",
+    "llava:7b", 
     "llava:13b",
     "cogvlm:latest",
     "minicpm-v:latest",
     "internvl:latest",
     "gpt-4-vision-preview",
     "gpt-4o",
+    "gpt-4o-mini",
     "claude-3-opus",
     "claude-3-sonnet",
-    "claude-3-haiku"
+    "claude-3-haiku",
+    "doubao-1.5-vision-pro-32k",
+    "llama-3.2-90b-vision",
+    "qwen2.5-vl-7b-instruct",
+    "qwen2-vl-72b-instruct",
+    "glm-4.1v-9b-thinking",
+    "yi-vision-v2",
+    "x-ai/grok-2-vision-1212",
+    "x-ai/grok-vision-beta"
   ],
   "function_calling_models": [
     "qwen2:7b",
