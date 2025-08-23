@@ -86,16 +86,15 @@ class CostEstimator:
             if 'siliconflow' not in channel.provider_name.lower():
                 return None
                 
-            from ..scheduler.tasks.siliconflow_pricing import get_siliconflow_pricing_task
-            pricing_task = get_siliconflow_pricing_task()
+            # 🚀 改为使用新的静态定价加载器
+            from .static_pricing import get_static_pricing_loader
+            loader = get_static_pricing_loader()
             
-            # 尝试从缓存获取
-            cached_pricing = pricing_task.get_all_pricing()
-            if model_name in cached_pricing:
-                pricing = cached_pricing[model_name]
+            result = loader.get_siliconflow_pricing(model_name)
+            if result:
                 return {
-                    "input": pricing.get("input_price", 0.0) / 1000,  # 转换为每token价格
-                    "output": pricing.get("output_price", 0.0) / 1000,
+                    "input": result.input_price / 1000000,  # 配置中是每百万token价格，转为每token
+                    "output": result.output_price / 1000000,
                 }
                 
             return None
@@ -110,25 +109,17 @@ class CostEstimator:
             if 'doubao' not in channel.provider_name.lower() and 'bytedance' not in channel.provider_name.lower():
                 return None
                 
-            from ..scheduler.tasks.doubao_pricing_fixed import get_doubao_enhanced_pricing_task
-            pricing_task = get_doubao_enhanced_pricing_task()
+            # 🚀 改为使用新的静态定价加载器（统一接口）
+            from .static_pricing import get_static_pricing_loader
+            loader = get_static_pricing_loader()
             
-            # 尝试从缓存获取定价
-            pricing_info = pricing_task.get_model_pricing(model_name)
-            if pricing_info:
+            # 使用固定的输入输出token数量进行估算（实际使用时会根据真实值重新计算）
+            result = loader.get_doubao_pricing(model_name, 10000, 2000)  # 默认10k输入，2k输出
+            if result:
                 return {
-                    "input": float(pricing_info.get("prompt", 0.0)) / 1000,  # 转换为每token价格
-                    "output": float(pricing_info.get("completion", 0.0)) / 1000,
+                    "input": result.input_price / 1000000,  # 配置中是每百万token价格，转为每token
+                    "output": result.output_price / 1000000,
                 }
-            
-            # 尝试通过别名匹配
-            all_models = pricing_task.get_all_models()
-            for cached_model_name, model_info in all_models.items():
-                if model_name.lower() in cached_model_name.lower() or cached_model_name.lower() in model_name.lower():
-                    return {
-                        "input": model_info.get("input_price", 0.0) / 1000,
-                        "output": model_info.get("output_price", 0.0) / 1000,
-                    }
                 
             return None
             

@@ -13,8 +13,9 @@ from core.auth import get_admin_auth_dependency
 from core.utils.token_counter import get_cost_tracker
 from core.yaml_config import YAMLConfigLoader
 
-# 导入子路由
-from .admin_modules.siliconflow import router as siliconflow_router
+# 子路由已移除 - SiliconFlow和Doubao现在使用静态配置文件
+# - SiliconFlow: cache/siliconflow_pricing_accurate.json
+# - Doubao: cache/doubao_pricing_accurate.json
 
 
 def create_admin_router(config_loader: YAMLConfigLoader) -> APIRouter:
@@ -149,7 +150,8 @@ def create_admin_router(config_loader: YAMLConfigLoader) -> APIRouter:
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"成本优化分析失败: {str(e)}")
 
-    # 包含子路由
-    router.include_router(siliconflow_router)
+    # 子路由已移除 - 现在使用静态配置文件管理定价数据
+    # - SiliconFlow: cache/siliconflow_pricing_accurate.json
+    # - Doubao: cache/doubao_pricing_accurate.json 和 core/utils/tiered_pricing.py
 
     return router

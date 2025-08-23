@@ -175,9 +175,31 @@ runtime_state.json
 channel_stats.json
 cost_tracking.json
 
-# API key files
+# API key files and sensitive data
 api_keys.json
 credentials.json
 secrets.json
+*.key
+*.pem
+*.p12
+*.pfx
 
+# Configuration files with API keys (keep templates only)
 config/*.yaml
+config/*.json
+!config/*.template
+!config/*.example
+!config/README.md
+
+# Backup files that may contain sensitive data
+*.backup
+*.bak
+*.old
+*_backup.*
+
+# Environment files
+.env*
+!.env.example
+
+# Sensitive runtime files
+router_config.yaml.backup

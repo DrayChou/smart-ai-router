@@ -355,11 +355,8 @@ tasks:
     interval_hours: 24             # 每24小时运行一次
     run_on_startup: true          # 启动时立即运行
     
-  # 豆包定价抓取任务 - 通过Jina.ai从官网抓取模型信息和定价
-  doubao_pricing:
-    enabled: true
-    interval_hours: 24             # 每24小时运行一次
-    run_on_startup: true          # 启动时立即运行
+  # 豆包定价 - 现在使用静态配置文件 (cache/doubao_pricing_accurate.json)
+  # 不再需要动态抓取任务，已改用手动维护的准确价格数据
     
   # 缓存清理任务 - 清理过期的缓存文件
   cache_cleanup:
