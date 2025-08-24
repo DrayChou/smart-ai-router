@@ -25,6 +25,7 @@ from api.anthropic import create_anthropic_router
 from api.chatgpt import create_chatgpt_router
 from api.gemini import create_gemini_router
 from api.usage_stats import create_usage_stats_router
+from api.token_estimation import create_token_estimation_router
 
 import uvicorn
 import sys
@@ -172,6 +173,10 @@ def create_minimal_app() -> FastAPI:
     # 使用统计路由
     usage_stats_router = create_usage_stats_router(config_loader)
     app.include_router(usage_stats_router)
+    
+    # Token预估和模型优化API路由
+    token_estimation_router = create_token_estimation_router(config_loader)
+    app.include_router(token_estimation_router)
     
     # Anthropic Claude API 兼容路由
     anthropic_router = create_anthropic_router(config_loader, router, chat_handler)

@@ -26,6 +26,7 @@ from ..utils.session_manager import get_session_manager
 from ..utils.cost_estimator import get_cost_estimator
 from ..utils.usage_tracker import get_usage_tracker, create_usage_record
 from ..utils.channel_monitor import get_channel_monitor, check_api_error_and_alert
+from ..utils.token_estimator import get_token_estimator, get_model_optimizer, TaskComplexity
 
 logger = logging.getLogger(__name__)
 
@@ -227,52 +228,135 @@ class ChatCompletionHandler:
         )
     
     async def _perform_cost_estimation(self, request: ChatCompletionRequest, candidate_channels: List, request_id: str) -> Optional[Dict[str, Any]]:
-        """执行请求前成本估算"""
+        """执行Token预估和智能模型推荐"""
         try:
-            cost_estimator = get_cost_estimator()
+            # 获取Token预估器和模型优化器
+            token_estimator = get_token_estimator()
+            model_optimizer = get_model_optimizer()
             
-            # 准备候选渠道信息
-            channel_candidates = []
-            for channel_score in candidate_channels[:10]:  # 限制前10个进行成本估算
-                channel_candidates.append({
-                    "id": channel_score.channel.id,
-                    "model_name": getattr(channel_score.channel, 'model_name', request.model),
-                    "provider": getattr(channel_score.channel, 'provider_name', 'unknown')
+            # 转换消息格式
+            messages = [{'role': msg.role, 'content': str(msg.content)} for msg in request.messages]
+            
+            # 进行Token预估
+            token_estimate = token_estimator.estimate_tokens(messages)
+            
+            # 准备候选渠道信息（包含定价）
+            available_channels = []
+            for channel_score in candidate_channels[:15]:  # 分析前15个候选
+                channel = channel_score.channel
+                
+                # 尝试获取定价信息
+                input_price = getattr(channel, 'input_price', 0.0)
+                output_price = getattr(channel, 'output_price', 0.0)
+                
+                # 如果没有定价信息，尝试从定价数据中获取
+                if input_price == 0.0 and output_price == 0.0:
+                    pricing_info = self._get_model_pricing(channel.model_name, channel.provider)
+                    if pricing_info:
+                        input_price = pricing_info.get('input_price', 0.0)
+                        output_price = pricing_info.get('output_price', 0.0)
+                
+                available_channels.append({
+                    'id': channel.id,
+                    'model_name': channel.model_name,
+                    'provider': channel.provider,
+                    'input_price': input_price,
+                    'output_price': output_price,
+                    'routing_score': channel_score.total_score,
+                    'matched_model': channel_score.matched_model
                 })
             
-            # 执行成本预览
-            cost_preview = cost_estimator.create_cost_preview(
-                messages=[msg.dict() for msg in request.messages],
-                candidate_channels=channel_candidates,
-                max_tokens=request.max_tokens
+            # 获取当前路由策略
+            current_strategy = getattr(self.router, 'current_strategy', 'balanced')
+            
+            # 生成模型推荐
+            recommendations = model_optimizer.recommend_models(
+                token_estimate, available_channels, current_strategy
             )
             
-            # 记录成本估算信息
-            calc_time = cost_preview.get('calculation_time_ms', 0)
-            total_estimates = len(cost_preview.get('estimates', []))
+            # 记录Token预估结果
+            complexity_name = token_estimate.task_complexity.value
+            logger.info(f"🧠 TOKEN ESTIMATE: [{request_id}] Input: {token_estimate.input_tokens}, "
+                       f"Output: {token_estimate.estimated_output_tokens} (total: {token_estimate.total_tokens})")
+            logger.info(f"🧠 TASK COMPLEXITY: [{request_id}] {complexity_name.upper()} "
+                       f"(confidence: {token_estimate.confidence:.1%})")
             
-            logger.info(f"💰 COST PREVIEW: [{request_id}] Analyzed {total_estimates} channels in {calc_time}ms")
+            # 显示推荐结果
+            if recommendations:
+                best_rec = recommendations[0]
+                logger.info(f"🎯 BEST RECOMMENDATION: [{request_id}] {best_rec.model_name} "
+                           f"(${best_rec.estimated_cost:.6f}, {best_rec.estimated_time:.1f}s) - {best_rec.reason}")
+                
+                # 显示免费选项
+                free_options = [r for r in recommendations[:5] if r.estimated_cost == 0]
+                if free_options:
+                    logger.info(f"💰 FREE OPTIONS: [{request_id}] Found {len(free_options)} free channels")
+                    for free_rec in free_options[:3]:
+                        logger.info(f"   • {free_rec.model_name} - {free_rec.reason}")
+                
+                # 成本对比
+                costs = [r.estimated_cost for r in recommendations[:5] if r.estimated_cost > 0]
+                if len(costs) > 1:
+                    savings = max(costs) - min(costs)
+                    if savings > 0.001:  # 只有当节省超过0.001美元时才提示
+                        logger.info(f"💰 COST SAVINGS: [{request_id}] Can save up to ${savings:.6f} by choosing optimal model")
             
-            # 如果有免费选项，优先推荐
-            recommendation = cost_preview.get('recommendation', {})
-            if 'free_options' in recommendation:
-                free_count = recommendation['free_options']['count']
-                logger.info(f"💰 FREE OPTIONS: [{request_id}] Found {free_count} free channels available")
-            
-            # 显示最优推荐
-            if 'cheapest_option' in recommendation:
-                cheapest = recommendation['cheapest_option']
-                logger.info(f"💰 RECOMMENDATION: [{request_id}] Cheapest option: {cheapest['channel_id']} - {cheapest['formatted_cost']}")
-            
-            # 显示潜在节省
-            if 'savings_potential' in recommendation:
-                savings = recommendation['savings_potential']
-                logger.info(f"💰 SAVINGS: [{request_id}] {savings['recommendation']}")
+            # 构造返回数据
+            cost_preview = {
+                'token_estimate': {
+                    'input_tokens': token_estimate.input_tokens,
+                    'estimated_output_tokens': token_estimate.estimated_output_tokens,
+                    'total_tokens': token_estimate.total_tokens,
+                    'confidence': token_estimate.confidence,
+                    'task_complexity': complexity_name
+                },
+                'recommendations': [
+                    {
+                        'model_name': rec.model_name,
+                        'channel_id': rec.channel_id,
+                        'estimated_cost': rec.estimated_cost,
+                        'estimated_time': rec.estimated_time,
+                        'quality_score': rec.quality_score,
+                        'reason': rec.reason,
+                        'formatted_cost': f"${rec.estimated_cost:.6f}" if rec.estimated_cost > 0 else "Free"
+                    }
+                    for rec in recommendations[:10]  # 返回前10个推荐
+                ],
+                'optimization_strategy': current_strategy,
+                'calculation_time_ms': 0  # Token预估很快，基本无延迟
+            }
             
             return cost_preview
             
         except Exception as e:
-            logger.warning(f"💰 COST ESTIMATION FAILED: [{request_id}] {e}")
+            logger.warning(f"🧠 TOKEN ESTIMATION FAILED: [{request_id}] {e}")
+            return None
+    
+    def _get_model_pricing(self, model_name: str, provider: str) -> Optional[Dict[str, float]]:
+        """获取模型定价信息"""
+        try:
+            # 尝试从静态定价加载器获取
+            from ..utils.static_pricing import get_static_pricing_loader
+            pricing_loader = get_static_pricing_loader()
+            
+            if provider == 'siliconflow':
+                pricing_result = pricing_loader.get_siliconflow_pricing(model_name)
+                if pricing_result:
+                    return {
+                        'input_price': pricing_result.input_price,
+                        'output_price': pricing_result.output_price
+                    }
+            elif provider == 'doubao':
+                pricing_result = pricing_loader.get_doubao_pricing(model_name)
+                if pricing_result:
+                    return {
+                        'input_price': pricing_result.input_price,
+                        'output_price': pricing_result.output_price
+                    }
+            
+            return None
+        except Exception as e:
+            logger.warning(f"获取模型定价失败 {model_name}: {e}")
             return None
     
     async def _perform_concurrent_channel_check(self, candidate_channels: List[RoutingScore]) -> None:

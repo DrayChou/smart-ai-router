@@ -17,6 +17,7 @@ import httpx
 from core.utils.api_key_cache import get_api_key_cache_manager
 from core.utils.async_file_ops import get_async_file_manager
 from core.utils.channel_cache_manager import get_channel_cache_manager
+from core.utils.api_key_cache_manager import get_api_key_cache_manager as get_api_key_level_cache_manager
 
 logger = logging.getLogger(__name__)
 
@@ -37,11 +38,14 @@ class ModelDiscoveryTask:
         self.merged_config: dict[str, Any] = {}
         self.last_update: Optional[datetime] = None
 
-        # API Key缓存管理器
+        # API Key缓存管理器 (旧版，用于验证)
         self.api_key_cache_manager = get_api_key_cache_manager()
 
-        # 渠道缓存管理器
+        # 渠道缓存管理器 (兼容性保留)
         self.channel_cache_manager = get_channel_cache_manager()
+        
+        # API Key级别缓存管理器 (新版，解决定价问题)
+        self.api_key_level_cache_manager = get_api_key_level_cache_manager()
 
         # 加载现有缓存
         self._load_cache()
@@ -255,9 +259,6 @@ class ModelDiscoveryTask:
                                 else:
                                     models.append(str(model))
 
-                    # 生成API Key级别的缓存键
-                    cache_key = self.api_key_cache_manager.generate_cache_key(channel_id, api_key)
-
                     result = {
                         'channel_id': channel_id,
                         'provider': provider,
@@ -268,8 +269,7 @@ class ModelDiscoveryTask:
                         'model_count': len(models),
                         'last_updated': datetime.now().isoformat(),
                         'status': 'success',
-                        'cache_key': cache_key,
-                        'api_key_hash': cache_key.split('_')[-1] if '_' in cache_key else '',
+                        'api_key': api_key,  # 保存API Key用于缓存
                         'user_level': self._detect_user_level(models, provider),
                         'response_data': data  # 保存原始响应用于调试
                     }
@@ -369,12 +369,26 @@ class ModelDiscoveryTask:
 
                 if result['status'] == 'success':
                     successful_count += 1
-                    # 立即保存成功的渠道模型数据到channel cache
+                    
+                    # 保存到API Key级别缓存 (新架构)
+                    try:
+                        # 从结果中获取API Key信息
+                        api_key = result.get('api_key', '')
+                        provider = result.get('provider', 'unknown')
+                        
+                        self.api_key_level_cache_manager.save_api_key_models(
+                            channel_id, api_key, result, provider
+                        )
+                        logger.debug(f"✅ Saved API key level cache for {channel_id}")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Failed to save API key level cache for {channel_id}: {e}")
+                    
+                    # 兼容性：仍然保存到旧的渠道缓存
                     try:
                         self.channel_cache_manager.save_channel_models(channel_id, result)
-                        logger.debug(f"✅ Immediately saved channel cache for {channel_id}")
+                        logger.debug(f"✅ Also saved to legacy channel cache for {channel_id}")
                     except Exception as e:
-                        logger.warning(f"⚠️ Failed to save immediate channel cache for {channel_id}: {e}")
+                        logger.warning(f"⚠️ Failed to save legacy channel cache for {channel_id}: {e}")
                 else:
                     failed_count += 1
 
