@@ -24,6 +24,8 @@ from ..utils.request_cache import get_request_cache
 from ..utils.response_aggregator import get_response_aggregator, RequestMetadata
 from ..utils.session_manager import get_session_manager
 from ..utils.cost_estimator import get_cost_estimator
+from ..utils.usage_tracker import get_usage_tracker, create_usage_record
+from ..utils.channel_monitor import get_channel_monitor, check_api_error_and_alert
 
 logger = logging.getLogger(__name__)
 
@@ -417,6 +419,19 @@ class ChatCompletionHandler:
         # 完成请求并获取最终元数据
         final_metadata = aggregator.finish_request(metadata.request_id)
         
+        # 记录使用情况到JSONL文件
+        await self._record_usage_async(
+            metadata.request_id,
+            request,
+            channel_info.channel,
+            response_json.get('model', 'unknown'),
+            prompt_tokens,
+            completion_tokens,
+            cost_info,
+            latency,
+            "success"
+        )
+        
         # 使用新的响应汇总格式
         enhanced_response = aggregator.enhance_response_with_summary(response_json, final_metadata)
         
@@ -492,6 +507,9 @@ class ChatCompletionHandler:
         error_text = error.response.text if hasattr(error.response, 'text') else str(error)
         logger.warning(f"ATTEMPT #{attempt_num} FAILED: Channel '{channel.name}' returned HTTP {error.response.status_code}")
         logger.warning(f"ERROR DETAILS: {error_text[:200]}...")
+        
+        # 记录渠道错误并发送告警
+        check_api_error_and_alert(channel.id, channel.name, error.response.status_code, error_text)
         
         self.router.update_channel_health(channel.id, False)
         
@@ -591,6 +609,60 @@ class ChatCompletionHandler:
         
         return None
     
+    async def _record_usage_async(self, request_id: str, request: ChatCompletionRequest, 
+                                  channel, model_used: str, input_tokens: int, output_tokens: int,
+                                  cost_info: dict, response_time_ms: float, status: str = "success",
+                                  error_message: str = None):
+        """异步记录使用情况到JSONL文件"""
+        try:
+            tracker = get_usage_tracker()
+            
+            # 创建使用记录
+            usage_record = create_usage_record(
+                model=model_used,
+                channel_id=channel.id,
+                channel_name=channel.name,
+                provider=channel.provider,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                input_cost=cost_info.get('input_cost', 0.0),
+                output_cost=cost_info.get('output_cost', 0.0),
+                request_id=request_id,
+                request_type="chat",
+                status=status,
+                error_message=error_message,
+                response_time_ms=int(response_time_ms * 1000),  # 转换为毫秒
+                tags=self._extract_request_tags(request)
+            )
+            
+            # 异步记录
+            await tracker.record_usage_async(usage_record)
+            
+        except Exception as e:
+            logger.error(f"记录使用情况失败: {e}")
+    
+    def _extract_request_tags(self, request: ChatCompletionRequest) -> list:
+        """从请求中提取标签信息"""
+        tags = []
+        
+        # 从模型名称提取标签
+        if request.model.startswith('tag:'):
+            tag_part = request.model[4:]  # 去掉 'tag:' 前缀
+            tags.extend(tag_part.split(','))
+        
+        # 添加请求特征标签
+        if request.stream:
+            tags.append('streaming')
+        if request.functions or request.tools:
+            tags.append('function_calling')
+        if request.max_tokens:
+            if request.max_tokens <= 100:
+                tags.append('short_response')
+            elif request.max_tokens >= 2000:
+                tags.append('long_response')
+        
+        return tags
+
     def _handle_request_error(self, error: httpx.RequestError, channel, attempt_num: int, total_candidates: List) -> None:
         """处理请求错误"""
         logger.warning(f"ATTEMPT #{attempt_num} FAILED: Channel '{channel.name}' network error: {str(error)}")

@@ -24,6 +24,7 @@ from api.admin import create_admin_router
 from api.anthropic import create_anthropic_router
 from api.chatgpt import create_chatgpt_router
 from api.gemini import create_gemini_router
+from api.usage_stats import create_usage_stats_router
 
 import uvicorn
 import sys
@@ -167,6 +168,10 @@ def create_minimal_app() -> FastAPI:
     # 管理功能路由
     admin_router = create_admin_router(config_loader)
     app.include_router(admin_router)
+    
+    # 使用统计路由
+    usage_stats_router = create_usage_stats_router(config_loader)
+    app.include_router(usage_stats_router)
     
     # Anthropic Claude API 兼容路由
     anthropic_router = create_anthropic_router(config_loader, router, chat_handler)
