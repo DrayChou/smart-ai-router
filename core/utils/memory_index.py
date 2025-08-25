@@ -93,8 +93,16 @@ class MemoryModelIndex:
             self._channel_tag_map = {}
             if channel_configs:
                 for channel_config in channel_configs:
-                    channel_id = channel_config.get("id")
-                    tags = channel_config.get("tags", [])
+                    # 处理不同格式的渠道配置
+                    if hasattr(channel_config, 'id'):  # Pydantic对象
+                        channel_id = channel_config.id
+                        tags = getattr(channel_config, 'tags', [])
+                    elif isinstance(channel_config, dict):  # 字典格式
+                        channel_id = channel_config.get("id")
+                        tags = channel_config.get("tags", [])
+                    else:
+                        continue
+                    
                     if channel_id and tags:
                         self._channel_tag_map[channel_id] = set(tags)
                         logger.debug(f"CHANNEL TAGS: {channel_id} -> {tags}")

@@ -27,6 +27,7 @@ from ..utils.cost_estimator import get_cost_estimator
 from ..utils.usage_tracker import get_usage_tracker, create_usage_record
 from ..utils.channel_monitor import get_channel_monitor, check_api_error_and_alert
 from ..utils.token_estimator import get_token_estimator, get_model_optimizer, TaskComplexity
+from ..utils.request_interval_manager import get_request_interval_manager
 
 logger = logging.getLogger(__name__)
 
@@ -149,6 +150,23 @@ class ChatCompletionHandler:
             
             if not provider:
                 continue
+            
+            # 检查渠道间隔限制，如果需要等待则跳过
+            interval_manager = get_request_interval_manager()
+            min_interval = getattr(channel, 'min_request_interval', 0)
+            logger.info(f"🔍 STREAM INTERVAL CHECK: Channel '{channel.name}' min_interval={min_interval}s")
+            if min_interval > 0:
+                is_ready = interval_manager.is_channel_ready(channel.id, min_interval)
+                logger.info(f"🔍 STREAM INTERVAL CHECK: Channel '{channel.name}' is_ready={is_ready}")
+                if not is_ready:
+                    wait_time = interval_manager.get_remaining_wait_time(channel.id, min_interval)
+                    logger.info(f"⏭️ STREAM SKIP #{attempt_num}: Channel '{channel.name}' needs to wait {wait_time:.1f}s (min_interval={min_interval}s), trying next channel")
+                    continue
+            
+            # 在发送流式请求前记录时间（用于间隔控制）
+            if min_interval > 0:
+                interval_manager.record_request(channel.id)
+                logger.info(f"🔍 STREAM INTERVAL RECORDED: Channel '{channel.name}' request time recorded")
             
             try:
                 channel_info = self._prepare_channel_request_info(channel, provider, request, routing_score.matched_model)
@@ -374,11 +392,21 @@ class ChatCompletionHandler:
         if check_tasks:
             check_results = await asyncio.gather(*[task[2] for task in check_tasks], return_exceptions=True)
             
-            # 找出第一个可用的渠道并移到首位
+            # 找出第一个可用且符合间隔要求的渠道并移到首位
+            interval_manager = get_request_interval_manager()
             for i, (original_index, channel, result) in enumerate(check_tasks):
                 if i < len(check_results) and not isinstance(check_results[i], Exception):
                     is_available, status_code, message = check_results[i]
                     if is_available:
+                        # 检查间隔限制
+                        min_interval = getattr(channel, 'min_request_interval', 0)
+                        if min_interval > 0:
+                            is_ready = interval_manager.is_channel_ready(channel.id, min_interval)
+                            if not is_ready:
+                                wait_time = interval_manager.get_remaining_wait_time(channel.id, min_interval)
+                                logger.info(f"🔍 FAST CHECK SKIP: Channel '{channel.name}' needs to wait {wait_time:.1f}s (min_interval={min_interval}s), not prioritizing")
+                                continue
+                        
                         logger.info(f"FAST CHECK: Channel '{channel.name}' is available (HTTP {status_code}), prioritizing")
                         priority_channel = candidate_channels.pop(original_index)
                         candidate_channels.insert(0, priority_channel)
@@ -404,8 +432,25 @@ class ChatCompletionHandler:
                 logger.warning(f"ATTEMPT #{attempt_num}: Provider '{channel.provider}' for channel '{channel.name}' not found, skipping")
                 continue
             
+            # 检查渠道间隔限制，如果需要等待则跳过
+            interval_manager = get_request_interval_manager()
+            min_interval = getattr(channel, 'min_request_interval', 0)
+            logger.info(f"🔍 INTERVAL CHECK: [{request_id}] Channel '{channel.name}' min_interval={min_interval}s")
+            if min_interval > 0:
+                is_ready = interval_manager.is_channel_ready(channel.id, min_interval)
+                logger.info(f"🔍 INTERVAL CHECK: [{request_id}] Channel '{channel.name}' is_ready={is_ready}")
+                if not is_ready:
+                    wait_time = interval_manager.get_remaining_wait_time(channel.id, min_interval)
+                    logger.info(f"⏭️ SKIP #{attempt_num}: Channel '{channel.name}' needs to wait {wait_time:.1f}s (min_interval={min_interval}s), trying next channel")
+                    continue
+            
             logger.info(f"ATTEMPT #{attempt_num}: [{request_id}] Trying channel '{channel.name}' (ID: {channel.id}) with score {routing_score.total_score:.3f}")
             logger.info(f"ATTEMPT #{attempt_num}: [{request_id}] Score breakdown - {routing_score.reason}")
+            
+            # 在发送请求前记录时间（用于间隔控制）
+            if min_interval > 0:
+                interval_manager.record_request(channel.id)
+                logger.info(f"🔍 INTERVAL RECORDED: [{request_id}] Channel '{channel.name}' request time recorded")
             
             try:
                 channel_info = self._prepare_channel_request_info(channel, provider, request, routing_score.matched_model)

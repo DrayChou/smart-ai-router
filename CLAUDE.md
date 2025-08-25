@@ -28,14 +28,19 @@ copy config\example.yaml config\config.yaml
 ### Development Server
 ```bash
 # Development mode with auto-reload
-uv run uvicorn main:app --host 0.0.0.0 --port 7601 --reload
+uv run uvicorn main:app --host 0.0.0.0 --port 7602 --reload
 
-# Direct run (production mode)
-uv run python main.py
+# Direct run (production mode) - use ports 7602-7610 for local dev
+uv run python main.py --port 7602
 
 # Quick development run
-python main.py
+python main.py --port 7602
 ```
+
+**IMPORTANT**: 
+- Port 7601 is reserved for Docker production environment
+- Use ports 7602-7610 for local development and testing
+- Never attempt to kill processes on port 7601 (Docker services)
 
 ### Code Quality & Testing
 ```bash

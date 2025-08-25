@@ -47,6 +47,9 @@ class Channel(BaseModel):
     # Currency exchange configuration for special pricing providers
     # Example: {"currency_exchange": {"from": "USD", "to": "CNY", "rate": 0.7, "description": "充值0.7人民币获得1美元"}}
     currency_exchange: Optional[Dict[str, Any]] = Field(default=None)
+    
+    # Rate limiting configuration
+    min_request_interval: int = Field(default=0, description="Minimum seconds between requests (0 = no limit)")  # 最小请求间隔(秒)
 
 class Routing(BaseModel):
     default_strategy: str = "balanced"

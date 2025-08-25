@@ -53,6 +53,10 @@ class Channel(Base):
     last_success_at = Column(DateTime)
     last_error_at = Column(DateTime)
     cooldown_until = Column(DateTime)  # 冷却结束时间
+    
+    # 速率限制控制
+    min_request_interval = Column(Integer, default=0)  # 最小请求间隔(秒)，0表示无限制
+    last_request_at = Column(DateTime)  # 上次请求时间
 
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
