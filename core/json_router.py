@@ -993,11 +993,11 @@ class JSONRouter:
         try:
             from core.utils.cost_estimator import CostEstimator
             estimator = CostEstimator(self.config_loader.config)
-            
+
             # 估算token数量
             input_tokens = self._estimate_tokens(request.messages)
             max_output_tokens = request.max_tokens or 1000
-            
+
             # 尝试使用成本估算器获取准确定价
             cost_result = estimator.estimate_cost(
                 channel=channel,
@@ -1005,7 +1005,7 @@ class JSONRouter:
                 messages=request.messages,
                 max_output_tokens=max_output_tokens
             )
-            
+
             if cost_result and cost_result.total_cost > 0:
                 total_cost = cost_result.total_cost
                 logger.debug(f"COST SCORE: Using dynamic pricing for {request.model}: ${total_cost:.6f}")
@@ -1013,7 +1013,7 @@ class JSONRouter:
                 # 回退到原有的channel-level定价逻辑
                 logger.debug(f"COST SCORE: Fallback to channel pricing for {request.model}")
                 total_cost = self._calculate_fallback_cost(channel, input_tokens, max_output_tokens)
-            
+
         except Exception as e:
             logger.debug(f"COST SCORE: Dynamic pricing failed ({e}), using fallback")
             # 出错时回退到原有逻辑
@@ -1025,18 +1025,18 @@ class JSONRouter:
         score = max(0, 1 - (total_cost / max_cost))
 
         return min(1.0, score)
-    
+
     def _calculate_fallback_cost(self, channel: Channel, input_tokens: int, max_output_tokens: int) -> float:
         """回退成本计算逻辑（使用channel-level定价）"""
         pricing = channel.pricing
         if not pricing:
             return 0.001  # 默认低成本
-            
+
         # 计算成本
         input_cost = pricing.get("input_cost_per_1k", 0.001) * input_tokens / 1000
         output_cost = pricing.get("output_cost_per_1k", 0.002) * max_output_tokens / 1000
         total_cost = (input_cost + output_cost) * pricing.get("effective_multiplier", 1.0)
-        
+
         return total_cost
 
     # 内置模型质量排名 (分数越高越好, 满分100)
@@ -1731,12 +1731,12 @@ class JSONRouter:
             if len(segment) >= 3 and re.search(r'[a-zA-Z]', segment) and re.search(r'[\d\-]', segment):
                 # 首先添加完整的段名
                 complete_segments.append(segment.lower())
-                
+
                 # 检查是否有日期后缀（格式: -YYYYMMDD 或 -YYYYMMDD 变种）
                 # 支持多种日期格式: -20240307, -202403, -2024-03-07 等
                 date_pattern = r'-(\d{8}|\d{6}|\d{4}-\d{2}-\d{2}|\d{4}\d{2}\d{2})$'
                 match = re.search(date_pattern, segment_lower)
-                
+
                 if match:
                     # 如果找到日期后缀，生成去掉日期的版本
                     segment_without_date = segment_lower[:match.start()]
@@ -1748,32 +1748,32 @@ class JSONRouter:
 
     def _resolve_model_aliases(self, model_name: str, channel) -> str:
         """解析模型别名映射
-        
+
         将标准模型名称转换为渠道特定的模型名称
-        
+
         Args:
             model_name: 标准模型名称（如 "deepseek-v3.1", "doubao-1.5-pro-256k"）
             channel: 渠道配置对象
-            
+
         Returns:
             str: 渠道特定的模型名称，如果没有别名则返回原名称
         """
         if not hasattr(channel, 'model_aliases') or not channel.model_aliases:
             return model_name
-            
+
         # 直接匹配
         if model_name in channel.model_aliases:
             resolved_name = channel.model_aliases[model_name]
             logger.debug(f"ALIAS RESOLVED: '{model_name}' -> '{resolved_name}' for channel {channel.id}")
             return resolved_name
-        
+
         # 尝试匹配不区分大小写
         model_lower = model_name.lower()
         for alias_key, alias_value in channel.model_aliases.items():
             if alias_key.lower() == model_lower:
                 logger.debug(f"ALIAS RESOLVED (case-insensitive): '{model_name}' -> '{alias_value}' for channel {channel.id}")
                 return alias_value
-        
+
         # 尝试前缀匹配（用于带provider前缀的情况）
         # 例如 "doubao/deepseek-v3" 匹配 "deepseek-v3"
         if '/' in model_name:
@@ -1782,29 +1782,29 @@ class JSONRouter:
                 resolved_name = channel.model_aliases[base_name]
                 logger.debug(f"ALIAS RESOLVED (prefix): '{model_name}' -> '{resolved_name}' for channel {channel.id}")
                 return resolved_name
-        
+
         # 没有找到别名，返回原名称
         return model_name
 
     def _extract_tags_with_aliases(self, model_name: str, channel) -> list[str]:
         """提取模型标签，包括来自渠道别名配置的标签
-        
+
         Args:
             model_name: 模型名称
             channel: 渠道配置对象
-            
+
         Returns:
             list[str]: 包含原始标签和别名标签的完整标签列表
         """
         # 获取基础标签
         base_tags = self._extract_tags_from_model_name(model_name)
-        
+
         if not hasattr(channel, 'model_aliases') or not channel.model_aliases:
             return base_tags
-        
+
         # 收集别名标签：遍历别名映射，如果当前模型名称是映射的目标值，则将标准名称作为标签添加
         alias_tags = []
-        
+
         for standard_name, channel_specific_name in channel.model_aliases.items():
             # 如果当前模型名称匹配渠道特定名称，将标准名称作为标签添加
             if model_name.lower() == channel_specific_name.lower():
@@ -1812,19 +1812,19 @@ class JSONRouter:
                 standard_tags = self._extract_tags_from_model_name(standard_name)
                 alias_tags.extend(standard_tags)
                 logger.debug(f"ALIAS TAGS: '{model_name}' matched '{channel_specific_name}', adding tags from '{standard_name}': {standard_tags}")
-                
+
             # 也支持反向匹配：如果模型名称包含标准名称的标签，也添加标准名称作为标签
             elif any(tag in model_name.lower() for tag in self._extract_tags_from_model_name(standard_name)):
-                standard_tags = self._extract_tags_from_model_name(standard_name) 
+                standard_tags = self._extract_tags_from_model_name(standard_name)
                 alias_tags.extend(standard_tags)
                 logger.debug(f"ALIAS TAGS (reverse): '{model_name}' contains tags from '{standard_name}', adding: {standard_tags}")
-        
+
         # 合并所有标签并去重
         all_tags = list(dict.fromkeys(base_tags + alias_tags))
-        
+
         if alias_tags:
             logger.debug(f"ALIAS ENRICHED TAGS: '{model_name}' -> base: {base_tags}, aliases: {alias_tags}, total: {all_tags}")
-        
+
         return all_tags
 
     def _get_candidate_channels_by_auto_tags(self, positive_tags: list[str], negative_tags: list[str] = None) -> list[ChannelCandidate]:
@@ -1882,7 +1882,17 @@ class JSONRouter:
             needs_rebuild = current_stats.total_models == 0 or memory_index.needs_rebuild(model_cache)
             if needs_rebuild:
                 logger.info(f"🔨 REBUILDING MEMORY INDEX: Cache structure changed or index empty (cache: {cache_size}, indexed: {current_stats.total_channels})")
-                stats = rebuild_index_if_needed(model_cache, force_rebuild=True)
+                # 获取渠道配置信息
+                channel_configs = []
+                try:
+                    from core.scheduler.tasks.model_discovery import get_merged_config
+                    merged_config = get_merged_config()
+                    channel_configs = merged_config.get("channels", [])
+                    logger.debug(f"CHANNEL CONFIG: Loaded {len(channel_configs)} channel configurations")
+                except Exception as e:
+                    logger.warning(f"Failed to load channel configs for index rebuild: {e}")
+
+                stats = rebuild_index_if_needed(model_cache, force_rebuild=True, channel_configs=channel_configs)
                 logger.info(f"INDEX REBUILT: {stats.total_models} models, {stats.total_tags} tags in {stats.build_time_ms:.1f}ms")
             else:
                 logger.debug("MEMORY INDEX: Using existing index (no rebuild needed)")
