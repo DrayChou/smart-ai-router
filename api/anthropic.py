@@ -229,7 +229,7 @@ def create_anthropic_router(
                 chat_request.extra_params = {}
             chat_request.extra_params["_anthropic_api_key"] = x_api_key
 
-            if request.stream:
+            if request_obj.stream:
                 # 流式响应
                 return StreamingResponse(
                     stream_anthropic_response(chat_handler, chat_request),
@@ -244,7 +244,7 @@ def create_anthropic_router(
             else:
                 # 非流式响应
                 response = await chat_handler.handle_request(chat_request)
-                return convert_to_anthropic_response(response, request.model)
+                return convert_to_anthropic_response(response, request_obj.model)
 
         except RouterException as e:
             logger.error(f"Router error: {e}")

@@ -253,7 +253,18 @@ class YAMLConfigLoader:
                 
             from core.utils.memory_index import get_memory_index
             memory_index = get_memory_index()
-            stats = memory_index.build_index_from_cache(self.model_cache)
+            
+            # 获取渠道配置用于标签继承
+            channel_configs = []
+            try:
+                from core.scheduler.tasks.model_discovery import get_merged_config
+                merged_config = get_merged_config()
+                channel_configs = merged_config.get("channels", [])
+                logger.debug(f"MEMORY INDEX: Loaded {len(channel_configs)} channel configs for tag mapping")
+            except Exception as e:
+                logger.warning(f"MEMORY INDEX: Failed to load channel configs: {e}")
+            
+            stats = memory_index.build_index_from_cache(self.model_cache, channel_configs)
             
             logger.info(f"MEMORY INDEX READY: {stats.total_models} models, {stats.total_tags} tags, "
                        f"{stats.memory_usage_mb:.1f}MB memory in {stats.build_time_ms:.1f}ms")

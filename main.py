@@ -4,6 +4,13 @@
 Smart AI Router - 精简版 (仅保留8个核心接口)
 """
 
+import os
+import sys
+
+# Fix Unicode encoding for Windows
+if sys.platform == "win32":
+    os.environ['PYTHONIOENCODING'] = 'utf-8'
+
 from core.scheduler.task_manager import initialize_background_tasks, stop_background_tasks
 from core.json_router import JSONRouter
 from core.yaml_config import get_yaml_config_loader, YAMLConfigLoader
@@ -143,6 +150,23 @@ def create_minimal_app() -> FastAPI:
             # 只清除路由器的内部缓存（标签缓存等），保留模型数据
             if len(config_loader.model_cache) > 0:
                 logger.info(f"[MINIMAL] Model cache already loaded with {len(config_loader.model_cache)} entries, skipping clear")
+                
+                # 🚀 性能优化：预构建内存索引（避免请求时重建）
+                from core.utils.memory_index import get_memory_index, rebuild_index_if_needed
+                from core.scheduler.tasks.model_discovery import get_merged_config
+                
+                try:
+                    # 获取渠道配置用于标签继承
+                    merged_config = get_merged_config()
+                    channel_configs = merged_config.get("channels", [])
+                    
+                    # 预构建内存索引
+                    memory_index = get_memory_index()
+                    stats = rebuild_index_if_needed(config_loader.model_cache, force_rebuild=True, channel_configs=channel_configs)
+                    
+                    logger.info(f"🚀 PREBUILT MEMORY INDEX: {stats.total_models} models, {stats.total_tags} tags ready for routing")
+                except Exception as e:
+                    logger.warning(f"[MINIMAL] Memory index prebuild failed: {e}")
             else:
                 logger.warning("[MINIMAL] Model cache is empty, this may cause routing failures")
                 

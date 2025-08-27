@@ -400,6 +400,7 @@ class ChatCompletionHandler:
                     if is_available:
                         # 检查间隔限制
                         min_interval = getattr(channel, 'min_request_interval', 0)
+                        logger.info(f"FAST CHECK DEBUG: Channel '{channel.name}' min_interval={min_interval} (id={channel.id}) type={type(channel)}")
                         if min_interval > 0:
                             is_ready = interval_manager.is_channel_ready(channel.id, min_interval)
                             if not is_ready:

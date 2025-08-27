@@ -58,68 +58,150 @@ class BatchScorer:
             'total_requests': 0,
             'slow_requests': 0,
             'cache_hits': 0,
+            'cache_misses': 0,
+            'cache_hit_rate': 0.0,
             'optimizations_applied': defaultdict(int)
         }
+        
+        # 🚀 智能缓存配置
+        self.min_cache_timeout = 60    # 1分钟最小缓存
+        self.max_cache_timeout = 600   # 10分钟最大缓存
+        self.adaptive_cache_timeout = self.cache_timeout  # 初始值
     
     def _get_cache_key(self, channels: List[ChannelCandidate], request) -> str:
-        """生成缓存键"""
+        """生成缓存键（优化版：包含更多请求上下文）"""
         channel_ids = sorted([c.channel.id for c in channels])
         model_name = getattr(request, 'model', 'unknown')
-        return f"batch_score_{hash(tuple(channel_ids))}_{model_name}"
+        
+        # 🚀 添加请求上下文信息以提高缓存命中率
+        request_context = {
+            'model': model_name,
+            'channels': channel_ids,
+            'timestamp': int(time.time() / 60)  # 每分钟变化一次
+        }
+        
+        # 使用更稳定的哈希算法
+        import hashlib
+        key_data = str(request_context).encode('utf-8')
+        cache_hash = hashlib.md5(key_data).hexdigest()[:12]
+        
+        return f"batch_score_{cache_hash}"
     
     def _check_cache(self, cache_key: str) -> Optional[BatchedScoreComponents]:
-        """检查缓存"""
+        """检查缓存（支持自适应超时）"""
         if cache_key in self.cache:
             cached_time, cached_result = self.cache[cache_key]
-            if (time.time() - cached_time) < self.cache_timeout:
-                logger.debug(f"BATCH_SCORER: Cache hit for {cache_key}")
+            
+            # 🚀 使用自适应缓存超时
+            current_timeout = self.adaptive_cache_timeout
+            if (time.time() - cached_time) < current_timeout:
+                logger.debug(f"BATCH_SCORER: Cache hit for {cache_key} (timeout: {current_timeout}s)")
+                self.performance_stats['cache_hits'] += 1
                 return cached_result
+            else:
+                # 缓存过期，移除
+                del self.cache[cache_key]
+                
+        self.performance_stats['cache_misses'] += 1
         return None
     
     def _store_cache(self, cache_key: str, result: BatchedScoreComponents):
-        """存储到缓存"""
+        """存储到缓存（更新统计信息）"""
         self.cache[cache_key] = (time.time(), result)
+        
+        # 🚀 更新缓存统计和自适应超时
+        self._update_cache_statistics()
+    
+    def _update_cache_statistics(self):
+        """更新缓存统计信息和自适应超时"""
+        total = self.performance_stats['cache_hits'] + self.performance_stats['cache_misses']
+        if total > 0:
+            hit_rate = self.performance_stats['cache_hits'] / total
+            self.performance_stats['cache_hit_rate'] = hit_rate
+            
+            # 🚀 自适应调整缓存超时：命中率高则延长超时
+            if hit_rate > 0.7:  # 命中率超过70%
+                self.adaptive_cache_timeout = min(self.max_cache_timeout, self.adaptive_cache_timeout * 1.2)
+            elif hit_rate < 0.3:  # 命中率低于30%
+                self.adaptive_cache_timeout = max(self.min_cache_timeout, self.adaptive_cache_timeout * 0.8)
+            
+            logger.debug(f"CACHE STATS: Hit rate {hit_rate:.1%}, timeout: {self.adaptive_cache_timeout}s")
     
     def _batch_get_model_specs(self, channels: List[ChannelCandidate]) -> Dict[str, Dict[str, Any]]:
-        """批量获取模型规格信息"""
+        """批量获取模型规格信息（内存索引优化版）"""
         model_specs = {}
         
-        # 按渠道分组以优化缓存访问
-        specs_by_channel = defaultdict(list)
-        for candidate in channels:
-            if candidate.matched_model:
-                specs_by_channel[candidate.channel.id].append(candidate.matched_model)
-        
-        # 批量加载每个渠道的模型缓存
-        for channel_id, models in specs_by_channel.items():
-            try:
-                channel_cache = self.router.cache_manager.load_channel_models(channel_id)
-                if channel_cache and 'models' in channel_cache:
-                    for model_name in models:
-                        key = f"{channel_id}_{model_name}"
-                        cached_spec = channel_cache['models'].get(model_name)
-                        if cached_spec:
-                            model_specs[key] = cached_spec
-                        else:
-                            # 回退到分析器
-                            analyzed_specs = self.router.model_analyzer.analyze_model(model_name)
-                            model_specs[key] = {
-                                'parameter_count': analyzed_specs.parameter_count,
-                                'context_length': analyzed_specs.context_length
-                            }
-            except Exception as e:
-                logger.debug(f"BATCH_SCORER: Failed to load specs for channel {channel_id}: {e}")
-                # 对该渠道的所有模型使用分析器
-                for model_name in models:
-                    key = f"{channel_id}_{model_name}"
+        # 🚀 性能优化：优先使用内存索引，避免文件I/O
+        try:
+            from core.utils.memory_index import get_memory_index
+            memory_index = get_memory_index()
+            
+            for candidate in channels:
+                if candidate.matched_model:
+                    key = f"{candidate.channel.id}_{candidate.matched_model}"
+                    
+                    # 首先尝试从内存索引获取
+                    specs = memory_index.get_model_specs(candidate.channel.id, candidate.matched_model)
+                    if specs:
+                        model_specs[key] = specs
+                        continue
+                    
+                    # 回退到文件缓存
                     try:
-                        analyzed_specs = self.router.model_analyzer.analyze_model(model_name)
+                        channel_cache = self.router.cache_manager.load_channel_models(candidate.channel.id)
+                        if channel_cache and 'models' in channel_cache:
+                            cached_spec = channel_cache['models'].get(candidate.matched_model)
+                            if cached_spec:
+                                model_specs[key] = cached_spec
+                                continue
+                    except Exception:
+                        pass
+                    
+                    # 最后使用分析器
+                    try:
+                        analyzed_specs = self.router.model_analyzer.analyze_model(candidate.matched_model)
                         model_specs[key] = {
                             'parameter_count': analyzed_specs.parameter_count,
                             'context_length': analyzed_specs.context_length
                         }
                     except:
                         model_specs[key] = {'parameter_count': 0, 'context_length': 0}
+                    
+        except Exception as e:
+            logger.warning(f"BATCH_SCORER: Memory index lookup failed, falling back to file cache: {e}")
+            # 回退到原始文件缓存方法
+            specs_by_channel = defaultdict(list)
+            for candidate in channels:
+                if candidate.matched_model:
+                    specs_by_channel[candidate.channel.id].append(candidate.matched_model)
+            
+            for channel_id, models in specs_by_channel.items():
+                try:
+                    channel_cache = self.router.cache_manager.load_channel_models(channel_id)
+                    if channel_cache and 'models' in channel_cache:
+                        for model_name in models:
+                            key = f"{channel_id}_{model_name}"
+                            cached_spec = channel_cache['models'].get(model_name)
+                            if cached_spec:
+                                model_specs[key] = cached_spec
+                            else:
+                                analyzed_specs = self.router.model_analyzer.analyze_model(model_name)
+                                model_specs[key] = {
+                                    'parameter_count': analyzed_specs.parameter_count,
+                                    'context_length': analyzed_specs.context_length
+                                }
+                except Exception as e2:
+                    logger.debug(f"BATCH_SCORER: Failed to load specs for channel {channel_id}: {e2}")
+                    for model_name in models:
+                        key = f"{channel_id}_{model_name}"
+                        try:
+                            analyzed_specs = self.router.model_analyzer.analyze_model(model_name)
+                            model_specs[key] = {
+                                'parameter_count': analyzed_specs.parameter_count,
+                                'context_length': analyzed_specs.context_length
+                            }
+                        except:
+                            model_specs[key] = {'parameter_count': 0, 'context_length': 0}
         
         return model_specs
     
@@ -562,16 +644,16 @@ class BatchScorer:
         return recommendations
     
     def cleanup_cache(self):
-        """清理过期缓存"""
+        """清理过期缓存（使用自适应超时）"""
         current_time = time.time()
         expired_keys = []
         
         for key, (cached_time, _) in self.cache.items():
-            if (current_time - cached_time) > self.cache_timeout:
+            if (current_time - cached_time) > self.adaptive_cache_timeout:
                 expired_keys.append(key)
         
         for key in expired_keys:
             del self.cache[key]
         
         if expired_keys:
-            logger.debug(f"BATCH_SCORER: Cleaned up {len(expired_keys)} expired cache entries")
+            logger.debug(f"BATCH_SCORER: Cleaned up {len(expired_keys)} expired cache entries (timeout: {self.adaptive_cache_timeout}s)")

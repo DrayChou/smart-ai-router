@@ -92,20 +92,36 @@ class MemoryModelIndex:
             # 构建渠道标签映射
             self._channel_tag_map = {}
             if channel_configs:
+                logger.info(f"🏷️ CHANNEL TAG MAPPING: Processing {len(channel_configs)} channel configs")
                 for channel_config in channel_configs:
                     # 处理不同格式的渠道配置
                     if hasattr(channel_config, 'id'):  # Pydantic对象
                         channel_id = channel_config.id
                         tags = getattr(channel_config, 'tags', [])
+                        logger.debug(f"PYDANTIC CHANNEL: {channel_id} -> {tags}")
                     elif isinstance(channel_config, dict):  # 字典格式
                         channel_id = channel_config.get("id")
                         tags = channel_config.get("tags", [])
+                        logger.debug(f"DICT CHANNEL: {channel_id} -> {tags}")
                     else:
+                        logger.debug(f"UNKNOWN CHANNEL TYPE: {type(channel_config)}")
                         continue
                     
                     if channel_id and tags:
                         self._channel_tag_map[channel_id] = set(tags)
-                        logger.debug(f"CHANNEL TAGS: {channel_id} -> {tags}")
+                        logger.info(f"✅ CHANNEL TAGS MAPPED: {channel_id} -> {tags}")
+                    elif channel_id:
+                        # 🚀 自动推断渠道标签（基于渠道名称）
+                        inferred_tags = self._infer_channel_tags(channel_id)
+                        if inferred_tags:
+                            self._channel_tag_map[channel_id] = inferred_tags
+                            logger.info(f"🏷️ INFERRED CHANNEL TAGS: {channel_id} -> {inferred_tags}")
+                        else:
+                            logger.warning(f"⚠️ CHANNEL NO TAGS: {channel_id} has no tags")
+                        
+                logger.info(f"🏷️ CHANNEL TAG MAP BUILT: {len(self._channel_tag_map)} channels with tags")
+            else:
+                logger.warning("⚠️ NO CHANNEL CONFIGS PROVIDED for tag mapping")
 
             logger.info(f"🔨 INDEX BUILD: Processing {len(model_cache)} cache entries...")
 
@@ -148,6 +164,11 @@ class MemoryModelIndex:
                     # 获取模型详细规格
                     model_specs = models_data.get(model_name, {}) if models_data else {}
 
+                    # 🚀 确保包含关键规格信息
+                    if not model_specs:
+                        # 尝试从其他位置获取规格信息
+                        model_specs = self._ensure_model_specs(model_name, cache_data)
+
                     # 创建模型信息
                     model_key = (channel_id, model_name)
                     model_info = ModelInfo(
@@ -162,6 +183,9 @@ class MemoryModelIndex:
                     # 添加模型规格到ModelInfo（扩展用于健康检查优化）
                     if model_specs:
                         model_info.specs = model_specs
+                    else:
+                        # 即使没有详细规格，也确保包含基本分析结果
+                        model_info.specs = self._get_basic_model_specs(model_name)
 
                     # 更新索引
                     self._model_info[model_key] = model_info
@@ -429,6 +453,83 @@ class MemoryModelIndex:
         capabilities_data = cache_data.get("models_capabilities", {})
         return capabilities_data.get(model_name) if capabilities_data else None
 
+    def _ensure_model_specs(self, model_name: str, cache_data: dict) -> dict:
+        """确保模型规格信息存在"""
+        specs = {}
+        
+        # 尝试从不同位置获取规格信息
+        if 'models' in cache_data and isinstance(cache_data['models'], dict):
+            specs = cache_data['models'].get(model_name, {})
+        
+        # 如果仍然没有规格信息，使用模型分析器
+        if not specs.get('parameter_count') or not specs.get('context_length'):
+            try:
+                from core.utils.model_analyzer import get_model_analyzer
+                analyzer = get_model_analyzer()
+                analyzed_specs = analyzer.analyze_model(model_name)
+                
+                # 确保包含关键规格信息
+                if analyzed_specs.parameter_count:
+                    specs['parameter_count'] = analyzed_specs.parameter_count
+                if analyzed_specs.context_length:
+                    specs['context_length'] = analyzed_specs.context_length
+                    
+            except Exception:
+                pass
+        
+        return specs
+    
+    def _get_basic_model_specs(self, model_name: str) -> dict:
+        """获取基本模型规格信息（回退方案）"""
+        try:
+            from core.utils.model_analyzer import get_model_analyzer
+            analyzer = get_model_analyzer()
+            analyzed_specs = analyzer.analyze_model(model_name)
+            
+            return {
+                'parameter_count': analyzed_specs.parameter_count,
+                'context_length': analyzed_specs.context_length
+            }
+        except Exception:
+            # 提供默认值
+            return {
+                'parameter_count': 0,
+                'context_length': 2048  # 默认上下文长度
+            }
+    
+    def _infer_channel_tags(self, channel_id: str) -> set:
+        """基于渠道ID自动推断标签"""
+        inferred_tags = set()
+        channel_lower = channel_id.lower()
+        
+        # 基于渠道名称的常见标签推断
+        tag_mappings = [
+            ('openrouter', {'openrouter', 'aggregator', 'multi-provider'}),
+            ('groq', {'groq', 'fast', 'inference-engine'}),
+            ('ollama', {'ollama', 'local', 'self-hosted', 'free'}),
+            ('lmstudio', {'lmstudio', 'local', 'self-hosted', 'free'}),
+            ('openai', {'openai', 'official', 'premium'}),
+            ('anthropic', {'anthropic', 'official', 'premium'}),
+            ('free', {'free', 'gratis'}),
+            ('pro', {'pro', 'premium', 'paid'}),
+            ('turbo', {'turbo', 'fast'}),
+            ('mini', {'mini', 'small', 'efficient'}),
+            ('max', {'max', 'large', 'powerful'}),
+            ('vision', {'vision', 'multimodal', 'image'}),
+            ('code', {'code', 'programming', 'developer'}),
+        ]
+        
+        for keyword, tags in tag_mappings:
+            if keyword in channel_lower:
+                inferred_tags.update(tags)
+        
+        # 添加提供商标签
+        provider_tag = self._extract_provider_tag(channel_id)
+        if provider_tag:
+            inferred_tags.add(provider_tag)
+        
+        return inferred_tags
+
     def _estimate_memory_usage(self) -> float:
         """估算内存使用量（MB）"""
         import sys
@@ -539,6 +640,11 @@ def get_memory_index() -> MemoryModelIndex:
     if _memory_index is None:
         _memory_index = MemoryModelIndex()
     return _memory_index
+
+def reset_memory_index():
+    """重置全局内存索引实例（用于修复后的重新构建）"""
+    global _memory_index
+    _memory_index = None
 
 def rebuild_index_if_needed(model_cache: dict[str, dict], force_rebuild: bool = False, channel_configs: Optional[list[dict]] = None) -> IndexStats:
     """按需重建索引"""
