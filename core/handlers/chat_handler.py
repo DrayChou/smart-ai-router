@@ -28,6 +28,8 @@ from ..utils.usage_tracker import get_usage_tracker, create_usage_record
 from ..utils.channel_monitor import get_channel_monitor, check_api_error_and_alert
 from ..utils.token_estimator import get_token_estimator, get_model_optimizer, TaskComplexity
 from ..utils.request_interval_manager import get_request_interval_manager
+from ..utils.text_processor import clean_model_response
+from ..utils.logging_integration import get_enhanced_logger, log_api_request, log_api_response, log_channel_operation
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +86,18 @@ class ChatCompletionHandler:
         start_time = time.time()
         request_id = f"req_{uuid.uuid4().hex[:8]}"
         
-        logger.info(f"API REQUEST: [{request_id}] Received chat completion request for model '{request.model}' (stream: {request.stream})")
+        # 🚀 使用智能日志记录API请求 (AIRouter功能集成)
+        enhanced_logger = get_enhanced_logger(__name__)
+        log_api_request(
+            enhanced_logger,
+            method="POST",
+            url="/v1/chat/completions", 
+            headers={"content-type": "application/json"},
+            body=f"model: {request.model}, messages: {len(request.messages)} msgs, stream: {request.stream}",
+            request_id=request_id,
+            model=request.model,
+            stream=request.stream
+        )
         logger.info(f"REQUEST DETAILS: [{request_id}] {len(request.messages)} messages, max_tokens: {request.max_tokens}, temperature: {request.temperature}")
         
         try:
@@ -516,6 +529,20 @@ class ChatCompletionHandler:
         latency = time.time() - start_time
         self.router.update_channel_health(channel_info.channel.id, True, latency)
         
+        # 🚀 使用智能日志记录成功响应 (AIRouter功能集成)  
+        log_channel_operation(
+            enhanced_logger,
+            operation="request",
+            channel_id=channel_info.channel.id,
+            model=response_json.get('model', 'unknown'),
+            success=True,
+            request_id=metadata.request_id,
+            latency=latency,
+            ttfb_ms=ttfb*1000,
+            usage=response_json.get('usage', {})
+        )
+        
+        # 记录传统日志（保持兼容性）
         logger.info(f"SUCCESS: [{metadata.request_id}] Channel '{channel_info.channel.name}' responded successfully (latency: {latency:.3f}s)")
         logger.info(f"TIMING: [{metadata.request_id}] TTFB: {ttfb*1000:.1f}ms, Total: {latency*1000:.1f}ms")
         logger.info(f"RESPONSE: [{metadata.request_id}] Model used -> {response_json.get('model', 'unknown')}")
@@ -562,8 +589,11 @@ class ChatCompletionHandler:
             "success"
         )
         
+        # 🚀 思维链清理处理 (AIRouter功能集成)
+        cleaned_response_json = self._clean_response_content(response_json)
+        
         # 使用新的响应汇总格式
-        enhanced_response = aggregator.enhance_response_with_summary(response_json, final_metadata)
+        enhanced_response = aggregator.enhance_response_with_summary(cleaned_response_json, final_metadata)
         
         # 获取汇总头信息（虽然非流式主要在响应体中，但保留头信息用于调试）
         debug_headers = aggregator.get_headers_summary(metadata.request_id)
@@ -996,6 +1026,92 @@ class ChatCompletionHandler:
             logger.error(f"STREAM EXCEPTION: Streaming request for channel '{channel_id}' failed: {e}", exc_info=True)
             self.router.update_channel_health(channel_id, False)
             yield f"data: {json.dumps({'error': {'message': str(e), 'code': 500}})}\n\n"
+
+    def _clean_response_content(self, response_json: dict) -> dict:
+        """
+        清理响应内容，移除推理模型的思维链标签
+        
+        Args:
+            response_json (dict): 原始API响应
+            
+        Returns:
+            dict: 清理后的响应，移除思维链内容
+        """
+        if not response_json or not isinstance(response_json, dict):
+            return response_json
+        
+        try:
+            # 创建响应副本避免修改原始数据
+            cleaned_response = response_json.copy()
+            
+            # 处理choices数组中的消息内容
+            choices = cleaned_response.get('choices', [])
+            if not choices:
+                return cleaned_response
+            
+            cleaned_choices = []
+            for choice in choices:
+                cleaned_choice = choice.copy() if isinstance(choice, dict) else choice
+                
+                # 处理message内容
+                if isinstance(cleaned_choice, dict) and 'message' in cleaned_choice:
+                    message = cleaned_choice['message']
+                    if isinstance(message, dict) and 'content' in message:
+                        original_content = message.get('content', '')
+                        if isinstance(original_content, str) and original_content:
+                            # 🚀 应用思维链清理 (AIRouter集成功能)
+                            # 检查是否启用思维链清理 (默认启用以支持推理模型)
+                            should_clean_thinking = getattr(self.config_loader.config, 'clean_thinking_chains', True)
+                            
+                            cleaned_content = clean_model_response(
+                                original_content, 
+                                remove_thinking=should_clean_thinking, 
+                                clean_sensitive=False,
+                                max_length=None
+                            )
+                            
+                            # 更新消息内容
+                            cleaned_message = message.copy()
+                            cleaned_message['content'] = cleaned_content
+                            cleaned_choice['message'] = cleaned_message
+                            
+                            # 记录清理效果 (仅在实际清理时记录)
+                            if len(cleaned_content) < len(original_content):
+                                reduction = len(original_content) - len(cleaned_content)
+                                logger.info(f"🧹 THINKING CHAINS CLEANED: Reduced content by {reduction} characters")
+                
+                # 处理delta内容 (流式响应)
+                elif isinstance(cleaned_choice, dict) and 'delta' in cleaned_choice:
+                    delta = cleaned_choice['delta']
+                    if isinstance(delta, dict) and 'content' in delta:
+                        original_content = delta.get('content', '')
+                        if isinstance(original_content, str) and original_content:
+                            # 对于流式响应，只进行基础的思维链清理
+                            # 避免破坏流式传输的连续性
+                            should_clean_thinking = getattr(self.config_loader.config, 'clean_thinking_chains', True)
+                            
+                            cleaned_content = clean_model_response(
+                                original_content,
+                                remove_thinking=should_clean_thinking,
+                                clean_sensitive=False,
+                                max_length=None
+                            )
+                            
+                            cleaned_delta = delta.copy()
+                            cleaned_delta['content'] = cleaned_content
+                            cleaned_choice['delta'] = cleaned_delta
+                
+                cleaned_choices.append(cleaned_choice)
+            
+            # 更新清理后的choices
+            cleaned_response['choices'] = cleaned_choices
+            
+            return cleaned_response
+            
+        except Exception as e:
+            # 如果清理过程出现异常，返回原始响应并记录错误
+            logger.warning(f"Response content cleaning failed: {e}, returning original response")
+            return response_json
 
     def _add_cost_information(self, response_json: dict, channel, routing_score: RoutingScore) -> dict:
         """为响应添加实时成本信息"""

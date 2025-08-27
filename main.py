@@ -22,6 +22,7 @@ from core.utils.logger import setup_logging, shutdown_logging
 from core.middleware.logging import LoggingMiddleware, RequestContextMiddleware
 from core.utils.audit_logger import initialize_audit_logger, get_audit_logger
 from core.middleware.audit import AuditMiddleware, SecurityAuditMiddleware
+from core.utils.logging_integration import enable_smart_logging, get_enhanced_logger
 
 # API路由模块
 from api.chat import create_chat_router
@@ -68,6 +69,22 @@ def create_minimal_app() -> FastAPI:
         "flush_interval": 5.0
     }
     smart_logger = setup_logging(log_config, "logs/smart-ai-router-minimal.log")
+    
+    # 🚀 启用智能日志系统 (AIRouter功能集成)
+    try:
+        # 检查配置中是否启用智能日志（默认启用）
+        enable_smart_logs = server_config.get('enable_smart_logging', True)
+        if enable_smart_logs:
+            enable_smart_logging(
+                enable_sensitive_cleaning=True,
+                enable_content_truncation=True,
+                max_content_length=800  # 适当增加长度以保留更多上下文
+            )
+            logger.info("[MINIMAL] 🔧 Smart logging enabled: sensitive cleaning, content truncation")
+        else:
+            logger.info("[MINIMAL] Smart logging disabled by configuration")
+    except Exception as e:
+        logger.warning(f"[MINIMAL] Failed to enable smart logging: {e}")
     
     # 创建FastAPI应用
     app = FastAPI(
