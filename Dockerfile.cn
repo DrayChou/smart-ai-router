@@ -1,0 +1,64 @@
+# Smart AI Router - 国内镜像优化版
+# 使用道云镜像加速，针对国内网络环境优化
+FROM docker.m.daocloud.io/library/python:3.11-slim
+
+WORKDIR /app
+
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PATH="/home/app/.local/bin:$PATH"
+
+# HTTP→HTTPS智能源切换策略（优化构建速度和可靠性）
+RUN echo "🇨🇳 第一步：配置HTTP镜像源（绕过证书验证）..." && \
+    # 备份原始源
+    cp /etc/apt/sources.list /etc/apt/sources.list.backup 2>/dev/null || true && \
+    # 使用HTTP阿里云镜像源（避免HTTPS证书验证死循环）
+    echo 'deb http://mirrors.aliyun.com/debian/ bookworm main contrib non-free non-free-firmware' > /etc/apt/sources.list && \
+    echo 'deb http://mirrors.aliyun.com/debian/ bookworm-updates main contrib non-free non-free-firmware' >> /etc/apt/sources.list && \
+    echo 'deb http://mirrors.aliyun.com/debian-security bookworm-security main contrib non-free non-free-firmware' >> /etc/apt/sources.list && \
+    # 清理其他源配置
+    rm -rf /etc/apt/sources.list.d/* 2>/dev/null || true && \
+    # 第二步：使用HTTP源安装ca-certificates
+    echo "🇨🇳 第二步：使用HTTP源安装ca-certificates..." && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates && \
+    # 第三步：升级为HTTPS源（安全加固）
+    echo "🇨🇳 第三步：升级为HTTPS源..." && \
+    sed -i 's|http://|https://|g' /etc/apt/sources.list && \
+    apt-get update && \
+    apt-get clean && \
+    echo "✅ 源配置完成（HTTP→HTTPS升级策略）"
+
+# 安装系统依赖
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# 创建非root用户(在安装依赖前)
+RUN useradd --create-home app && chown -R app:app /app
+USER app
+
+# 复制必要文件
+COPY --chown=app:app pyproject.toml README.md ./
+
+# 使用清华大学PyPI镜像安装uv和项目依赖
+RUN pip install --no-cache-dir --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple && \
+    pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
+    pip install uv -i https://pypi.tuna.tsinghua.edu.cn/simple && \
+    export PATH="/home/app/.local/bin:$PATH" && \
+    uv sync --no-dev --index-url https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 复制应用代码
+COPY --chown=app:app . .
+
+# 创建必要目录
+RUN mkdir -p logs cache
+
+EXPOSE 7601
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=30s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:7601/health || exit 1
+
+# 启动命令（使用虚拟环境中的Python）
+CMD [".venv/bin/python", "main.py"]

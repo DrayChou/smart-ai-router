@@ -1,0 +1,30 @@
+# Smart AI Router - 国内镜像优化版 Docker Compose
+
+services:
+  smart-ai-router:
+    build: 
+      context: .
+      dockerfile: Dockerfile.cn
+    image: smart-ai-router:cn-latest
+    container_name: smart-ai-router-cn
+    restart: unless-stopped
+    ports:
+      - "7601:7601"
+    environment:
+      - LOG_LEVEL=INFO
+      - DEBUG=false
+    volumes:
+      - ./config:/app/config:ro
+      - ./logs:/app/logs
+      - ./cache:/app/cache
+      - ./.env:/app/.env:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7601/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  default:
+    name: smart-ai-router-cn
