@@ -112,6 +112,66 @@ Docker部署会自动：
 - 设置健康检查
 - 管理数据持久化
 
+### Docker镜像导出与导入
+
+#### 导出镜像
+```bash
+# 查看当前所有镜像
+docker images
+
+# 导出指定镜像（示例：导出 smart-ai-router:cn-test）
+docker save -o smart-ai-router-cn-test.tar smart-ai-router:cn-test
+
+# 查看导出的文件大小
+ls -lh smart-ai-router-cn-test.tar
+```
+
+#### 上传到其他服务器
+```bash
+# 方法1: 使用 scp
+scp smart-ai-router-cn-test.tar username@server-ip:/path/to/destination/
+
+# 方法2: 使用 rsync（支持断点续传）
+rsync -avz --progress smart-ai-router-cn-test.tar username@server-ip:/path/to/destination/
+
+# 方法3: 如果目标服务器无法直接访问，可以使用 SFTP 工具
+# FileZilla、WinSCP 等工具拖拽上传
+```
+
+#### 在目标服务器上导入镜像
+```bash
+# 进入上传文件所在目录
+cd /path/to/destination/
+
+# 加载 Docker 镜像
+docker load -i smart-ai-router-cn-test.tar
+
+# 验证镜像是否加载成功
+docker images | grep smart-ai-router
+
+# 运行容器
+docker run -d \
+  --name smart-ai-router \
+  -p 7601:7601 \
+  -v $(pwd)/config:/app/config \
+  -v $(pwd)/cache:/app/cache \
+  smart-ai-router:cn-test
+
+# 或者使用 docker-compose
+# 确保 docker-compose.yml 中的镜像名称正确
+docker-compose up -d
+```
+
+#### 镜像压缩（可选）
+如果需要更小的文件大小，可以使用 gzip 压缩：
+```bash
+# 导出并压缩
+docker save smart-ai-router:cn-test | gzip > smart-ai-router-cn-test.tar.gz
+
+# 在目标服务器上解压并加载
+gunzip -c smart-ai-router-cn-test.tar.gz | docker load
+```
+
 ### 4. 测试API
 
 #### 无认证模式（auth.enabled: false）
