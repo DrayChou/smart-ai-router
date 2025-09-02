@@ -41,131 +41,37 @@ class CapabilityMapper:
         self._load_config()
 
     def _load_default_capabilities(self) -> ModelCapabilityMap:
-        """加载默认能力映射"""
+        """加载默认能力映射（简化版，主要数据从统一注册表获取）"""
         return ModelCapabilityMap(
-            vision_models={
-                # OpenAI视觉模型
-                "gpt-4-vision", "gpt-4o", "gpt-4-turbo", "chatgpt-4o-latest",
-                "gpt-4o-mini", "gpt-4o-2024", "gpt-4-1106-vision-preview",
-
-                # Anthropic视觉模型
-                "claude-3-opus", "claude-3-sonnet", "claude-3-haiku",
-                "claude-3.5-sonnet", "claude-3-5-sonnet",
-
-                # Google视觉模型
-                "gemini-pro-vision", "gemini-1.5-pro", "gemini-1.5-flash",
-
-                # 其他视觉模型
-                "qwen-vl", "qwen2-vl", "internvl", "cogvlm", "llava",
-                "minicpm-v", "yi-vl"
-            },
-
-            function_calling_models={
-                # OpenAI支持函数调用的模型
-                "gpt-3.5-turbo", "gpt-4", "gpt-4-turbo", "gpt-4o",
-                "gpt-4o-mini", "gpt-3.5-turbo-16k", "chatgpt-4o-latest",
-
-                # Anthropic支持函数调用的模型
-                "claude-3-opus", "claude-3-sonnet", "claude-3-haiku",
-                "claude-3.5-sonnet", "claude-3-5-sonnet", "claude-2.1",
-
-                # Google支持函数调用的模型
-                "gemini-pro", "gemini-1.5-pro", "gemini-1.5-flash",
-
-                # 其他支持函数调用的模型
-                "qwen-max", "qwen-plus", "qwen2-72b", "qwen2-57b",
-                "deepseek-chat", "deepseek-coder", "yi-large",
-                "moonshot-v1-128k", "moonshot-v1-32k"
-            },
-
-            code_generation_models={
-                # 专门的代码生成模型
-                "gpt-4", "gpt-4-turbo", "gpt-4o", "claude-3-opus",
-                "claude-3-sonnet", "claude-3.5-sonnet", "deepseek-coder",
-                "codellama", "code-llama", "starcoder", "codeqwen",
-                "qwen2-coder", "yi-coder", "granite-code"
-            },
-
+            # 简化的基础模式集合，复杂查询委托给统一注册表
+            vision_models=set(),  # 由统一注册表处理
+            function_calling_models=set(),  # 由统一注册表处理  
+            code_generation_models=set(),  # 由统一注册表处理
             streaming_models=set(),  # 大部分现代模型都支持流式
 
+            # 保留本地模型模式用于基础判断
             local_model_patterns={
-                # 本地模型名称模式
                 "ollama", "llama.cpp", "local", "localhost",
                 "ggml", "gguf", "quantized", "4bit", "8bit",
                 "alpaca", "vicuna", "wizard", "orca"
             },
 
+            # 保留基础提供商能力用于回退
             provider_capabilities={
-                "openai": {
-                    "vision": True,
-                    "function_calling": True,
-                    "code_generation": True,
-                    "streaming": True
-                },
-                "anthropic": {
-                    "vision": True,
-                    "function_calling": True,
-                    "code_generation": True,
-                    "streaming": True
-                },
-                "groq": {
-                    "vision": False,
-                    "function_calling": True,
-                    "code_generation": True,
-                    "streaming": True
-                },
-                "siliconflow": {
-                    "vision": True,
-                    "function_calling": True,
-                    "code_generation": True,
-                    "streaming": True
-                },
-                "deepseek": {
-                    "vision": False,
-                    "function_calling": True,
-                    "code_generation": True,
-                    "streaming": True
-                },
-                "moonshot": {
-                    "vision": False,
-                    "function_calling": True,
-                    "code_generation": True,
-                    "streaming": True
-                },
-                "ollama": {
-                    "vision": False,  # 大部分Ollama模型不支持视觉
-                    "function_calling": False,  # 大部分不支持函数调用
-                    "code_generation": True,
-                    "streaming": True
-                },
-                "lmstudio": {
-                    "vision": False,
-                    "function_calling": False,
-                    "code_generation": True,
-                    "streaming": True
-                }
+                "openai": {"vision": True, "function_calling": True, "code_generation": True, "streaming": True},
+                "anthropic": {"vision": True, "function_calling": True, "code_generation": True, "streaming": True},
+                "groq": {"vision": False, "function_calling": True, "code_generation": True, "streaming": True},
+                "siliconflow": {"vision": True, "function_calling": True, "code_generation": True, "streaming": True},
+                "deepseek": {"vision": False, "function_calling": True, "code_generation": True, "streaming": True},
+                "moonshot": {"vision": False, "function_calling": True, "code_generation": True, "streaming": True},
+                "ollama": {"vision": False, "function_calling": False, "code_generation": True, "streaming": True},
+                "lmstudio": {"vision": False, "function_calling": False, "code_generation": True, "streaming": True}
             },
 
+            # 保留关键本地模型覆盖
             model_overrides={
-                # 特定模型的能力覆盖
-                "llava:latest": {
-                    "vision": True,
-                    "function_calling": False,
-                    "code_generation": False,
-                    "streaming": True
-                },
-                "cogvlm:latest": {
-                    "vision": True,
-                    "function_calling": False,
-                    "code_generation": False,
-                    "streaming": True
-                },
-                "deepseek-coder": {
-                    "vision": False,
-                    "function_calling": True,
-                    "code_generation": True,
-                    "streaming": True
-                }
+                "llava:latest": {"vision": True, "function_calling": False, "code_generation": False, "streaming": True},
+                "cogvlm:latest": {"vision": True, "function_calling": False, "code_generation": False, "streaming": True}
             }
         )
 
@@ -228,6 +134,15 @@ class CapabilityMapper:
         Returns:
             能力预测结果
         """
+        # 优先从统一模型注册表获取数据
+        try:
+            from .legacy_adapters import get_capability_mapper_adapter
+            adapter = get_capability_mapper_adapter()
+            return adapter.predict_capabilities(model_name, provider)
+        except Exception as e:
+            logger.warning(f"统一模型注册表查询失败，回退到原逻辑: {e}")
+        
+        # 回退到原逻辑
         capabilities = {
             "vision": False,
             "function_calling": False,
@@ -248,21 +163,7 @@ class CapabilityMapper:
             provider_caps = self.capability_map.provider_capabilities[provider_lower]
             capabilities.update(provider_caps)
 
-        # 基于模型名称模式进行细化预测
-
-        # 检查视觉能力
-        if self._model_matches_patterns(model_name_lower, self.capability_map.vision_models):
-            capabilities["vision"] = True
-
-        # 检查函数调用能力
-        if self._model_matches_patterns(model_name_lower, self.capability_map.function_calling_models):
-            capabilities["function_calling"] = True
-
-        # 检查代码生成能力
-        if self._model_matches_patterns(model_name_lower, self.capability_map.code_generation_models):
-            capabilities["code_generation"] = True
-
-        # 特殊逻辑：本地模型通常能力受限
+        # 简化的本地模型特殊逻辑（详细能力由统一注册表处理）
         if self._is_local_model(model_name_lower, provider_lower):
             # 本地模型通常不支持复杂功能
             if "llava" not in model_name_lower and "cogvlm" not in model_name_lower:

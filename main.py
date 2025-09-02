@@ -80,7 +80,7 @@ def create_minimal_app() -> FastAPI:
                 enable_content_truncation=True,
                 max_content_length=800  # 适当增加长度以保留更多上下文
             )
-            logger.info("[MINIMAL] 🔧 Smart logging enabled: sensitive cleaning, content truncation")
+            logger.info("[MINIMAL] Smart logging enabled: sensitive cleaning, content truncation")
         else:
             logger.info("[MINIMAL] Smart logging disabled by configuration")
     except Exception as e:

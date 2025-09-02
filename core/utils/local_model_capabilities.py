@@ -208,44 +208,35 @@ class LocalModelCapabilityDetector:
         return capabilities
 
     def _get_cloud_provider_capabilities(self, capabilities: ModelCapabilities) -> ModelCapabilities:
-        """获取云端提供商的默认能力"""
+        """获取云端提供商的默认能力（优先使用统一注册表）"""
+        try:
+            # 优先从统一注册表获取准确数据
+            from core.utils.unified_model_registry import get_unified_model_registry
+            
+            registry = get_unified_model_registry()
+            metadata = registry.get_model_metadata(capabilities.model_name, capabilities.provider)
+            
+            if metadata:
+                capabilities.supports_vision = metadata.supports_vision
+                capabilities.supports_function_calling = metadata.supports_function_calling
+                capabilities.supports_streaming = metadata.supports_streaming
+                capabilities.supports_code_generation = True  # 默认支持
+                if metadata.context_length:
+                    capabilities.max_context_length = metadata.context_length
+                return capabilities
+                
+        except Exception as e:
+            logger.debug(f"统一注册表查询失败，使用基础推断: {e}")
+
+        # 回退到基础推断
         provider = capabilities.provider.lower()
         model_name = capabilities.model_name.lower()
-
-        # OpenAI
-        if provider == "openai":
-            capabilities.supports_vision = "vision" in model_name or "gpt-4" in model_name
-            capabilities.supports_function_calling = True
-            capabilities.supports_code_generation = True
-            capabilities.supports_streaming = True
-
-        # Anthropic
-        elif provider == "anthropic":
-            capabilities.supports_vision = "claude-3" in model_name
-            capabilities.supports_function_calling = True
-            capabilities.supports_code_generation = True
-            capabilities.supports_streaming = True
-
-        # Groq
-        elif provider == "groq":
-            capabilities.supports_vision = False  # Groq暂不支持视觉
-            capabilities.supports_function_calling = True
-            capabilities.supports_code_generation = True
-            capabilities.supports_streaming = True
-
-        # SiliconFlow
-        elif provider == "siliconflow":
-            capabilities.supports_vision = "vision" in model_name
-            capabilities.supports_function_calling = "pro" in model_name or "claude" in model_name
-            capabilities.supports_code_generation = True
-            capabilities.supports_streaming = True
-
-        # 默认云端能力
-        else:
-            capabilities.supports_vision = "vision" in model_name
-            capabilities.supports_function_calling = True
-            capabilities.supports_code_generation = True
-            capabilities.supports_streaming = True
+        
+        # 简化的基础能力推断
+        capabilities.supports_vision = any(keyword in model_name for keyword in ["vision", "gpt-4", "claude-3", "gemini"])
+        capabilities.supports_function_calling = provider not in ["ollama", "lmstudio"]  # 本地模型通常不支持
+        capabilities.supports_code_generation = True
+        capabilities.supports_streaming = True
 
         return capabilities
 

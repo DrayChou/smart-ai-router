@@ -14,6 +14,7 @@ from .utils.channel_cache_manager import get_channel_cache_manager
 from .utils.local_model_capabilities import get_capability_detector
 from .utils.model_analyzer import get_model_analyzer
 from .utils.parameter_comparator import get_parameter_comparator
+from .utils.unified_model_registry import get_unified_model_registry
 from .utils.request_cache import RequestFingerprint, get_request_cache
 from .yaml_config import YAMLConfigLoader, get_yaml_config_loader
 
@@ -318,12 +319,15 @@ class JSONRouter:
         self._available_tags_cache: Optional[set] = None
         self._available_models_cache: Optional[list[str]] = None
 
-        # 模型分析器、缓存管理器和参数量比较器
+        # 统一模型注册表（优先使用）
+        self.unified_registry = get_unified_model_registry()
+        
+        # 模型分析器、缓存管理器和参数量比较器（作为回退）
         self.model_analyzer = get_model_analyzer()
         self.cache_manager = get_channel_cache_manager()
         self.parameter_comparator = get_parameter_comparator()
 
-        # 能力检测器和映射器
+        # 能力检测器和映射器（作为回退）
         self.capability_detector = get_capability_detector()
         self.capability_mapper = get_capability_mapper()
 
