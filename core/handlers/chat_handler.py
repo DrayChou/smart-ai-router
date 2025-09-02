@@ -79,6 +79,7 @@ class ChatCompletionHandler:
     
     def __init__(self, config_loader: YAMLConfigLoader, router: JSONRouter):
         self.config = config_loader
+        self.config_loader = config_loader  # 保持向后兼容
         self.router = router
         
     async def handle_request(self, request: ChatCompletionRequest) -> Union[JSONResponse, StreamingResponse]:
@@ -531,7 +532,7 @@ class ChatCompletionHandler:
         
         # 🚀 使用智能日志记录成功响应 (AIRouter功能集成)  
         log_channel_operation(
-            enhanced_logger,
+            get_enhanced_logger(__name__),
             operation="request",
             channel_id=channel_info.channel.id,
             model=response_json.get('model', 'unknown'),

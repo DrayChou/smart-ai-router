@@ -191,7 +191,11 @@ class YAMLConfigLoader:
                         self._migration_in_progress = True
                         
                         # 🚀 启动后台迁移任务（不阻塞启动）
-                        asyncio.create_task(self._migrate_cache_background(raw_cache))
+                        try:
+                            asyncio.create_task(self._migrate_cache_background(raw_cache))
+                        except RuntimeError:
+                            # 如果没有事件循环，跳过后台迁移
+                            logger.info("No event loop available for background migration, skipping")
                     else:
                         self.model_cache = raw_cache
                         if not self._needs_cache_migration(raw_cache):

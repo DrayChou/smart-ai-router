@@ -53,7 +53,7 @@ class SmartLoggingIntegration:
         self._enhance_existing_loggers()
         
         logging.getLogger('smart-ai-router').info(
-            "🔧 SMART LOGGING ENABLED: Sensitive info cleaning, content truncation activated"
+            "[SMART] LOGGING ENABLED: Sensitive info cleaning, content truncation activated"
         )
     
     def disable_smart_logging(self) -> None:
