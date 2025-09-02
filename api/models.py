@@ -203,10 +203,18 @@ def create_models_router(config_loader: YAMLConfigLoader, json_router: JSONRoute
             # 从内存索引获取模型的自动提取tags（如果没有从base_model_info获取到）
             if not model_tags and memory_index:
                 try:
-                    # 使用_generate_model_tags方法（直接调用内部方法获取基础tags）
-                    extracted_tags = memory_index._generate_model_tags(model_id, "unknown")
+                    # 尝试从第一个可用渠道获取provider信息
+                    provider = None
+                    if channel_ids and len(channel_ids) > 0:
+                        channel_id = channel_ids[0]
+                        if channel_id in channels:
+                            provider = getattr(channels[channel_id], 'provider', None)
+                    
+                    # 使用_generate_model_tags方法（不传入provider避免添加unknown标签）
+                    extracted_tags = memory_index._generate_model_tags(model_id, provider or "")
                     if extracted_tags:
-                        model_tags = list(extracted_tags)
+                        # 过滤掉空字符串标签
+                        model_tags = [tag for tag in extracted_tags if tag and tag.strip()]
                 except Exception as e:
                     logger.debug(f"Failed to get tags for model {model_id}: {e}")
                     pass
