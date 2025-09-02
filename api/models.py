@@ -150,7 +150,11 @@ def create_models_router(config_loader: YAMLConfigLoader, json_router: JSONRoute
                     # 构建渠道特定的能力信息和tags
                     channel_capabilities = None
                     channel_context = None
-                    channel_specific_tags = None
+                    channel_specific_tags = [channel.id]  # 至少包含渠道ID
+                    
+                    # 添加渠道名称作为标签（如果与ID不同）
+                    if channel.name and channel.name.lower() != channel.id.lower():
+                        channel_specific_tags.append(channel.name.lower())
                     
                     if channel_model_info:
                         if channel_model_info.capabilities:
@@ -162,9 +166,9 @@ def create_models_router(config_loader: YAMLConfigLoader, json_router: JSONRoute
                             )
                         if channel_model_info.specs and channel_model_info.specs.context_length:
                             channel_context = channel_model_info.specs.context_length
-                        # 获取渠道特定的tags（如果有的话）
+                        # 添加渠道模型特定的tags（如果有的话）
                         if channel_model_info.tags:
-                            channel_specific_tags = list(channel_model_info.tags)
+                            channel_specific_tags.extend(channel_model_info.tags)
 
                     channel_list.append(ChannelInfo(
                         id=channel.id,
