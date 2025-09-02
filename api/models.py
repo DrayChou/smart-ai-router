@@ -13,6 +13,7 @@ from core.json_router import JSONRouter
 from core.utils.logger import get_logger
 from core.yaml_config import YAMLConfigLoader
 from core.services import get_model_service
+from core.utils.memory_index import get_memory_index
 
 logger = get_logger(__name__)
 
@@ -39,6 +40,8 @@ class ChannelInfo(BaseModel):
     # 渠道特定的模型信息覆盖
     channel_context_length: Optional[int] = None
     channel_capabilities: Optional[ModelCapabilities] = None
+    # 渠道特定的tags（从渠道配置或模型分析得出）
+    channel_tags: Optional[List[str]] = None
 
 class ModelInfo(BaseModel):
     id: str
@@ -106,9 +109,10 @@ def create_models_router(config_loader: YAMLConfigLoader, json_router: JSONRoute
         models_data = []
         current_time = int(time.time())
 
-        # 获取渠道映射
+        # 获取渠道映射和内存索引（用于tags提取）
         channels_list = config_loader.config.channels or []
         channels = {channel.id: channel for channel in channels_list}
+        memory_index = get_memory_index()
 
         for model_id in sorted(list(all_models)):
             # 获取模型的详细信息（使用新的服务架构）
@@ -143,9 +147,11 @@ def create_models_router(config_loader: YAMLConfigLoader, json_router: JSONRoute
                             output=channel.cost_per_token.get('output')
                         )
 
-                    # 构建渠道特定的能力信息
+                    # 构建渠道特定的能力信息和tags
                     channel_capabilities = None
                     channel_context = None
+                    channel_specific_tags = None
+                    
                     if channel_model_info:
                         if channel_model_info.capabilities:
                             channel_capabilities = ModelCapabilities(
@@ -156,6 +162,9 @@ def create_models_router(config_loader: YAMLConfigLoader, json_router: JSONRoute
                             )
                         if channel_model_info.specs and channel_model_info.specs.context_length:
                             channel_context = channel_model_info.specs.context_length
+                        # 获取渠道特定的tags（如果有的话）
+                        if channel_model_info.tags:
+                            channel_specific_tags = list(channel_model_info.tags)
 
                     channel_list.append(ChannelInfo(
                         id=channel.id,
@@ -166,7 +175,8 @@ def create_models_router(config_loader: YAMLConfigLoader, json_router: JSONRoute
                         capabilities=getattr(channel, 'capabilities', None),
                         cost_per_token=cost_info,
                         channel_context_length=channel_context,
-                        channel_capabilities=channel_capabilities
+                        channel_capabilities=channel_capabilities,
+                        channel_tags=channel_specific_tags
                     ))
 
             # 构建模型基础信息
@@ -189,6 +199,17 @@ def create_models_router(config_loader: YAMLConfigLoader, json_router: JSONRoute
                     output_price = base_model_info.pricing.output_price
                 if base_model_info.tags:
                     model_tags = list(base_model_info.tags)
+            
+            # 从内存索引获取模型的自动提取tags（如果没有从base_model_info获取到）
+            if not model_tags and memory_index:
+                try:
+                    # 使用_generate_model_tags方法（直接调用内部方法获取基础tags）
+                    extracted_tags = memory_index._generate_model_tags(model_id, "unknown")
+                    if extracted_tags:
+                        model_tags = list(extracted_tags)
+                except Exception as e:
+                    logger.debug(f"Failed to get tags for model {model_id}: {e}")
+                    pass
 
             models_data.append(ModelInfo(
                 id=model_id,
