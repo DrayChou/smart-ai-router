@@ -339,21 +339,71 @@ Use real API data and scenarios when possible:
 
 ## Important Notes
 
+### Project Positioning & Security Philosophy
+**🏠 Personal Local Use Focus**: This project is designed for individual users running locally, not enterprise production environments.
+
+**Security Approach**:
+- **Key Protection**: Primary concern is preventing API keys from being committed to version control
+- **Local-First**: Security measures optimized for single-user local deployment
+- **Practical Security**: Focus on preventing accidental key exposure rather than enterprise-grade threat models
+- **Development Safety**: `.env` and `.gitignore` patterns ensure keys stay local
+
 ### Data Management Philosophy
 - **Database-First**: All business data (channels, keys, costs) in database, not config files
 - **Dynamic Configuration**: Changes take effect immediately without restart
 - **Scalable Design**: Support hundreds of channels and thousands of API keys
-- **Security Focus**: Encrypted API key storage with rotation and quotas
+- **Practical Security**: API keys managed securely for local use, with focus on preventing version control exposure
 
-### Development Priorities
-1. **Database Layer**: Implement SQLAlchemy models and migrations first
-2. **Management APIs**: Channel and key management endpoints
-3. **Routing Engine**: Database-integrated intelligent routing
-4. **Web Interface**: For dynamic configuration management
+### Local Use Optimization Priorities
+1. **Performance First**: Route optimization and caching for responsive local usage
+2. **Cost Control**: Free resource prioritization and cost tracking for personal budgets
+3. **Ease of Use**: Simple configuration and management for individual users
+4. **Reliability**: Stable operation without complex enterprise infrastructure
 
-### Key Features
-- All API requests logged with detailed cost and performance metrics
-- Multi-key rotation per channel for resilience
-- Real-time cost tracking and budget enforcement
-- Intelligent health monitoring and automatic recovery
-- Chinese/English bilingual support throughout system
+### Personal Use Optimization Recommendations
+
+#### 🎯 **High Priority (Individual User Benefits)**
+1. **Code Quality Improvements**:
+   - [ ] Split large `core/json_router.py` file for better maintainability
+   - [ ] Improve exception handling consistency for better debugging
+   - [ ] Add comprehensive type annotations for development experience
+
+2. **User Experience Enhancements**:
+   - [ ] Improve startup time and initial configuration experience
+   - [ ] Better error messages and debugging information
+   - [ ] Enhanced logging for troubleshooting personal setups
+
+3. **Performance Optimizations** (已基本完成):
+   - ✅ 800x routing performance improvement
+   - ✅ Multi-layer caching system
+   - ✅ Async processing optimization
+
+#### 🔧 **Medium Priority (Nice to Have)**
+1. **Configuration Management**:
+   - [ ] Web-based configuration interface for easier management
+   - [ ] Configuration validation and error prevention
+   - [ ] Backup/restore configuration features
+
+2. **Monitoring & Analytics**:
+   - [ ] Personal usage analytics and cost optimization suggestions
+   - [ ] Simple health monitoring dashboard
+   - [ ] Request/response debugging tools
+
+#### 🌟 **Low Priority (Future Enhancements)**
+1. **Advanced Features**:
+   - [ ] Model performance benchmarking for personal use cases
+   - [ ] Custom routing strategy creation
+   - [ ] Integration with personal productivity tools
+
+### Development Priorities (Personal Use Focused)
+1. **Code Maintainability**: Improve codebase structure for easier personal modifications
+2. **User Experience**: Simplify configuration and management for individual users
+3. **Performance**: Maintain current high-performance routing capabilities
+4. **Reliability**: Ensure stable operation in personal computing environments
+
+### Key Features (Personal Use Optimized)
+- **Local-First Design**: All processing happens locally, no external dependencies for core functionality
+- **Personal Cost Tracking**: Detailed cost analysis for individual API usage patterns
+- **Flexible Configuration**: Easy setup and modification for personal preferences
+- **Intelligent Routing**: Automatic optimization for personal use cases and cost savings
+- **Multi-Language Support**: Chinese/English bilingual interface for global users

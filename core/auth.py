@@ -9,11 +9,9 @@ from fastapi import Request, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.middleware.base import BaseHTTPMiddleware
 
-logger = logging.getLogger(__name__)
+from core.utils.thread_safe_singleton import get_or_create_global
 
-# 全局变量存储生成的tokens
-_generated_api_token: Optional[str] = None
-_generated_admin_token: Optional[str] = None
+logger = logging.getLogger(__name__)
 
 def generate_secure_token() -> str:
     """生成安全的随机token"""
@@ -21,23 +19,27 @@ def generate_secure_token() -> str:
 
 def get_or_generate_api_token(config_token: Optional[str] = None) -> str:
     """获取或生成API token"""
-    global _generated_api_token
     if config_token:
         return config_token
-    if not _generated_api_token:
-        _generated_api_token = generate_secure_token()
-        logger.info(f"🔑 Generated API Token: {_generated_api_token}")
-    return _generated_api_token
+    
+    def _create_api_token():
+        token = generate_secure_token()
+        logger.info(f"🔑 Generated API Token: {token}")
+        return token
+    
+    return get_or_create_global("_generated_api_token", _create_api_token)
 
 def get_or_generate_admin_token(config_token: Optional[str] = None) -> str:
     """获取或生成Admin token"""
-    global _generated_admin_token
     if config_token:
         return config_token
-    if not _generated_admin_token:
-        _generated_admin_token = generate_secure_token()
-        logger.info(f"[KEY] Generated Admin Token: {_generated_admin_token}")
-    return _generated_admin_token
+    
+    def _create_admin_token():
+        token = generate_secure_token()
+        logger.info(f"[KEY] Generated Admin Token: {token}")
+        return token
+    
+    return get_or_create_global("_generated_admin_token", _create_admin_token)
 
 class AuthenticationMiddleware(BaseHTTPMiddleware):
     """API Token认证中间件"""
@@ -133,17 +135,17 @@ class AdminAuthDependency:
         
         return True
 
-# 全局依赖实例 - 将在应用启动时初始化
-admin_auth_dependency: Optional[AdminAuthDependency] = None
-
 def get_admin_auth_dependency():
     """获取Admin认证依赖实例"""
-    if admin_auth_dependency is None:
+    from core.utils.thread_safe_singleton import get_global
+    admin_auth = get_global("admin_auth_dependency")
+    if admin_auth is None:
         raise HTTPException(status_code=500, detail="Admin authentication not initialized")
-    return admin_auth_dependency
+    return admin_auth
 
 def initialize_admin_auth(config_loader):
     """初始化Admin认证依赖"""
-    global admin_auth_dependency
-    admin_auth_dependency = AdminAuthDependency(config_loader)
-    return admin_auth_dependency
+    from core.utils.thread_safe_singleton import set_global
+    admin_auth = AdminAuthDependency(config_loader)
+    set_global("admin_auth_dependency", admin_auth)
+    return admin_auth

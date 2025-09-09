@@ -5,6 +5,7 @@ Anthropic Claude API 兼容接口
 """
 
 import json
+import time
 import uuid
 from typing import Any, Dict, List, Optional, Union
 
@@ -421,8 +422,28 @@ async def stream_anthropic_response(chat_handler: ChatCompletionHandler, request
     total_output_tokens = 0
 
     try:
-        # 使用chat_handler的流式处理
-        async for chunk in chat_handler.handle_stream_request(request):
+        # 使用chat_handler的流式处理 - 获取异步生成器而不是StreamingResponse
+        start_time = time.time()
+        routing_result = await chat_handler._route_request_with_fallback(request, start_time)
+        
+        # 检查路由结果
+        if not routing_result.candidates:
+            error_data = {
+                "type": "error",
+                "error": {
+                    "type": "no_channels_available",
+                    "message": "No available channels for the requested model"
+                }
+            }
+            yield f"data: {json.dumps(error_data)}\n\n"
+            return
+            
+        async for chunk in chat_handler._execute_stream_request_with_retry(
+            request, 
+            routing_result,
+            start_time,
+            f"anthropic_{message_id}"
+        ):
             # 处理不同类型的chunk
             if isinstance(chunk, str):
                 # 如果是字符串，尝试解析为JSON

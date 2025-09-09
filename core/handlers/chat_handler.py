@@ -1062,7 +1062,8 @@ class ChatCompletionHandler:
                         if isinstance(original_content, str) and original_content:
                             # 🚀 应用思维链清理 (AIRouter集成功能)
                             # 检查是否启用思维链清理 (默认启用以支持推理模型)
-                            should_clean_thinking = getattr(self.config_loader.config, 'clean_thinking_chains', True)
+                            from core.utils.null_safety import safe
+                            should_clean_thinking = safe(self.config_loader).config.clean_thinking_chains.value(True)
                             
                             cleaned_content = clean_model_response(
                                 original_content, 
@@ -1089,7 +1090,8 @@ class ChatCompletionHandler:
                         if isinstance(original_content, str) and original_content:
                             # 对于流式响应，只进行基础的思维链清理
                             # 避免破坏流式传输的连续性
-                            should_clean_thinking = getattr(self.config_loader.config, 'clean_thinking_chains', True)
+                            from core.utils.null_safety import safe
+                            should_clean_thinking = safe(self.config_loader).config.clean_thinking_chains.value(True)
                             
                             cleaned_content = clean_model_response(
                                 original_content,

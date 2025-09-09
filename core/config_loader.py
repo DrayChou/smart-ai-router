@@ -261,18 +261,18 @@ class ConfigLoader:
             "log_responses": False
         })
 
-# 全局配置实例
-_config_loader: Optional[ConfigLoader] = None
-
 def get_config_loader() -> ConfigLoader:
     """获取全局配置加载器实例"""
-    global _config_loader
-    if _config_loader is None:
-        _config_loader = ConfigLoader()
-    return _config_loader
+    from core.utils.thread_safe_singleton import get_or_create_global
+    
+    def _create_config_loader():
+        return ConfigLoader()
+    
+    return get_or_create_global("_config_loader", _create_config_loader)
 
 def reload_config() -> ConfigLoader:
     """重新加载配置"""
-    global _config_loader
-    _config_loader = ConfigLoader()
-    return _config_loader
+    from core.utils.thread_safe_singleton import set_global
+    config_loader = ConfigLoader()
+    set_global("_config_loader", config_loader)
+    return config_loader
