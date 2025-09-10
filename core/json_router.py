@@ -13,6 +13,7 @@ from .utils.capability_mapper import get_capability_mapper
 from .utils.channel_cache_manager import get_channel_cache_manager
 from .utils.local_model_capabilities import get_capability_detector
 from .utils.model_analyzer import get_model_analyzer
+from .utils.model_channel_blacklist import get_model_blacklist_manager
 from .utils.parameter_comparator import get_parameter_comparator
 from .utils.unified_model_registry import get_unified_model_registry
 from .utils.request_cache import RequestFingerprint, get_request_cache
@@ -330,6 +331,9 @@ class JSONRouter:
         # 能力检测器和映射器（作为回退）
         self.capability_detector = get_capability_detector()
         self.capability_mapper = get_capability_mapper()
+        
+        # 模型-渠道黑名单管理器
+        self.blacklist_manager = get_model_blacklist_manager()
 
     async def route_request(self, request: RoutingRequest) -> list[RoutingScore]:
         """
@@ -571,7 +575,61 @@ class JSONRouter:
                     logger.info(f"  {i+1}. {candidate.channel.name} -> {candidate.matched_model}")
             return candidates
 
-        # 2. 检查是否为标签查询
+        # 2. 检查是否为隐式标签查询（包含逗号的查询，如 "kimi,0905"）
+        if "," in request.model and not request.model.startswith("tag:") and not request.model.startswith("tags:"):
+            # 自动将逗号分隔的查询转换为标签查询
+            logger.info(f"IMPLICIT TAG QUERY: Detected comma-separated query '{request.model}', treating as tag query")
+            tag_query = request.model
+            
+            # 支持多标签查询，用逗号分隔：kimi,0905,!local
+            tag_parts = [tag.strip() for tag in tag_query.split(",")]
+            positive_tags = []
+            negative_tags = []
+
+            for tag_part in tag_parts:
+                if tag_part.startswith("!"):
+                    # 负标签：!local
+                    negative_tags.append(tag_part[1:].lower())
+                else:
+                    # 检查是否为大小过滤标签
+                    size_filter = parse_size_filter(tag_part)
+                    if size_filter:
+                        # 这是大小过滤标签，但也要当作正标签处理查找候选者
+                        pass  # Size filter will be applied later
+                    else:
+                        # 正标签：kimi, 0905
+                        positive_tags.append(tag_part.lower())
+
+            logger.info(f"IMPLICIT TAG ROUTING: Processing query '{request.model}' -> positive: {positive_tags}, negative: {negative_tags}")
+            candidates = self._get_candidate_channels_by_auto_tags(positive_tags, negative_tags)
+            if not candidates:
+                logger.error(f"IMPLICIT TAG NOT FOUND: No models found matching tags {positive_tags} excluding {negative_tags}")
+                from core.exceptions import TagNotFoundError
+                raise TagNotFoundError(positive_tags + [f"!{tag}" for tag in negative_tags])
+
+            # 提取并应用大小过滤器
+            size_filters = []
+            for tag_part in tag_parts:
+                if not tag_part.startswith("!"):
+                    size_filter = parse_size_filter(tag_part)
+                    if size_filter:
+                        size_filters.append(size_filter)
+
+            if size_filters:
+                logger.info(f"SIZE FILTERS: Applying {len(size_filters)} size filters: {[f'{sf.operator}{sf.value}{sf.unit}' for sf in size_filters]}")
+                filtered_candidates = apply_size_filters(candidates, size_filters)
+                logger.info(f"SIZE FILTERS: Filtered from {len(candidates)} to {len(filtered_candidates)} candidates")
+                candidates = filtered_candidates
+
+            if not candidates:
+                logger.error("SIZE FILTERS: No candidates left after applying size filters")
+                from core.exceptions import TagNotFoundError
+                raise TagNotFoundError(positive_tags + [f"!{tag}" for tag in negative_tags])
+
+            logger.info(f"IMPLICIT TAG ROUTING: Found {len(candidates)} candidate channels")
+            return candidates
+
+        # 3. 检查是否为显式标签查询
         if request.model.startswith("tag:") or request.model.startswith("tags:"):
             # 统一处理 tag: 和 tags: 前缀
             prefix = "tag:" if request.model.startswith("tag:") else "tags:"
@@ -756,6 +814,18 @@ class JSONRouter:
         for candidate in channels:
             channel = candidate.channel
             if not channel.enabled or not channel.api_key:
+                continue
+
+            # 🚫 模型黑名单过滤检查
+            model_name = candidate.matched_model or channel.model_name
+            is_blacklisted, blacklist_entry = self.blacklist_manager.is_model_blacklisted(channel.id, model_name)
+            if is_blacklisted:
+                remaining_time = blacklist_entry.get_remaining_time() if blacklist_entry else -1
+                if remaining_time > 0:
+                    logger.debug(f"BLACKLIST FILTER: Skipping {channel.name} -> {model_name} "
+                               f"(blacklisted for {remaining_time}s due to {blacklist_entry.error_type.value})")
+                else:
+                    logger.debug(f"BLACKLIST FILTER: Skipping {channel.name} -> {model_name} (permanently blacklisted)")
                 continue
 
             # 🚀 优化健康分数检查（避免重复访问）
