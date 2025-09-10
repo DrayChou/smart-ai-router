@@ -6,9 +6,11 @@ Provider adapters for different AI service providers
 from .anthropic import AnthropicAdapter
 from .groq import GroqAdapter
 from .openai import OpenAIAdapter
+from .openrouter import OpenRouterAdapter
 
 __all__ = [
     "OpenAIAdapter",
     "AnthropicAdapter",
     "GroqAdapter",
+    "OpenRouterAdapter",
 ]

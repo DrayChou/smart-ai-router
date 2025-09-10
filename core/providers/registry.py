@@ -10,6 +10,7 @@ from core.utils.logger import get_logger
 from .adapters.anthropic import AnthropicAdapter
 from .adapters.groq import GroqAdapter
 from .adapters.openai import OpenAIAdapter
+from .adapters.openrouter import OpenRouterAdapter
 from .base import BaseAdapter
 
 logger = get_logger(__name__)
@@ -28,6 +29,7 @@ class ProviderRegistry:
         self.register("OpenAIAdapter", OpenAIAdapter)
         self.register("AnthropicAdapter", AnthropicAdapter)
         self.register("GroqAdapter", GroqAdapter)
+        self.register("OpenRouterAdapter", OpenRouterAdapter)
 
         logger.info(f"注册了{len(self._adapters)}个内置适配器")
 

@@ -28,6 +28,7 @@ from ..utils.usage_tracker import get_usage_tracker, create_usage_record
 from ..utils.channel_monitor import get_channel_monitor, check_api_error_and_alert
 from ..utils.token_estimator import get_token_estimator, get_model_optimizer, TaskComplexity
 from ..utils.request_interval_manager import get_request_interval_manager
+from ..utils.adapter_manager import get_adapter_manager
 from ..utils.text_processor import clean_model_response
 from ..utils.logging_integration import get_enhanced_logger, log_api_request, log_api_response, log_channel_operation
 from ..utils.model_channel_blacklist import get_model_blacklist_manager
@@ -627,40 +628,116 @@ class ChatCompletionHandler:
         return JSONResponse(content=enhanced_response, headers=debug_headers)
     
     def _prepare_channel_request_info(self, channel, provider, request: Optional[ChatCompletionRequest], matched_model: Optional[str]) -> ChannelRequestInfo:
-        """准备渠道请求信息"""
-        base_url = (channel.base_url or provider.base_url).rstrip('/')
-        if not base_url.endswith('/v1'):
-            base_url += '/v1'
-        url = f"{base_url}/chat/completions"
-
-        headers = {"Content-Type": "application/json", "User-Agent": "smart-ai-router/0.2.0"}
-        if provider.auth_type == "bearer":
-            headers["Authorization"] = f"Bearer {channel.api_key}"
-        elif provider.auth_type == "x-api-key":
-            headers["x-api-key"] = channel.api_key
-
-        request_data = {}
-        if request:
-            request_data = request.dict(exclude_unset=True)
-            # 智能模型选择逻辑
-            if matched_model:
-                request_data["model"] = matched_model
-                logger.info(f"📡 MODEL SELECTION: Using matched model '{matched_model}' for routing")
-            elif request.model.startswith("auto:") or request.model.startswith("tag:"):
-                request_data["model"] = channel.model_name
-                logger.info(f"📡 MODEL SELECTION: Using channel default model '{channel.model_name}' for virtual query")
+        """准备渠道请求信息 - 使用适配器系统"""
+        try:
+            # 🚀 使用适配器管理器准备请求
+            adapter_manager = get_adapter_manager()
+            
+            if request:
+                # 转换为适配器可用的格式
+                from ..models.chat_request import ChatRequest
+                
+                # 创建ChatRequest对象
+                request_dict = request.dict(exclude_unset=True)
+                
+                # 智能模型选择逻辑
+                if matched_model:
+                    request_dict["model"] = matched_model
+                    logger.info(f"📡 MODEL SELECTION: Using matched model '{matched_model}' for routing")
+                elif request.model.startswith("auto:") or request.model.startswith("tag:"):
+                    request_dict["model"] = channel.model_name
+                    logger.info(f"📡 MODEL SELECTION: Using channel default model '{channel.model_name}' for virtual query")
+                else:
+                    request_dict["model"] = request.model
+                    logger.info(f"📡 MODEL SELECTION: Using requested model '{request.model}' for physical query")
+                
+                # 添加路由策略信息（如果有）
+                if hasattr(request, 'routing_strategy'):
+                    request_dict["routing_strategy"] = request.routing_strategy
+                
+                chat_request = ChatRequest(**request_dict)
+                
+                # 使用适配器准备请求
+                adapter_result = adapter_manager.prepare_request_with_adapter(
+                    channel=channel,
+                    provider=provider,
+                    request=chat_request,
+                    matched_model=matched_model
+                )
+                
+                # 🎯 为OpenRouter启用成本优化
+                if adapter_result.get("adapter"):
+                    routing_strategy = getattr(request, 'routing_strategy', 'balanced')
+                    adapter_result["request_data"] = adapter_manager.enhance_request_for_cost_optimization(
+                        adapter_result["request_data"],
+                        adapter_result["adapter"],
+                        routing_strategy
+                    )
+                
+                return ChannelRequestInfo(
+                    url=adapter_result["url"],
+                    headers=adapter_result["headers"],
+                    request_data=adapter_result["request_data"],
+                    channel=channel,
+                    provider=provider,
+                    matched_model=matched_model
+                )
+            
             else:
-                request_data["model"] = request.model
-                logger.info(f"📡 MODEL SELECTION: Using requested model '{request.model}' for physical query")
+                # 无请求时的回退逻辑
+                base_url = (channel.base_url or provider.base_url).rstrip('/')
+                if not base_url.endswith('/v1'):
+                    base_url += '/v1'
+                url = f"{base_url}/chat/completions"
+                
+                headers = {"Content-Type": "application/json", "User-Agent": "smart-ai-router/0.2.0"}
+                if provider.auth_type == "bearer":
+                    headers["Authorization"] = f"Bearer {channel.api_key}"
+                elif provider.auth_type == "x-api-key":
+                    headers["x-api-key"] = channel.api_key
+                
+                return ChannelRequestInfo(
+                    url=url,
+                    headers=headers,
+                    request_data={},
+                    channel=channel,
+                    provider=provider,
+                    matched_model=matched_model
+                )
         
-        return ChannelRequestInfo(
-            url=url,
-            headers=headers,
-            request_data=request_data,
-            channel=channel,
-            provider=provider,
-            matched_model=matched_model
-        )
+        except Exception as e:
+            logger.warning(f"⚠️ 适配器准备失败，使用回退方式: {e}")
+            # 回退到原始逻辑
+            base_url = (channel.base_url or provider.base_url).rstrip('/')
+            if not base_url.endswith('/v1'):
+                base_url += '/v1'
+            url = f"{base_url}/chat/completions"
+
+            headers = {"Content-Type": "application/json", "User-Agent": "smart-ai-router/0.2.0"}
+            if provider.auth_type == "bearer":
+                headers["Authorization"] = f"Bearer {channel.api_key}"
+            elif provider.auth_type == "x-api-key":
+                headers["x-api-key"] = channel.api_key
+
+            request_data = {}
+            if request:
+                request_data = request.dict(exclude_unset=True)
+                # 智能模型选择逻辑
+                if matched_model:
+                    request_data["model"] = matched_model
+                elif request.model.startswith("auto:") or request.model.startswith("tag:"):
+                    request_data["model"] = channel.model_name
+                else:
+                    request_data["model"] = request.model
+            
+            return ChannelRequestInfo(
+                url=url,
+                headers=headers,
+                request_data=request_data,
+                channel=channel,
+                provider=provider,
+                matched_model=matched_model
+            )
     
     def _create_debug_headers(self, channel_info: ChannelRequestInfo, routing_score: RoutingScore, attempt_num: int, request_type: str, latency: Optional[float] = None) -> Dict[str, str]:
         """创建调试头信息"""
