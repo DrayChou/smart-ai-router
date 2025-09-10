@@ -28,6 +28,7 @@ active_connections: List[WebSocket] = []
 
 # 请求上下文存储（用于在请求期间传递渠道信息）
 import threading
+from core.utils.model_capabilities import get_model_capabilities_from_openrouter
 
 _request_context = threading.local()
 
@@ -229,6 +230,9 @@ def create_status_monitor_router(
                     channel, routing_request
                 )
 
+                # 🎯 使用OpenRouter数据库作为通用模型能力参考
+                capabilities, context_length = get_model_capabilities_from_openrouter(model_name)
+
                 result = {
                     "rank": i + 1,
                     "model_name": model_name,
@@ -242,6 +246,8 @@ def create_status_monitor_router(
                     "speed_score": score.speed_score,
                     "quality_score": score.quality_score,
                     "total_score": score.total_score,
+                    "capabilities": capabilities,
+                    "context_length": context_length,
                     "estimated_cost": {
                         "total": estimated_cost,
                         "input": estimated_cost * 0.6,  # 估算输入成本占比
