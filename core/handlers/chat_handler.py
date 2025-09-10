@@ -30,8 +30,14 @@ from ..utils.token_estimator import get_token_estimator, get_model_optimizer, Ta
 from ..utils.request_interval_manager import get_request_interval_manager
 from ..utils.text_processor import clean_model_response
 from ..utils.logging_integration import get_enhanced_logger, log_api_request, log_api_response, log_channel_operation
+from ..utils.model_channel_blacklist import get_model_blacklist_manager
 
 logger = logging.getLogger(__name__)
+
+# Status logging is now handled at the API level
+def status_log_request(*args, **kwargs):
+    """Placeholder - status logging handled at API level"""
+    pass
 
 # --- Request/Response Models ---
 
@@ -500,7 +506,7 @@ class ChatCompletionHandler:
                     
             except httpx.HTTPStatusError as e:
                 last_error = e
-                await self._handle_http_status_error(e, channel, attempt_num, failed_channels, routing_result.candidates)
+                await self._handle_http_status_error(e, channel, routing_score, attempt_num, failed_channels, routing_result.candidates)
                 continue
             except httpx.RequestError as e:
                 last_error = e
@@ -599,6 +605,25 @@ class ChatCompletionHandler:
         # 获取汇总头信息（虽然非流式主要在响应体中，但保留头信息用于调试）
         debug_headers = aggregator.get_headers_summary(metadata.request_id)
         
+        # Record successful request with channel info
+        try:
+            from api.status_monitor import log_request, set_request_channel
+            set_request_channel(channel_info.channel.name)
+            
+            # Single logging point - moved from API to get channel info
+            total_duration_ms = (time.time() - start_time) * 1000
+            log_request(
+                method="POST", 
+                path="/v1/chat/completions",
+                status_code=200,
+                duration_ms=total_duration_ms,
+                model=request.model,
+                channel=None,  # Will get from thread-local storage
+                error=None
+            )
+        except ImportError:
+            pass
+        
         return JSONResponse(content=enhanced_response, headers=debug_headers)
     
     def _prepare_channel_request_info(self, channel, provider, request: Optional[ChatCompletionRequest], matched_model: Optional[str]) -> ChannelRequestInfo:
@@ -662,45 +687,61 @@ class ChatCompletionHandler:
             logger.info(f"🗑️  CACHE INVALIDATED: Cleared cached selections for channel '{channel_name}' due to {reason}")
         except Exception as e:
             logger.warning(f"CACHE INVALIDATION FAILED for channel '{channel_name}': {e}")
+    
+    def _invalidate_model_cache(self, channel_id: str, model_name: str, reason: str):
+        """使指定模型在指定渠道的缓存失效"""
+        try:
+            cache = get_request_cache()
+            # 使该模型-渠道组合的缓存失效
+            invalidated_count = cache.invalidate_model_channel_combination(channel_id, model_name)
+            if invalidated_count > 0:
+                logger.info(f"🗑️  MODEL CACHE INVALIDATED: Cleared {invalidated_count} cache entries for {model_name}@{channel_id} due to {reason}")
+            else:
+                logger.debug(f"🗑️  MODEL CACHE: No cache entries found for {model_name}@{channel_id}")
+        except Exception as e:
+            logger.warning(f"MODEL CACHE INVALIDATION FAILED for {model_name}@{channel_id}: {e}")
 
-    async def _handle_http_status_error(self, error: httpx.HTTPStatusError, channel, attempt_num: int, failed_channels: set, total_candidates: List) -> None:
-        """处理HTTP状态错误"""
+    async def _handle_http_status_error(self, error: httpx.HTTPStatusError, channel, routing_score, attempt_num: int, failed_channels: set, total_candidates: List) -> None:
+        """增强的HTTP错误处理，支持模型级别黑名单"""
         error_text = error.response.text if hasattr(error.response, 'text') else str(error)
-        logger.warning(f"ATTEMPT #{attempt_num} FAILED: Channel '{channel.name}' returned HTTP {error.response.status_code}")
+        model_name = routing_score.matched_model or channel.model_name
+        
+        logger.warning(f"ATTEMPT #{attempt_num} FAILED: Channel '{channel.name}' -> {model_name} returned HTTP {error.response.status_code}")
         logger.warning(f"ERROR DETAILS: {error_text[:200]}...")
         
         # 记录渠道错误并发送告警
         check_api_error_and_alert(channel.id, channel.name, error.response.status_code, error_text)
         
+        # 更新渠道健康分数
         self.router.update_channel_health(channel.id, False)
         
-        # 智能拉黑：对于认证错误等永久性错误，拉黑整个渠道
-        if error.response.status_code in [401, 403]:
-            failed_channels.add(channel.id)
-            logger.warning(f"🚫 CHANNEL BLACKLISTED: Channel '{channel.name}' (ID: {channel.id}) blacklisted due to HTTP {error.response.status_code}")
-            logger.info(f"SKIP OPTIMIZATION: Will skip all remaining models from channel '{channel.name}'")
-            
-            # 使相关缓存失效 - 永久性错误需要立即清除缓存
-            self._invalidate_channel_cache(channel.id, channel.name, "permanent error")
+        # 使用模型黑名单管理器处理错误
+        blacklist_manager = get_model_blacklist_manager()
+        should_blacklist_channel = await blacklist_manager.add_blacklist_entry(
+            channel.id, model_name, error.response.status_code, error_text
+        )
         
-        # 对于临时错误（如429, 500），也使缓存失效但不永久拉黑，并添加退避延迟
-        elif error.response.status_code in [429, 500, 502, 503, 504]:
-            self._invalidate_channel_cache(channel.id, channel.name, "temporary error")
+        if should_blacklist_channel:
+            # 需要拉黑整个渠道（认证错误或多个模型失败）
+            failed_channels.add(channel.id)
+            logger.error(f"🔴 CHANNEL BLACKLISTED: Channel '{channel.name}' (ID: {channel.id}) blacklisted due to multiple failures or critical errors")
+            self._invalidate_channel_cache(channel.id, channel.name, "channel-level failure")
+        else:
+            # 仅模型级别黑名单
+            logger.warning(f"🚫 MODEL BLACKLISTED: Model '{model_name}' blacklisted on channel '{channel.name}' due to HTTP {error.response.status_code}")
+            self._invalidate_model_cache(channel.id, model_name, "model-specific error")
+        
+        # 对于429错误，实施智能退避
+        if error.response.status_code == 429:
+            wait_time = self._extract_rate_limit_wait_time(error_text)
+            if wait_time:
+                backoff_time = min(wait_time, 60)  # 最大等待60秒
+                logger.warning(f"SMART RATE LIMIT: {model_name}@{channel.name} suggests waiting {wait_time}s, applying {backoff_time}s backoff")
+            else:
+                backoff_time = min(2 ** (attempt_num - 1), 16)  # 指数退避，最大16秒
+                logger.warning(f"RATE LIMIT: {model_name}@{channel.name} rate limited, applying {backoff_time}s backoff")
             
-            # 429错误需要特别处理 - 实施智能退避策略
-            if error.response.status_code == 429:
-                failed_channels.add(channel.id)  # 暂时拉黑，避免连续重试
-                
-                # 尝试从错误信息中提取等待时间
-                wait_time = self._extract_rate_limit_wait_time(error_text)
-                if wait_time:
-                    backoff_time = min(wait_time, 60)  # 最大等待60秒
-                    logger.warning(f"SMART RATE LIMIT: Channel '{channel.name}' suggests waiting {wait_time}s, applying {backoff_time}s backoff")
-                else:
-                    backoff_time = min(2 ** (attempt_num - 1), 16)  # 指数退避，最大16秒
-                    logger.warning(f"RATE LIMIT: Channel '{channel.name}' rate limited, applying {backoff_time}s backoff")
-                
-                await asyncio.sleep(backoff_time)
+            await asyncio.sleep(backoff_time)
         
         if attempt_num < len(total_candidates):
             logger.info(f"FAILOVER: Trying next channel (#{attempt_num + 1})")
@@ -853,6 +894,8 @@ class ChatCompletionHandler:
     def _create_no_channels_error(self, model: str, execution_time: float) -> JSONResponse:
         """创建无可用渠道错误响应"""
         logger.error(f"ROUTING FAILED: No available channels found for model '{model}'")
+        
+        # Status error logging handled at API level
         
         headers = {
             "X-Router-Status": "no-channels-found",
