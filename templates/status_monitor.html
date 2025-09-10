@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>[[ title ]]</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <style>
+        [v-cloak] { display: none; }
+        .status-healthy { @apply bg-green-100 text-green-800; }
+        .status-degraded { @apply bg-yellow-100 text-yellow-800; }
+        .status-unhealthy { @apply bg-red-100 text-red-800; }
+        .rank-badge { @apply inline-flex items-center px-2 py-1 rounded-full text-xs font-medium; }
+        .rank-1 { @apply bg-green-100 text-green-800; }
+        .rank-2 { @apply bg-blue-100 text-blue-800; }
+        .rank-3 { @apply bg-purple-100 text-purple-800; }
+        .rank-other { @apply bg-gray-100 text-gray-800; }
+        .log-entry { @apply border-l-4 pl-4 py-2; }
+        .log-success { @apply border-green-500; }
+        .log-error { @apply border-red-500; }
+        .log-warning { @apply border-yellow-500; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="app" v-cloak class="min-h-screen">
+        <!-- 顶部导航 -->
+        <nav class="bg-white shadow-sm border-b">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16">
+                    <div class="flex items-center">
+                        <h1 class="text-xl font-semibold text-gray-900">Smart AI Router - 状态监控</h1>
+                        <div class="ml-4 flex items-center space-x-2">
+                            <div class="w-2 h-2 rounded-full" :class="connectionStatus ? 'bg-green-500' : 'bg-red-500'"></div>
+                            <span class="text-sm text-gray-600">{{ connectionStatus ? '已连接' : '未连接' }}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <span class="text-sm text-gray-500">最后更新: {{ lastUpdate }}</span>
+                        <button @click="refreshAll" class="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
+                            刷新
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- 主要内容 -->
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <!-- 标签页导航 -->
+            <div class="border-b border-gray-200 mb-6">
+                <nav class="-mb-px flex space-x-8">
+                    <button v-for="tab in tabs" :key="tab.id"
+                            @click="activeTab = tab.id"
+                            :class="[
+                                'py-2 px-1 border-b-2 font-medium text-sm',
+                                activeTab === tab.id 
+                                    ? 'border-blue-500 text-blue-600' 
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                            ]">
+                        {{ tab.name }}
+                        <span v-if="tab.count !== undefined" class="ml-2 px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
+                            {{ tab.count }}
+                        </span>
+                    </button>
+                </nav>
+            </div>
+
+            <!-- 概览仪表板 -->
+            <div v-show="activeTab === 'overview'" class="space-y-6">
+                <!-- 统计卡片 -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div class="bg-white overflow-hidden shadow rounded-lg">
+                        <div class="p-5">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <div class="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
+                                        <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"/>
+                                        </svg>
+                                    </div>
+                                </div>
+                                <div class="ml-5 w-0 flex-1">
+                                    <dl>
+                                        <dt class="text-sm font-medium text-gray-500 truncate">活跃渠道</dt>
+                                        <dd class="text-lg font-medium text-gray-900">{{ channelsStats.healthy_channels }}/{{ channelsStats.total_channels }}</dd>
+                                    </dl>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white overflow-hidden shadow rounded-lg">
+                        <div class="p-5">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <div class="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
+                                        <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                        </svg>
+                                    </div>
+                                </div>
+                                <div class="ml-5 w-0 flex-1">
+                                    <dl>
+                                        <dt class="text-sm font-medium text-gray-500 truncate">可用模型</dt>
+                                        <dd class="text-lg font-medium text-gray-900">{{ totalAvailableModels }}</dd>
+                                    </dl>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white overflow-hidden shadow rounded-lg">
+                        <div class="p-5">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <div class="w-8 h-8 bg-red-500 rounded-md flex items-center justify-center">
+                                        <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                        </svg>
+                                    </div>
+                                </div>
+                                <div class="ml-5 w-0 flex-1">
+                                    <dl>
+                                        <dt class="text-sm font-medium text-gray-500 truncate">黑名单</dt>
+                                        <dd class="text-lg font-medium text-gray-900">{{ blacklistStats.summary.total_blacklisted }}</dd>
+                                    </dl>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white overflow-hidden shadow rounded-lg">
+                        <div class="p-5">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <div class="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center">
+                                        <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z"/>
+                                            <path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z"/>
+                                        </svg>
+                                    </div>
+                                </div>
+                                <div class="ml-5 w-0 flex-1">
+                                    <dl>
+                                        <dt class="text-sm font-medium text-gray-500 truncate">请求总数</dt>
+                                        <dd class="text-lg font-medium text-gray-900">{{ requestLogs.length }}</dd>
+                                    </dl>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 快速模型搜索 -->
+                <div class="bg-white shadow rounded-lg">
+                    <div class="px-4 py-5 sm:p-6">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">快速模型搜索</h3>
+                        <div class="flex space-x-3">
+                            <input v-model="quickSearchQuery" 
+                                   @keyup.enter="quickSearch"
+                                   placeholder="输入模型名称或标签 (如: tag:free, gpt-4, claude)" 
+                                   class="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <button @click="quickSearch" 
+                                    :disabled="!quickSearchQuery.trim()"
+                                    class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400">
+                                搜索
+                            </button>
+                        </div>
+                        <div v-if="quickSearchResults.length > 0" class="mt-4">
+                            <div class="text-sm text-gray-600 mb-2">
+                                找到 {{ quickSearchResults.length }} 个匹配结果，按路由优先级排序：
+                            </div>
+                            <div class="space-y-2 max-h-60 overflow-y-auto">
+                                <div v-for="result in quickSearchResults.slice(0, 10)" :key="`${result.channel_id}-${result.model_name}`"
+                                     class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                    <div class="flex items-center space-x-3">
+                                        <span :class="[
+                                            'rank-badge',
+                                            result.rank === 1 ? 'rank-1' : result.rank === 2 ? 'rank-2' : result.rank === 3 ? 'rank-3' : 'rank-other'
+                                        ]">
+                                            #{{ result.rank }}
+                                        </span>
+                                        <div>
+                                            <div class="font-medium">{{ result.model_name }}</div>
+                                            <div class="text-sm text-gray-500">{{ result.channel_name }} ({{ result.provider }})</div>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <span v-if="!result.available" class="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">
+                                            黑名单
+                                        </span>
+                                        <span class="text-sm text-gray-500">
+                                            评分: {{ (result.total_score || 0).toFixed(2) }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 渠道状态 -->
+            <div v-show="activeTab === 'channels'" class="space-y-6">
+                <div class="bg-white shadow overflow-hidden sm:rounded-md">
+                    <ul class="divide-y divide-gray-200">
+                        <li v-for="channel in channels" :key="channel.id" class="px-6 py-4">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0">
+                                        <div class="w-3 h-3 rounded-full" 
+                                             :class="channel.status === 'healthy' ? 'bg-green-400' : 
+                                                     channel.status === 'degraded' ? 'bg-yellow-400' : 'bg-red-400'">
+                                        </div>
+                                    </div>
+                                    <div class="ml-4">
+                                        <div class="flex items-center space-x-2">
+                                            <p class="text-sm font-medium text-gray-900">{{ channel.name }}</p>
+                                            <span :class="[
+                                                'px-2 inline-flex text-xs leading-5 font-semibold rounded-full',
+                                                'status-' + channel.status
+                                            ]">
+                                                {{ channel.status === 'healthy' ? '健康' : 
+                                                   channel.status === 'degraded' ? '降级' : '不可用' }}
+                                            </span>
+                                        </div>
+                                        <div class="text-sm text-gray-500">
+                                            {{ channel.provider }} | 优先级: {{ channel.priority }} | 健康分数: {{ (channel.health_score * 100).toFixed(1) }}%
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-4">
+                                    <div class="text-right text-sm">
+                                        <div class="text-gray-900">{{ channel.available_models }}/{{ channel.total_models }} 可用</div>
+                                        <div class="text-gray-500">{{ channel.blacklisted_models }} 被屏蔽</div>
+                                    </div>
+                                    <button @click="viewChannelModels(channel)" 
+                                            class="text-blue-600 hover:text-blue-900 text-sm font-medium">
+                                        查看模型
+                                    </button>
+                                </div>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 模型搜索 -->
+            <div v-show="activeTab === 'search'" class="space-y-6">
+                <div class="bg-white shadow rounded-lg">
+                    <div class="px-4 py-5 sm:p-6">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">模型搜索测试</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">搜索查询</label>
+                                <input v-model="searchQuery" 
+                                       placeholder="支持模型名称、标签 (tag:free)、参数量比较 (>7b) 等"
+                                       class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div class="flex space-x-3">
+                                <button @click="searchModels" 
+                                        :disabled="!searchQuery.trim() || searching"
+                                        class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400">
+                                    {{ searching ? '搜索中...' : '搜索模型' }}
+                                </button>
+                                <button @click="clearSearch" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400">
+                                    清除
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 搜索结果 -->
+                        <div v-if="searchResults.length > 0" class="mt-6">
+                            <div class="flex justify-between items-center mb-4">
+                                <h4 class="text-md font-medium text-gray-900">
+                                    搜索结果 ({{ searchResults.length }}/{{ searchTotalMatches }})
+                                </h4>
+                                <div class="text-sm text-gray-500">
+                                    路由策略: {{ searchStrategy }}
+                                </div>
+                            </div>
+                            
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">排名</th>
+                                            <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">模型</th>
+                                            <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">渠道</th>
+                                            <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                                            <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">评分</th>
+                                            <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">成本</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200">
+                                        <tr v-for="result in searchResults" :key="`${result.channel_id}-${result.model_name}`"
+                                            :class="[
+                                                result.available ? '' : 'bg-red-50',
+                                                result.rank <= 3 ? 'border-l-4' : '',
+                                                result.rank === 1 ? 'border-green-400' : 
+                                                result.rank === 2 ? 'border-blue-400' : 
+                                                result.rank === 3 ? 'border-purple-400' : ''
+                                            ]">
+                                            <td class="px-3 py-4 whitespace-nowrap text-sm">
+                                                <span :class="[
+                                                    'rank-badge',
+                                                    result.rank === 1 ? 'rank-1' : result.rank === 2 ? 'rank-2' : result.rank === 3 ? 'rank-3' : 'rank-other'
+                                                ]">
+                                                    #{{ result.rank }}
+                                                </span>
+                                            </td>
+                                            <td class="px-3 py-4 whitespace-nowrap">
+                                                <div class="text-sm font-medium text-gray-900">{{ result.model_name }}</div>
+                                            </td>
+                                            <td class="px-3 py-4 whitespace-nowrap">
+                                                <div class="text-sm text-gray-900">{{ result.channel_name }}</div>
+                                                <div class="text-sm text-gray-500">{{ result.provider }}</div>
+                                            </td>
+                                            <td class="px-3 py-4 whitespace-nowrap">
+                                                <span v-if="result.available" class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
+                                                    可用
+                                                </span>
+                                                <span v-else class="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">
+                                                    {{ result.blacklist_reason || '不可用' }}
+                                                </span>
+                                            </td>
+                                            <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                <div>总分: {{ (result.total_score || 0).toFixed(2) }}</div>
+                                                <div class="text-xs">
+                                                    成本:{{ (result.cost_score || 0).toFixed(1) }} 
+                                                    速度:{{ (result.speed_score || 0).toFixed(1) }}
+                                                </div>
+                                            </td>
+                                            <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                <div v-if="result.estimated_cost.total">
+                                                    ${{ result.estimated_cost.total.toFixed(6) }}
+                                                </div>
+                                                <div v-else class="text-gray-400">未知</div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 请求日志 -->
+            <div v-show="activeTab === 'logs'" class="space-y-6">
+                <div class="bg-white shadow rounded-lg">
+                    <div class="px-4 py-5 sm:p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900">实时请求日志</h3>
+                            <button @click="refreshLogs" class="text-blue-600 hover:text-blue-900 text-sm font-medium">
+                                刷新日志
+                            </button>
+                        </div>
+                        
+                        <div class="space-y-2 max-h-96 overflow-y-auto">
+                            <div v-for="log in requestLogs.slice().reverse().slice(0, 50)" :key="log.timestamp"
+                                 :class="[
+                                     'log-entry',
+                                     log.status_code >= 200 && log.status_code < 300 ? 'log-success' :
+                                     log.status_code >= 400 ? 'log-error' : 'log-warning'
+                                 ]">
+                                <div class="flex justify-between items-start">
+                                    <div class="flex-1">
+                                        <div class="flex items-center space-x-2">
+                                            <span class="font-medium">{{ log.method }}</span>
+                                            <span class="text-gray-600">{{ log.path }}</span>
+                                            <span :class="[
+                                                'px-2 py-1 rounded text-xs',
+                                                log.status_code >= 200 && log.status_code < 300 ? 'bg-green-100 text-green-800' :
+                                                log.status_code >= 400 ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                                            ]">
+                                                {{ log.status_code }}
+                                            </span>
+                                        </div>
+                                        <div v-if="log.model || log.channel" class="text-sm text-gray-600 mt-1">
+                                            <span v-if="log.model">模型: {{ log.model }}</span>
+                                            <span v-if="log.channel" class="ml-4">渠道: {{ log.channel }}</span>
+                                        </div>
+                                        <div v-if="log.error" class="text-sm text-red-600 mt-1">
+                                            错误: {{ log.error }}
+                                        </div>
+                                    </div>
+                                    <div class="text-right text-sm text-gray-500">
+                                        <div>{{ formatTime(log.timestamp) }}</div>
+                                        <div>{{ log.duration_ms.toFixed(1) }}ms</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 黑名单状态 -->
+            <div v-show="activeTab === 'blacklist'" class="space-y-6">
+                <div class="bg-white shadow rounded-lg">
+                    <div class="px-4 py-5 sm:p-6">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">黑名单统计</h3>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                            <div class="text-center p-4 bg-gray-50 rounded-lg">
+                                <div class="text-2xl font-bold text-gray-900">{{ blacklistStats.summary.total_blacklisted }}</div>
+                                <div class="text-sm text-gray-600">总计</div>
+                            </div>
+                            <div class="text-center p-4 bg-red-50 rounded-lg">
+                                <div class="text-2xl font-bold text-red-600">{{ blacklistStats.summary.permanent }}</div>
+                                <div class="text-sm text-gray-600">永久</div>
+                            </div>
+                            <div class="text-center p-4 bg-yellow-50 rounded-lg">
+                                <div class="text-2xl font-bold text-yellow-600">{{ blacklistStats.summary.temporary }}</div>
+                                <div class="text-sm text-gray-600">临时</div>
+                            </div>
+                        </div>
+
+                        <div v-if="Object.keys(blacklistStats.by_error_type).length > 0" class="mb-6">
+                            <h4 class="text-md font-medium text-gray-900 mb-3">按错误类型分布</h4>
+                            <div class="space-y-2">
+                                <div v-for="(count, errorType) in blacklistStats.by_error_type" :key="errorType"
+                                     class="flex justify-between items-center p-2 bg-gray-50 rounded">
+                                    <span class="text-sm font-medium">{{ errorType }}</span>
+                                    <span class="text-sm text-gray-600">{{ count }}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div v-if="Object.keys(blacklistStats.by_channel).length > 0">
+                            <h4 class="text-md font-medium text-gray-900 mb-3">按渠道分布</h4>
+                            <div class="space-y-3">
+                                <div v-for="(models, channelId) in blacklistStats.by_channel" :key="channelId"
+                                     class="border border-gray-200 rounded-lg p-3">
+                                    <div class="font-medium text-gray-900 mb-2">{{ channelId }}</div>
+                                    <div class="space-y-1">
+                                        <div v-for="model in models" :key="model.model"
+                                             class="flex justify-between items-center text-sm">
+                                            <span>{{ model.model }}</span>
+                                            <div class="flex items-center space-x-2">
+                                                <span class="text-gray-500">{{ model.error_type }}</span>
+                                                <span v-if="model.remaining_time > 0" class="text-blue-600">
+                                                    {{ Math.ceil(model.remaining_time / 60) }}分钟后恢复
+                                                </span>
+                                                <span v-else class="text-red-600">永久</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 模型详情模态框 -->
+        <div v-if="showModelModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-medium text-gray-900">{{ selectedChannel.name }} - 模型列表</h3>
+                    <button @click="showModelModal = false" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                
+                <div class="max-h-96 overflow-y-auto">
+                    <div v-if="channelModels.length === 0" class="text-center py-8 text-gray-500">
+                        暂无模型数据
+                    </div>
+                    <div v-else class="space-y-2">
+                        <div v-for="model in channelModels" :key="model.id"
+                             class="flex justify-between items-center p-3 border border-gray-200 rounded-lg">
+                            <div class="flex-1">
+                                <div class="font-medium">{{ model.name }}</div>
+                                <div class="text-sm text-gray-500">
+                                    <span v-if="model.parameter_count">{{ model.parameter_count }} 参数 | </span>
+                                    <span v-if="model.context_length">{{ model.context_length }} 上下文</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <span v-if="model.available" class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
+                                    可用
+                                </span>
+                                <span v-else class="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">
+                                    黑名单
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue
+
+        createApp({
+            data() {
+                return {
+                    activeTab: 'overview',
+                    connectionStatus: false,
+                    lastUpdate: '',
+                    websocket: null,
+                    
+                    // 标签页配置
+                    tabs: [
+                        { id: 'overview', name: '概览', count: undefined },
+                        { id: 'channels', name: '渠道状态', count: undefined },
+                        { id: 'search', name: '模型搜索', count: undefined },
+                        { id: 'logs', name: '请求日志', count: undefined },
+                        { id: 'blacklist', name: '黑名单', count: undefined }
+                    ],
+                    
+                    // 数据状态
+                    channels: [],
+                    channelsStats: { total_channels: 0, healthy_channels: 0 },
+                    requestLogs: [],
+                    blacklistStats: { summary: { total_blacklisted: 0, permanent: 0, temporary: 0 }, by_channel: {}, by_error_type: {} },
+                    
+                    // 搜索功能
+                    quickSearchQuery: '',
+                    quickSearchResults: [],
+                    searchQuery: '',
+                    searchResults: [],
+                    searchTotalMatches: 0,
+                    searchStrategy: '',
+                    searching: false,
+                    
+                    // 模态框
+                    showModelModal: false,
+                    selectedChannel: {},
+                    channelModels: []
+                }
+            },
+            
+            computed: {
+                totalAvailableModels() {
+                    return this.channels.reduce((sum, channel) => sum + channel.available_models, 0)
+                }
+            },
+            
+            async mounted() {
+                await this.initializeData()
+                this.connectWebSocket()
+                this.updateLastUpdate()
+                
+                // 设置定时刷新
+                setInterval(() => {
+                    this.refreshAll()
+                }, 30000) // 30秒刷新一次
+            },
+            
+            methods: {
+                async initializeData() {
+                    await Promise.all([
+                        this.loadChannels(),
+                        this.loadLogs(),
+                        this.loadBlacklistStats()
+                    ])
+                },
+                
+                async loadChannels() {
+                    try {
+                        const response = await axios.get('/status/api/channels')
+                        this.channels = response.data.channels
+                        this.channelsStats = {
+                            total_channels: response.data.total_channels,
+                            healthy_channels: response.data.healthy_channels
+                        }
+                        this.tabs[1].count = this.channels.length
+                    } catch (error) {
+                        console.error('加载渠道数据失败:', error)
+                    }
+                },
+                
+                async loadLogs() {
+                    try {
+                        const response = await axios.get('/status/api/logs?limit=100')
+                        this.requestLogs = response.data.logs
+                        this.tabs[3].count = this.requestLogs.length
+                    } catch (error) {
+                        console.error('加载日志失败:', error)
+                    }
+                },
+                
+                async loadBlacklistStats() {
+                    try {
+                        const response = await axios.get('/status/api/blacklist')
+                        this.blacklistStats = response.data
+                        this.tabs[4].count = this.blacklistStats.summary.total_blacklisted
+                    } catch (error) {
+                        console.error('加载黑名单统计失败:', error)
+                    }
+                },
+                
+                async searchModels() {
+                    if (!this.searchQuery.trim()) return
+                    
+                    this.searching = true
+                    try {
+                        const response = await axios.post('/status/api/search', {
+                            query: this.searchQuery,
+                            max_results: 50
+                        })
+                        
+                        this.searchResults = response.data.matches
+                        this.searchTotalMatches = response.data.total_matches
+                        this.searchStrategy = response.data.routing_strategy
+                    } catch (error) {
+                        console.error('搜索失败:', error)
+                        this.searchResults = []
+                    } finally {
+                        this.searching = false
+                    }
+                },
+                
+                async quickSearch() {
+                    if (!this.quickSearchQuery.trim()) return
+                    
+                    try {
+                        const response = await axios.post('/status/api/search', {
+                            query: this.quickSearchQuery,
+                            max_results: 10
+                        })
+                        this.quickSearchResults = response.data.matches
+                    } catch (error) {
+                        console.error('快速搜索失败:', error)
+                        this.quickSearchResults = []
+                    }
+                },
+                
+                clearSearch() {
+                    this.searchQuery = ''
+                    this.searchResults = []
+                    this.searchTotalMatches = 0
+                    this.searchStrategy = ''
+                },
+                
+                async viewChannelModels(channel) {
+                    this.selectedChannel = channel
+                    try {
+                        const response = await axios.get(`/status/api/channels/${channel.id}/models`)
+                        this.channelModels = response.data.models
+                        this.showModelModal = true
+                    } catch (error) {
+                        console.error('加载渠道模型失败:', error)
+                        this.channelModels = []
+                        this.showModelModal = true
+                    }
+                },
+                
+                async refreshAll() {
+                    await this.initializeData()
+                    this.updateLastUpdate()
+                },
+                
+                async refreshLogs() {
+                    await this.loadLogs()
+                },
+                
+                connectWebSocket() {
+                    try {
+                        const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
+                        this.websocket = new WebSocket(`${protocol}//${location.host}/status/ws`)
+                        
+                        this.websocket.onopen = () => {
+                            this.connectionStatus = true
+                            console.log('WebSocket 连接已建立')
+                        }
+                        
+                        this.websocket.onmessage = (event) => {
+                            const message = JSON.parse(event.data)
+                            this.handleWebSocketMessage(message)
+                        }
+                        
+                        this.websocket.onclose = () => {
+                            this.connectionStatus = false
+                            console.log('WebSocket 连接已断开')
+                            // 尝试重连
+                            setTimeout(() => this.connectWebSocket(), 5000)
+                        }
+                        
+                        this.websocket.onerror = (error) => {
+                            console.error('WebSocket 错误:', error)
+                            this.connectionStatus = false
+                        }
+                    } catch (error) {
+                        console.error('WebSocket 连接失败:', error)
+                        this.connectionStatus = false
+                    }
+                },
+                
+                handleWebSocketMessage(message) {
+                    if (message.type === 'request_log') {
+                        this.requestLogs.push(message.data)
+                        if (this.requestLogs.length > 1000) {
+                            this.requestLogs = this.requestLogs.slice(-1000)
+                        }
+                        this.tabs[3].count = this.requestLogs.length
+                    }
+                    // 可以添加更多消息类型的处理
+                },
+                
+                formatTime(timestamp) {
+                    return new Date(timestamp).toLocaleTimeString('zh-CN')
+                },
+                
+                updateLastUpdate() {
+                    this.lastUpdate = new Date().toLocaleTimeString('zh-CN')
+                }
+            }
+        }).mount('#app')
+    </script>
+</body>
+</html>
