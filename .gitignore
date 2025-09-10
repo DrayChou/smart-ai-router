@@ -204,3 +204,4 @@ config/*.json
 # Sensitive runtime files
 router_config.yaml.backup
 *.tar
+examples
