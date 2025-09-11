@@ -222,7 +222,7 @@ except Exception as e:
 ### OpenRouter 缓存位置
 
 ```
-cache/channels/openrouter.free.json
+cache/channels/openrouter_1.json
 ```
 
 ### 数据结构示例

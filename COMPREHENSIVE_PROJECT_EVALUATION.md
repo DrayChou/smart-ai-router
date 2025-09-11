@@ -62,7 +62,7 @@
 ```yaml
 # 当前问题示例
 channels:
-- id: openrouter.free
+- id: openrouter_1
   api_key: sk-or-v1-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  # 明文暴露风险
 ```
 **解决方案**: 
@@ -218,7 +218,7 @@ async def _call_channel_api(self, url, headers, request_data):
 ## 📈 成功案例展示
 
 ### **DeepSeek-v3.1路由问题修复** ✅
-**问题**: 用户请求`deepseek-v3.1`无法匹配到免费的openrouter.free渠道
+**问题**: 用户请求`deepseek-v3.1`无法匹配到免费的openrouter_1渠道
 **根因**: 缺少模型别名映射，`deepseek-v3.1` → `deepseek/deepseek-chat:free`
 **解决**: 在配置文件中添加model_aliases映射
 ```yaml

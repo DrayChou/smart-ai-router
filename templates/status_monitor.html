@@ -361,8 +361,11 @@
                                                 </div>
                                             </td>
                                             <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                <div v-if="result.estimated_cost.total">
-                                                    ${{ result.estimated_cost.total.toFixed(6) }}
+                                                <div v-if="result.estimated_cost.input">
+                                                    <div class="font-mono">{{ formatCost(result.estimated_cost.input) }}</div>
+                                                    <div v-if="result.estimated_cost.currency_discount" class="text-xs text-green-600">
+                                                        💰 {{ result.estimated_cost.currency_discount }}折扣
+                                                    </div>
                                                 </div>
                                                 <div v-else class="text-gray-400">未知</div>
                                             </td>
@@ -747,6 +750,27 @@
                         return (contextLength / 1000).toFixed(0) + 'K'
                     } else {
                         return contextLength.toString()
+                    }
+                },
+                
+                formatCost(cost) {
+                    if (!cost || cost === 0) return 'Free'
+                    
+                    // 后端返回每百万token价格，直接使用
+                    const costPerMillion = cost
+                    
+                    if (costPerMillion < 0.01) {
+                        // 小于0.01的，显示4位小数
+                        return `$${costPerMillion.toFixed(4)}/1M`
+                    } else if (costPerMillion < 1) {
+                        // 小于1的，显示3位小数
+                        return `$${costPerMillion.toFixed(3)}/1M`
+                    } else if (costPerMillion < 100) {
+                        // 小于100的，显示2位小数
+                        return `$${costPerMillion.toFixed(2)}/1M`
+                    } else {
+                        // 大于100的，显示1位小数
+                        return `$${costPerMillion.toFixed(1)}/1M`
                     }
                 },
                 

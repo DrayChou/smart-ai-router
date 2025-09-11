@@ -127,6 +127,9 @@ class MemoryModelIndex:
 
             total_models = 0
             processed_channels = set()
+            
+            # 🚀 多Provider免费策略：收集所有模型的定价信息
+            global_model_pricing = {}  # {model_name: [{'provider': provider, 'is_free': bool, 'channel_id': str}]}
 
             for cache_key, cache_data in model_cache.items():
                 if not isinstance(cache_data, dict):
@@ -142,14 +145,65 @@ class MemoryModelIndex:
                 # 处理模型列表
                 models = cache_data.get("models", [])
                 models_data = cache_data.get("models_data", {})  # 模型详细规格数据
+                models_pricing = cache_data.get("models_pricing", {})  # 🚀 新增：模型定价数据
                 provider = cache_data.get("provider", "unknown")
+                
+                # 🚀 收集定价信息用于多Provider免费策略
+                for model_name in models:
+                    if model_name not in global_model_pricing:
+                        global_model_pricing[model_name] = []
+                    
+                    # 添加此Provider/Channel的定价信息
+                    pricing_info = models_pricing.get(model_name, {})
+                    is_free = pricing_info.get('is_free', False)
+                    
+                    global_model_pricing[model_name].append({
+                        'provider': provider,
+                        'channel_id': channel_id,
+                        'is_free': is_free,
+                        'pricing': pricing_info
+                    })
 
                 for model_name in models:
                     if not isinstance(model_name, str):
                         continue
 
-                    # 生成标签
+                    # 生成基础标签
                     tags = self._generate_model_tags(model_name, provider)
+                    
+                    # 🚀 多Provider免费策略：检查是否有任何Provider提供免费
+                    if model_name in global_model_pricing:
+                        provider_infos = global_model_pricing[model_name]
+                        has_free_provider = any(info.get('is_free', False) for info in provider_infos)
+                        
+                        if has_free_provider:
+                            tags.add('free')
+                            logger.debug(f"🆓 模型 {model_name} 标记为免费 (跨Provider检测)")
+                    
+                    # 🚀 动态价格检测：检查当前渠道的定价信息
+                    if model_name in models_pricing:
+                        pricing_info = models_pricing[model_name]
+                        is_free_by_pricing = pricing_info.get('is_free', False)
+                        prompt_price = pricing_info.get('prompt', 0)
+                        completion_price = pricing_info.get('completion', 0)
+                        
+                        # 如果当前渠道价格为0，添加临时free标签
+                        if is_free_by_pricing or (prompt_price == 0 and completion_price == 0):
+                            tags.add('free')
+                            logger.debug(f"🆓 模型 {model_name} 标记为免费 (当前渠道 {channel_id} 定价为0)")
+                    
+                    # 🚀 渠道级别价格检测：检查渠道配置的cost_per_token
+                    try:
+                        channel_cost = cache_data.get('cost_per_token', {})
+                        if isinstance(channel_cost, dict):
+                            input_cost = channel_cost.get('input', 0)
+                            output_cost = channel_cost.get('output', 0)
+                            if input_cost == 0 and output_cost == 0:
+                                tags.add('free')
+                                logger.debug(f"🆓 模型 {model_name} 标记为免费 (渠道 {channel_id} 配置cost_per_token为0)")
+                    except Exception as e:
+                        logger.debug(f"渠道价格检测失败 {channel_id}: {e}")
+                        
 
                     # 🚀 合并渠道级别的标签
                     channel_tags = self._get_channel_tags(channel_id)
@@ -210,9 +264,20 @@ class MemoryModelIndex:
             self._last_build_time = current_time
             self._last_build_hash = cache_hash
             self._build_count += 1
-
+            
+            # 🚀 统计多Provider免费策略的效果
+            free_models_count = len(self._tag_to_models.get('free', set()))
+            multi_provider_free = 0
+            
+            for model_name, provider_infos in global_model_pricing.items():
+                if len(provider_infos) > 1:  # 多Provider
+                    has_free = any(info.get('is_free', False) for info in provider_infos)
+                    if has_free:
+                        multi_provider_free += 1
+            
             logger.info(f"✅ INDEX BUILT: {total_models} models, {len(processed_channels)} channels, "
                        f"{len(self._tag_to_models)} tags in {build_time_ms:.1f}ms")
+            logger.info(f"🆓 FREE MODELS: {free_models_count} models tagged as free, {multi_provider_free} from multi-provider analysis")
 
             return self._stats
 
@@ -420,7 +485,7 @@ class MemoryModelIndex:
             return None
 
         # 提取渠道ID的第一部分作为渠道商标签
-        # 例如: groq -> groq, openrouter.free -> openrouter, burn.hair -> burn
+        # 例如: groq -> groq, openrouter_1 -> openrouter, burn.hair -> burn
         provider_name = channel_id.split('.')[0].lower()
 
         # 过滤掉一些无意义的标签

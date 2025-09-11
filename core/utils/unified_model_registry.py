@@ -161,7 +161,7 @@ class UnifiedModelRegistry:
         self.cache_dir.mkdir(exist_ok=True)
 
         # 配置文件路径
-        self.openrouter_file = self.cache_dir / "channels" / "openrouter.free.json"
+        self.openrouter_file = self.cache_dir / "channels" / "openrouter_1.json"
         self.provider_overrides_file = self.cache_dir / "provider_overrides.json"
         self.channel_overrides_file = self.cache_dir / "channel_overrides.json"
 

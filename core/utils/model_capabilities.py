@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 # 文件内容缓存
 _cache_content: Optional[Dict] = None
-_cache_file_path = Path("cache/channels/openrouter.free.json")
+_cache_file_path = Path("cache/channels/openrouter_1.json")
 
 
 def _load_openrouter_cache() -> Dict:

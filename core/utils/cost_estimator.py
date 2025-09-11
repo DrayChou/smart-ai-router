@@ -5,6 +5,7 @@
 """
 
 import time
+import re
 from typing import Dict, List, Any, Optional, Tuple, NamedTuple
 from dataclasses import dataclass
 import logging
@@ -13,6 +14,37 @@ from .token_counter import TokenCounter
 from ..yaml_config import get_yaml_config_loader
 
 logger = logging.getLogger(__name__)
+
+
+def normalize_model_name(model_name: str) -> List[str]:
+    """
+    标准化模型名称，处理日期戳后缀
+    
+    返回可能的模型名称变体，优先级从高到低：
+    1. 原始名称
+    2. 去除日期戳后的名称
+    """
+    candidates = [model_name]
+    
+    # 匹配日期戳模式：YYYY-MM-DD, YYYYMMDD, YYYY-MM, YYYYMM
+    # 示例：gpt-5-2025-08-07 -> gpt-5
+    #      claude-sonnet-4-20250514 -> claude-sonnet-4
+    #      但不匹配版本号如 kimi-k2-0905 (非年份)
+    date_patterns = [
+        r'-20\d{2}-\d{2}-\d{2}$',     # -2025-08-07
+        r'-20\d{6}$',                 # -20250514  
+        r'-20\d{2}-\d{2}$',           # -2025-08
+        r'-20\d{4}$',                 # -202508
+    ]
+    
+    for pattern in date_patterns:
+        if re.search(pattern, model_name):
+            normalized = re.sub(pattern, '', model_name)
+            if normalized != model_name and normalized not in candidates:
+                candidates.append(normalized)
+                logger.debug(f"DATE NORMALIZATION: {model_name} -> {normalized}")
+    
+    return candidates
 
 
 @dataclass
@@ -53,28 +85,53 @@ class CostEstimator:
         self._preview_cache_ttl = 60  # 1分钟缓存
         
     def _get_model_pricing(self, channel_id: str, model_name: str) -> Optional[Dict[str, float]]:
-        """获取模型定价信息"""
+        """获取模型定价信息（支持OpenRouter基准定价和渠道折扣）"""
         try:
             # 从配置中获取渠道信息
             channel = self.config_loader.get_channel_by_id(channel_id)
             if not channel:
                 return None
                 
-            # 尝试从不同的定价源获取信息
+            # 🚀 优先获取 OpenRouter 基准定价
+            openrouter_pricing = self._get_openrouter_base_pricing(model_name)
+            logger.info(f"💰 PRICING DEBUG: {channel_id} | {model_name}")
+            logger.info(f"  OpenRouter baseline: {openrouter_pricing}")
+            
+            # 如果渠道有特定定价源，使用特定定价
             pricing_sources = [
                 self._get_pricing_from_siliconflow,
                 self._get_pricing_from_doubao,
                 self._get_pricing_from_openai,
                 self._get_pricing_from_anthropic,
-                self._get_pricing_from_fallback
             ]
             
+            channel_specific_pricing = None
             for source in pricing_sources:
                 pricing = source(channel, model_name)
                 if pricing:
-                    return pricing
-                    
-            return None
+                    channel_specific_pricing = pricing
+                    logger.info(f"  Channel-specific pricing: {pricing}")
+                    break
+            
+            # 决定使用哪个定价作为基准
+            # 🔧 修复：对于github provider，强制使用OpenRouter基准定价避免错误的channel_specific_pricing
+            if channel.provider.lower() == 'github' and openrouter_pricing:
+                base_pricing = openrouter_pricing
+                logger.info(f"  🔧 GITHUB PROVIDER FIX: Using OpenRouter baseline instead of channel-specific pricing")
+            else:
+                base_pricing = channel_specific_pricing or openrouter_pricing or self._get_pricing_from_fallback(channel, model_name)
+            logger.info(f"  Base pricing: {base_pricing}")
+            
+            if not base_pricing:
+                logger.info(f"  ❌ No pricing found for {model_name} in {channel_id}")
+                return None
+                
+            # 🚀 应用渠道的货币汇率折扣
+            final_pricing = self._apply_currency_exchange_discount(channel, base_pricing)
+            logger.info(f"  Final pricing after currency discount: {final_pricing}")
+            
+            logger.debug(f"PRICING: {channel_id} -> {model_name}: input=${final_pricing['input']:.6f}, output=${final_pricing['output']:.6f}")
+            return final_pricing
             
         except Exception as e:
             logger.error(f"获取模型定价失败 ({channel_id}, {model_name}): {e}")
@@ -83,7 +140,7 @@ class CostEstimator:
     def _get_pricing_from_siliconflow(self, channel, model_name: str) -> Optional[Dict[str, float]]:
         """从SiliconFlow获取定价"""
         try:
-            if 'siliconflow' not in channel.provider_name.lower():
+            if 'siliconflow' not in channel.provider.lower():
                 return None
                 
             # 🚀 改为使用新的静态定价加载器
@@ -106,7 +163,7 @@ class CostEstimator:
     def _get_pricing_from_doubao(self, channel, model_name: str) -> Optional[Dict[str, float]]:
         """从豆包获取定价"""
         try:
-            if 'doubao' not in channel.provider_name.lower() and 'bytedance' not in channel.provider_name.lower():
+            if 'doubao' not in channel.provider.lower() and 'bytedance' not in channel.provider.lower():
                 return None
                 
             # 🚀 改为使用新的静态定价加载器（统一接口）
@@ -130,7 +187,7 @@ class CostEstimator:
     def _get_pricing_from_openai(self, channel, model_name: str) -> Optional[Dict[str, float]]:
         """从OpenAI获取定价（基于模型名称的启发式定价）"""
         try:
-            if 'openai' not in channel.provider_name.lower():
+            if 'openai' not in channel.provider.lower():
                 return None
                 
             # OpenAI标准定价 (2025年1月价格)
@@ -160,7 +217,7 @@ class CostEstimator:
     def _get_pricing_from_anthropic(self, channel, model_name: str) -> Optional[Dict[str, float]]:
         """从Anthropic获取定价"""
         try:
-            if 'anthropic' not in channel.provider_name.lower():
+            if 'anthropic' not in channel.provider.lower():
                 return None
                 
             # Anthropic标准定价
@@ -203,6 +260,140 @@ class CostEstimator:
             return {"input": 0.004, "output": 0.004}    # 大模型
         else:
             return {"input": 0.001, "output": 0.002}    # 默认定价
+    
+    def _get_openrouter_base_pricing(self, model_name: str) -> Optional[Dict[str, float]]:
+        """获取OpenRouter基准定价（作为其他渠道的参考价格）"""
+        try:
+            # 🚀 直接使用全局model_pricing.json中已经转换的价格数据
+            import json
+            from pathlib import Path
+            
+            model_pricing_file = Path("cache/model_pricing.json")
+            if not model_pricing_file.exists():
+                logger.debug(f"OpenRouter基准定价文件不存在: {model_pricing_file}")
+                return None
+            
+            with open(model_pricing_file, 'r', encoding='utf-8') as f:
+                pricing_data = json.load(f)
+            
+            # 寻找模型定价（可能有多个变体）
+            found_pricing = None
+            max_price = {"input": 0.0, "output": 0.0}
+            
+            # 尝试精确匹配（包括日期戳变体）
+            model_candidates = normalize_model_name(model_name)
+            
+            for candidate in model_candidates:
+                if candidate in pricing_data:
+                    pricing_info = pricing_data[candidate]
+                    if pricing_info.get("source") == "openrouter":
+                        # 🔧 UNIT FIX: 直接使用raw_pricing字段中的per_token价格
+                        raw_pricing = pricing_info.get("raw_pricing", {})
+                        if raw_pricing and "prompt" in raw_pricing and "completion" in raw_pricing:
+                            found_pricing = {
+                                "input": float(raw_pricing["prompt"]),
+                                "output": float(raw_pricing["completion"])
+                            }
+                            logger.debug(f"OPENROUTER MATCH: {model_name} -> {candidate} -> per_token: {found_pricing}")
+                        else:
+                            # 缓存数据已经是per_million_tokens，直接除以1000000转为per_token
+                            found_pricing = {
+                                "input": pricing_info.get("input", 0) / 1000000,
+                                "output": pricing_info.get("output", 0) / 1000000
+                            }
+                            logger.debug(f"OPENROUTER MATCH (fallback): {model_name} -> {candidate} -> per_token: {found_pricing}")
+                        break  # 找到第一个匹配就停止
+            
+            # 如果没有精确匹配，尝试模糊匹配OpenRouter相关模型
+            if not found_pricing:
+                for cached_model, pricing_info in pricing_data.items():
+                    if (pricing_info.get("source") == "openrouter" and 
+                        model_name.lower() in cached_model.lower()):
+                        
+                        input_price = pricing_info.get("input", 0)
+                        output_price = pricing_info.get("output", 0)
+                        
+                        # 跳过免费模型，寻找付费价格作为基准
+                        if input_price == 0 and output_price == 0:
+                            continue
+                        
+                        # 记录最高价格作为基准
+                        if input_price > max_price["input"]:
+                            max_price["input"] = input_price
+                        if output_price > max_price["output"]:
+                            max_price["output"] = output_price
+                
+                if max_price["input"] > 0 or max_price["output"] > 0:
+                    # 🔧 UNIT FIX: 缓存中的价格已经是per_million_tokens，转换为per_token
+                    found_pricing = {
+                        "input": max_price["input"] / 1000000,
+                        "output": max_price["output"] / 1000000
+                    }
+                    logger.debug(f"OPENROUTER FUZZY MATCH: {model_name} -> per_token: {found_pricing}")
+            
+            if found_pricing and (found_pricing["input"] > 0 or found_pricing["output"] > 0):
+                logger.debug(f"OPENROUTER BASE: {model_name} -> input=${found_pricing['input']:.6f}, output=${found_pricing['output']:.6f}")
+                return found_pricing
+                
+            logger.debug(f"OPENROUTER BASE: No pricing found for {model_name}")
+            return None
+                
+        except Exception as e:
+            logger.debug(f"OpenRouter基准定价获取失败: {e}")
+            return None
+    
+    def _apply_currency_exchange_discount(self, channel, base_pricing: Dict[str, float]) -> Dict[str, float]:
+        """应用渠道的货币汇率折扣"""
+        try:
+            # 检查渠道是否有currency_exchange配置
+            if not hasattr(channel, 'currency_exchange') or not channel.currency_exchange:
+                return base_pricing
+            
+            exchange_config = channel.currency_exchange
+            if not isinstance(exchange_config, dict):
+                return base_pricing
+                
+            exchange_rate = exchange_config.get("rate", 1.0)
+            from_currency = exchange_config.get("from", "USD")
+            to_currency = exchange_config.get("to", "CNY")
+            description = exchange_config.get("description", "")
+            
+            # 应用汇率折扣 (如 0.7 汇率意味着打七折)
+            discounted_pricing = {
+                "input": base_pricing["input"] * exchange_rate,
+                "output": base_pricing["output"] * exchange_rate,
+            }
+            
+            logger.info(f"CURRENCY DISCOUNT: {channel.name} applied {exchange_rate}x rate ({from_currency}->{to_currency})")
+            logger.info(f"  Before: input=${base_pricing['input']:.6f}, output=${base_pricing['output']:.6f}")
+            logger.info(f"  After:  input=${discounted_pricing['input']:.6f}, output=${discounted_pricing['output']:.6f}")
+            
+            return discounted_pricing
+            
+        except Exception as e:
+            logger.debug(f"货币汇率折扣应用失败: {e}")
+            return base_pricing
+    
+    def estimate_cost(self, channel, model_name: str, messages: List[Dict[str, Any]], max_output_tokens: int = 1000):
+        """兼容性方法：估算请求成本（用于路由器调用）"""
+        try:
+            estimate = self.estimate_request_cost(
+                messages=messages,
+                model_name=model_name,
+                channel_id=channel.id,
+                max_tokens=max_output_tokens
+            )
+            
+            # 返回一个简单的成本对象，包含total_cost属性
+            class SimpleCostResult:
+                def __init__(self, total_cost: float):
+                    self.total_cost = total_cost
+                    
+            return SimpleCostResult(estimate.total_estimated_cost)
+            
+        except Exception as e:
+            logger.debug(f"成本估算失败: {e}")
+            return None
     
     def estimate_request_cost(
         self, 

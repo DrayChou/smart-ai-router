@@ -259,6 +259,9 @@ class ModelDiscoveryTask:
                                 else:
                                     models.append(str(model))
 
+                    # 🚀 提取模型定价信息用于多Provider免费策略
+                    models_pricing = self._extract_models_pricing(models_data, data, provider)
+
                     result = {
                         'channel_id': channel_id,
                         'provider': provider,
@@ -266,6 +269,7 @@ class ModelDiscoveryTask:
                         'models_url': models_url,
                         'models': models,
                         'models_data': models_data,  # 添加详细的模型数据
+                        'models_pricing': models_pricing,  # 🚀 新增：每个模型的定价信息
                         'model_count': len(models),
                         'last_updated': datetime.now().isoformat(),
                         'status': 'success',
@@ -640,6 +644,81 @@ class ModelDiscoveryTask:
 
         age = datetime.now() - self.last_update
         return age <= timedelta(hours=max_age_hours)
+
+    def _extract_models_pricing(self, models_data: dict, response_data: dict, provider: str) -> dict[str, dict]:
+        """提取模型定价信息用于多Provider免费策略
+        
+        Args:
+            models_data: 模型详细数据字典
+            response_data: API原始响应数据
+            provider: 提供商名称
+            
+        Returns:
+            模型定价字典 {model_id: {'prompt': price, 'completion': price, 'is_free': bool}}
+        """
+        pricing_info = {}
+        
+        try:
+            # 方法1: 从models_data中提取详细定价
+            for model_id, model_data in models_data.items():
+                if 'pricing' in model_data:
+                    pricing = model_data['pricing']
+                    prompt_price = pricing.get('prompt', 0)
+                    completion_price = pricing.get('completion', 0)
+                    
+                    # 转换字符串价格到数值
+                    try:
+                        prompt_price = float(prompt_price) if prompt_price else 0
+                        completion_price = float(completion_price) if completion_price else 0
+                    except (ValueError, TypeError):
+                        prompt_price = completion_price = 0
+                    
+                    is_free = (prompt_price == 0 and completion_price == 0)
+                    
+                    pricing_info[model_id] = {
+                        'prompt': prompt_price,
+                        'completion': completion_price,
+                        'is_free': is_free,
+                        'provider': provider
+                    }
+            
+            # 方法2: OpenRouter特殊处理 - 从data字段直接提取
+            if provider == 'openrouter' and 'data' in response_data:
+                for model in response_data['data']:
+                    if isinstance(model, dict):
+                        model_id = model.get('id')
+                        if model_id and 'pricing' in model:
+                            pricing = model['pricing']
+                            prompt_price = pricing.get('prompt', 0)
+                            completion_price = pricing.get('completion', 0)
+                            
+                            # 转换字符串价格到数值
+                            try:
+                                prompt_price = float(prompt_price) if prompt_price else 0
+                                completion_price = float(completion_price) if completion_price else 0
+                            except (ValueError, TypeError):
+                                prompt_price = completion_price = 0
+                            
+                            is_free = (prompt_price == 0 and completion_price == 0)
+                            
+                            # 如果还没有定价信息或这次检测到免费，更新信息
+                            if model_id not in pricing_info or is_free:
+                                pricing_info[model_id] = {
+                                    'prompt': prompt_price,
+                                    'completion': completion_price,
+                                    'is_free': is_free,
+                                    'provider': provider
+                                }
+            
+            logger.debug(f"提取到 {len(pricing_info)} 个模型的定价信息 (Provider: {provider})")
+            free_models = [mid for mid, info in pricing_info.items() if info.get('is_free')]
+            if free_models:
+                logger.info(f"🆓 发现免费模型 ({provider}): {len(free_models)} 个")
+                
+        except Exception as e:
+            logger.warning(f"提取定价信息失败 (Provider: {provider}): {e}")
+        
+        return pricing_info
 
     def _detect_user_level(self, models: list[str], provider: str) -> str:
         """检测用户等级（基于模型列表和提供商）"""

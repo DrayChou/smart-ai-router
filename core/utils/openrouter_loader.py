@@ -18,7 +18,7 @@ class OpenRouterDataLoader:
     
     def __init__(self, cache_dir: str = "cache"):
         self.cache_dir = Path(cache_dir)
-        self.openrouter_file = self.cache_dir / "channels" / "openrouter.free.json"
+        self.openrouter_file = self.cache_dir / "channels" / "openrouter_1.json"
         self._models_cache: Optional[Dict[str, ModelInfo]] = None
     
     def load_models(self) -> Dict[str, ModelInfo]:

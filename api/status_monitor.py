@@ -38,6 +38,7 @@ class ModelSearchRequest(BaseModel):
 
     query: str
     max_results: Optional[int] = 50
+    strategy: Optional[str] = "cost_first"  # cost_first, quality_first, speed_first, balanced
 
 
 class ChannelTestRequest(BaseModel):
@@ -196,9 +197,10 @@ def create_status_monitor_router(
                 model=search_request.query,
                 messages=[{"role": "user", "content": "test"}],
                 max_tokens=10,
+                strategy=search_request.strategy,
             )
 
-            # 使用路由器进行路由评分
+            # 使用路由器进行路由评分，应用指定的策略
             routing_scores = await router.route_request(routing_request)
 
             if not routing_scores:
@@ -225,13 +227,74 @@ def create_status_monitor_router(
                     blacklist_manager.is_model_blacklisted(channel.id, model_name)
                 )
 
-                # 估算成本（简化版）
-                estimated_cost = router._estimate_cost_for_channel(
-                    channel, routing_request
-                )
-
                 # 🎯 使用OpenRouter数据库作为通用模型能力参考
                 capabilities, context_length = get_model_capabilities_from_openrouter(model_name)
+
+                # 💰 使用路由器的成本估算逻辑（保证与路由一致）
+                try:
+                    # 使用路由器的成本估算，这会正确应用汇率折扣
+                    estimated_cost = router._estimate_cost_for_channel(channel, routing_request)
+                    
+                    # 获取实际定价信息（如果可用）
+                    from core.utils.cost_estimator import CostEstimator
+                    estimator = CostEstimator()
+                    model_pricing = estimator._get_model_pricing(channel.id, model_name)
+                    
+                    # 检查汇率折扣信息
+                    currency_discount_info = None
+                    if hasattr(channel, 'currency_exchange') and channel.currency_exchange:
+                        exchange_config = channel.currency_exchange
+                        if hasattr(exchange_config, 'rate') and exchange_config.rate != 1.0:
+                            discount_percentage = round((1 - exchange_config.rate) * 100, 1)
+                            currency_discount_info = f"{exchange_config.rate:.1f}x ({discount_percentage}% 折扣)"
+                    
+                    if model_pricing and 'input' in model_pricing and 'output' in model_pricing:
+                        # 如果有精确的定价信息，使用它来计算每百万token的价格
+                        # 但总成本使用路由器的估算（包含汇率折扣）
+                        input_price_per_token = model_pricing['input']
+                        output_price_per_token = model_pricing['output']
+                        
+                        # 应用汇率折扣到单价（如果有）
+                        if hasattr(channel, 'currency_exchange') and channel.currency_exchange:
+                            rate = getattr(channel.currency_exchange, 'rate', 1.0)
+                            input_price_per_token *= rate
+                            output_price_per_token *= rate
+                        
+                        # 转换为每百万token的价格用于前端显示
+                        # 🔧 修复：检测并修正100倍错误放大问题
+                        if input_price_per_token > 0.01:  # 如果每token价格异常高(>$0.01)
+                            # 发现了100倍错误放大，数据可能已经是错误的per-million格式
+                            input_price_per_million = input_price_per_token / 100  # 修正100倍错误
+                            output_price_per_million = output_price_per_token / 100
+                        else:
+                            # 正常转换流程：每token价格转为每百万token价格
+                            input_price_per_million = input_price_per_token * 1000000
+                            output_price_per_million = output_price_per_token * 1000000
+                        
+                        cost_info = {
+                            "total": estimated_cost,  # 使用路由器估算的总成本
+                            "input": input_price_per_million,  # 每百万token输入价格（含折扣）
+                            "output": output_price_per_million,  # 每百万token输出价格（含折扣）
+                            "currency_discount": currency_discount_info
+                        }
+                        logger.info(f"💰 STATUS API: Using router cost estimation for {channel.id} | {model_name} | total: ${estimated_cost:.6f}")
+                    else:
+                        # 没有精确定价时，基于总成本估算输入输出比例
+                        cost_info = {
+                            "total": estimated_cost,
+                            "input": (estimated_cost * 0.6) * 1000000,  # 转换为每百万token格式
+                            "output": (estimated_cost * 0.4) * 1000000,
+                            "currency_discount": currency_discount_info
+                        }
+                except Exception as e:
+                    logger.warning(f"Cost estimation failed for {channel.id}, using fallback: {e}")
+                    # 最终回退
+                    cost_info = {
+                        "total": 0.001,  # 默认示例成本
+                        "input": 600.0,  # 默认每百万token输入价格
+                        "output": 1200.0,  # 默认每百万token输出价格
+                        "currency_discount": None
+                    }
 
                 result = {
                     "rank": i + 1,
@@ -248,11 +311,7 @@ def create_status_monitor_router(
                     "total_score": score.total_score,
                     "capabilities": capabilities,
                     "context_length": context_length,
-                    "estimated_cost": {
-                        "total": estimated_cost,
-                        "input": estimated_cost * 0.6,  # 估算输入成本占比
-                        "output": estimated_cost * 0.4,  # 估算输出成本占比
-                    },
+                    "estimated_cost": cost_info,
                 }
 
                 if is_blacklisted and blacklist_entry:
@@ -266,7 +325,7 @@ def create_status_monitor_router(
                 "matches": results,
                 "total_matches": len(routing_scores),
                 "showing": len(limited_scores),
-                "routing_strategy": "intelligent",
+                "routing_strategy": search_request.strategy,
                 "timestamp": datetime.now().isoformat(),
             }
 

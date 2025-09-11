@@ -307,6 +307,7 @@ class RoutingRequest:
     functions: Optional[list[dict[str, Any]]] = None
     required_capabilities: list[str] = None
     data: Optional[dict[str, Any]] = None  # 完整的请求数据，用于能力检测
+    strategy: Optional[str] = None  # 路由策略: cost_first, quality_first, speed_first, balanced
 
 class JSONRouter:
     """基于Pydantic验证后配置的路由器"""
@@ -349,7 +350,7 @@ class JSONRouter:
         # 生成请求指纹用于缓存
         fingerprint = RequestFingerprint(
             model=request.model,
-            routing_strategy=getattr(request, 'routing_strategy', 'balanced'),
+            routing_strategy=getattr(request, 'strategy', 'cost_first'),
             required_capabilities=getattr(request, 'required_capabilities', None),
             min_context_length=getattr(request, 'min_context_length', None),
             max_cost_per_1k=getattr(request, 'max_cost_per_1k', None),
@@ -900,7 +901,7 @@ class JSONRouter:
 
         # 构建评分结果
         scored_channels = []
-        strategy = self._get_routing_strategy(request.model)
+        strategy = self._get_routing_strategy(request)
 
         logger.info(f"📊 SCORING: Using routing strategy with {len(strategy)} rules")
         for rule in strategy:
@@ -953,7 +954,7 @@ class JSONRouter:
         logger.info(f"📊 SCORING: Using individual scoring for {len(channels)} channels")
 
         scored_channels = []
-        strategy = self._get_routing_strategy(request.model)
+        strategy = self._get_routing_strategy(request)
 
         for candidate in channels:
             channel = candidate.channel
@@ -997,13 +998,20 @@ class JSONRouter:
 
         return scored_channels
 
-    def _get_routing_strategy(self, model: str) -> list[dict[str, Any]]:
+    def _get_routing_strategy(self, request: RoutingRequest) -> list[dict[str, Any]]:
         """获取并解析路由策略，始终返回规则列表"""
+        # 获取路由配置
         routing_config = self.config.routing if hasattr(self.config, 'routing') else None
-        if routing_config and hasattr(routing_config, 'default_strategy'):
-            strategy_name = routing_config.default_strategy or 'balanced'
+        
+        # 优先使用请求中指定的策略
+        if hasattr(request, 'strategy') and request.strategy:
+            strategy_name = request.strategy
         else:
-            strategy_name = 'balanced'
+            # 回退到配置中的默认策略
+            if routing_config and hasattr(routing_config, 'default_strategy'):
+                strategy_name = routing_config.default_strategy or 'cost_first'
+            else:
+                strategy_name = 'cost_first'
 
         # 尝试从配置中获取自定义策略
         if routing_config and hasattr(routing_config, 'sorting_strategies'):
@@ -1063,14 +1071,18 @@ class JSONRouter:
 
     def _calculate_cost_score(self, channel: Channel, request: RoutingRequest) -> float:
         """计算成本评分(0-1，越低成本越高分)"""
+        logger.info(f"🔍 COST SCORE CALCULATION: {channel.id} | {request.model}")
+        
         # 优先尝试使用动态成本估算器获取精确定价
         try:
             from core.utils.cost_estimator import CostEstimator
-            estimator = CostEstimator(self.config_loader.config)
+            estimator = CostEstimator()
+            logger.info(f"  ✅ CostEstimator created successfully")
 
             # 估算token数量
             input_tokens = self._estimate_tokens(request.messages)
             max_output_tokens = request.max_tokens or 1000
+            logger.info(f"  📊 Tokens: input={input_tokens}, max_output={max_output_tokens}")
 
             # 尝试使用成本估算器获取准确定价
             cost_result = estimator.estimate_cost(
@@ -1079,17 +1091,18 @@ class JSONRouter:
                 messages=request.messages,
                 max_output_tokens=max_output_tokens
             )
+            logger.info(f"  💰 CostEstimator result: {cost_result}")
 
             if cost_result and cost_result.total_cost > 0:
                 total_cost = cost_result.total_cost
-                logger.debug(f"COST SCORE: Using dynamic pricing for {request.model}: ${total_cost:.6f}")
+                logger.info(f"  ✅ COST SCORE: Using dynamic pricing for {request.model}: ${total_cost:.6f}")
             else:
                 # 回退到原有的channel-level定价逻辑
-                logger.debug(f"COST SCORE: Fallback to channel pricing for {request.model}")
+                logger.info(f"  ⚠️ COST SCORE: Fallback to channel pricing for {request.model}")
                 total_cost = self._calculate_fallback_cost(channel, input_tokens, max_output_tokens)
 
         except Exception as e:
-            logger.debug(f"COST SCORE: Dynamic pricing failed ({e}), using fallback")
+            logger.info(f"  ❌ COST SCORE: Dynamic pricing failed ({e}), using fallback")
             # 出错时回退到原有逻辑
             total_cost = self._calculate_fallback_cost(channel, self._estimate_tokens(request.messages), request.max_tokens or 1000)
 
@@ -1367,6 +1380,35 @@ class JSONRouter:
         """计算免费优先评分 - 严格验证真正免费的渠道"""
         free_tags = {"free", "免费", "0cost", "nocost", "trial"}
 
+        # 🚀 多Provider免费策略检查 - 最高优先级
+        if model_name:
+            try:
+                from ..utils.memory_index import get_memory_index
+                memory_index = get_memory_index()
+                
+                # 检查内存索引中是否有此模型的跨Provider免费信息
+                model_info = memory_index.get_model_info(channel.id, model_name)
+                if model_info and model_info.pricing:
+                    # 如果有定价信息且标记为免费
+                    if model_info.pricing.get('is_free', False):
+                        logger.debug(f"🆓 FREE SCORE: Model '{model_name}' confirmed free via multi-provider pricing analysis")
+                        return 1.0
+                    elif model_info.pricing.get('prompt', 0) == 0 and model_info.pricing.get('completion', 0) == 0:
+                        logger.debug(f"🆓 FREE SCORE: Model '{model_name}' has zero costs across providers")
+                        return 1.0
+                    else:
+                        logger.debug(f"FREE SCORE: Model '{model_name}' has non-zero costs in provider analysis")
+                        # 继续其他检查，可能其他Provider免费
+                
+                # 检查是否此模型被标记为'free'标签（我们的新多Provider策略）
+                if model_info and 'free' in model_info.tags:
+                    logger.debug(f"🆓 FREE SCORE: Model '{model_name}' has 'free' tag from multi-provider analysis")
+                    return 1.0
+                    
+            except Exception as e:
+                logger.debug(f"Multi-provider free check failed: {e}")
+
+
         # 🔥 优先检查模型级别的定价信息（从缓存中获取）
         if model_name:
             model_specs = self._get_model_specs(channel.id, model_name)
@@ -1541,11 +1583,9 @@ class JSONRouter:
             context_score = score.context_score
 
             # 将每个维度的评分转换为0-9的整数评分
-            # 第1位：成本优化程度 (9=完全免费, 8=很便宜, 0=很昂贵)
-            if free_score >= 0.9:
-                cost_tier = 9  # 免费模型固定为9分
-            else:
-                cost_tier = min(8, int(score.cost_score * 8))  # 付费模型最高8分
+            # 第1位：成本优化程度 - 基于实际成本评分，包括折扣后价格
+            # 对于 cost_first 策略，完全按照成本排序，不区分免费/付费
+            cost_tier = min(9, int(score.cost_score * 9))
 
             # 第2位：上下文长度程度 (9=很长, 0=很短) - 优先级高于参数量
             context_tier = min(9, int(context_score * 9))
@@ -1586,11 +1626,8 @@ class JSONRouter:
             parameter_score = scored.parameter_score
             context_score = scored.context_score
 
-            # 计算6位数字评分
-            if free_score >= 0.9:
-                cost_tier = 9  # 免费模型固定为9分
-            else:
-                cost_tier = min(8, int(scored.cost_score * 8))  # 付费模型最高8分
+            # 计算6位数字评分 - 使用实际成本评分，包括折扣后价格
+            cost_tier = min(9, int(scored.cost_score * 9))
 
             context_tier = min(9, int(context_score * 9))
             parameter_tier = min(9, int(parameter_score * 9))
@@ -1652,9 +1689,31 @@ class JSONRouter:
         return max(1, estimated_tokens)
 
     def _estimate_cost_for_channel(self, channel: Channel, request: RoutingRequest) -> float:
-        """估算特定渠道的请求成本"""
+        """估算特定渠道的请求成本（包含汇率折扣）"""
         try:
-            # 估算token数量
+            # 优先使用增强的CostEstimator（包含汇率折扣）
+            try:
+                from core.utils.cost_estimator import CostEstimator
+                estimator = CostEstimator()
+                
+                # 估算token数量
+                input_tokens = self._estimate_tokens(request.messages)
+                max_output_tokens = request.max_tokens or max(50, input_tokens // 4)
+                
+                cost_result = estimator.estimate_cost(
+                    channel_id=channel.id,
+                    model_name=request.model,
+                    input_tokens=input_tokens,
+                    output_tokens=max_output_tokens
+                )
+                
+                if cost_result and cost_result.total_cost > 0:
+                    return cost_result.total_cost
+                    
+            except Exception as e:
+                logger.debug(f"Enhanced cost estimation failed for {channel.id}: {e}")
+            
+            # 回退到原有逻辑
             input_tokens = self._estimate_tokens(request.messages)
             estimated_output_tokens = max(50, input_tokens // 4)  # 预估输出token
 

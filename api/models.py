@@ -13,6 +13,7 @@ from core.json_router import JSONRouter
 from core.utils.logger import get_logger
 from core.yaml_config import YAMLConfigLoader
 from core.services import get_model_service
+
 from core.utils.memory_index import get_memory_index
 
 logger = get_logger(__name__)
@@ -139,13 +140,34 @@ def create_models_router(config_loader: YAMLConfigLoader, json_router: JSONRoute
                     # 获取该渠道对该模型的特定信息（可能包含覆盖）
                     channel_model_info = model_service.get_model_info(model_id, channel_id=channel_id)
 
-                    # 构建成本信息
+                    # 构建成本信息（应用汇率折扣）
                     cost_info = None
                     if hasattr(channel, 'cost_per_token') and channel.cost_per_token:
-                        cost_info = ChannelCost(
-                            input=channel.cost_per_token.get('input'),
-                            output=channel.cost_per_token.get('output')
-                        )
+                        try:
+                            # 优先使用增强的CostEstimator（包含汇率折扣）
+                            from core.utils.cost_estimator import CostEstimator
+                            estimator = CostEstimator()
+                            model_pricing = estimator._get_model_pricing(channel.id, model_id)
+                            
+                            if model_pricing and 'input' in model_pricing and 'output' in model_pricing:
+                                cost_info = ChannelCost(
+                                    input=model_pricing['input'],
+                                    output=model_pricing['output']
+                                )
+                                logger.info(f"💰 MODELS API: Applied currency discount for {channel.id} | {model_id} | input: ${model_pricing['input']:,.6f}, output: ${model_pricing['output']:,.6f}")
+                            else:
+                                # 回退到静态定价
+                                cost_info = ChannelCost(
+                                    input=channel.cost_per_token.get('input'),
+                                    output=channel.cost_per_token.get('output')
+                                )
+                        except Exception as e:
+                            logger.warning(f"Cost estimation failed for {channel.id}, using static pricing: {e}")
+                            # 回退到静态定价
+                            cost_info = ChannelCost(
+                                input=channel.cost_per_token.get('input'),
+                                output=channel.cost_per_token.get('output')
+                            )
 
                     # 构建渠道特定的能力信息和tags
                     channel_capabilities = None
