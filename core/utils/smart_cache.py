@@ -92,7 +92,7 @@ class SmartCache:
     def _get_cache_key(self, cache_type: str, key: str) -> str:
         """生成缓存键"""
         # 使用hash确保键的长度和格式一致
-        key_hash = hashlib.md5(f"{cache_type}:{key}".encode()).hexdigest()
+        key_hash = hashlib.sha256(f"{cache_type}:{key}".encode()).hexdigest()
         return f"{cache_type}:{key_hash}"
     
     def _get_cache_config(self, cache_type: str) -> Dict[str, Any]:

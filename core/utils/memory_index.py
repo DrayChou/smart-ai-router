@@ -74,7 +74,7 @@ class MemoryModelIndex:
         # 计算缓存数据的哈希值来检测变化
         import hashlib
         cache_str = str(sorted(model_cache.items()))
-        cache_hash = hashlib.md5(cache_str.encode()).hexdigest()
+        cache_hash = hashlib.sha256(cache_str.encode()).hexdigest()
 
         # 智能重建判断
         if self._should_skip_rebuild(current_time, cache_hash):

@@ -555,7 +555,7 @@ class CostEstimator:
         channel_ids = sorted([ch.get('id', '') for ch in candidate_channels])
         key_data = f"{message_content}_{channel_ids}_{max_tokens}"
         
-        return hashlib.md5(key_data.encode()).hexdigest()
+        return hashlib.sha256(key_data.encode()).hexdigest()
     
     def create_cost_preview(
         self, 

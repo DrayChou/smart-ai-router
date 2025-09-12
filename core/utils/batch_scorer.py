@@ -83,7 +83,7 @@ class BatchScorer:
         # 使用更稳定的哈希算法
         import hashlib
         key_data = str(request_context).encode('utf-8')
-        cache_hash = hashlib.md5(key_data).hexdigest()[:12]
+        cache_hash = hashlib.sha256(key_data).hexdigest()[:12]
         
         return f"batch_score_{cache_hash}"
     
