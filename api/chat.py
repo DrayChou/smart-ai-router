@@ -6,7 +6,7 @@ Chat completion API endpoints
 import time
 from fastapi import APIRouter, HTTPException
 
-from core.exceptions import RouterException
+from core.exceptions import RoutingException
 from core.handlers.chat_handler import ChatCompletionHandler, ChatCompletionRequest
 from core.utils.logger import get_logger
 # Removed duplicate log_request import - logging handled by chat_handler
@@ -29,7 +29,7 @@ def create_chat_router(chat_handler: ChatCompletionHandler) -> APIRouter:
             pass
             
             return response
-        except RouterException as e:
+        except RoutingException as e:
             # Record router error to status monitor
             duration_ms = (time.time() - start_time) * 1000
             from .status_monitor import log_request

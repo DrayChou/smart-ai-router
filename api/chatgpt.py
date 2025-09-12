@@ -13,7 +13,7 @@ from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from core.exceptions import RouterException
+from core.exceptions import RoutingException
 from core.handlers.chat_handler import ChatCompletionHandler, ChatCompletionRequest
 from core.json_router import JSONRouter
 from core.utils.logger import get_logger
@@ -174,7 +174,7 @@ def create_chatgpt_router(
                 response = await chat_handler.handle_request(chat_request)
                 return convert_to_chatgpt_response(response, request)
 
-        except RouterException as e:
+        except RoutingException as e:
             logger.error(f"Router error: {e}")
             raise HTTPException(
                 status_code=e.status_code,

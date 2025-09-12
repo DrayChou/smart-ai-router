@@ -13,7 +13,7 @@ from fastapi import APIRouter, Header, HTTPException, Body
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
-from core.exceptions import RouterException
+from core.exceptions import RoutingException
 from core.handlers.chat_handler import ChatCompletionHandler, ChatCompletionRequest
 from core.json_router import JSONRouter
 from core.utils.logger import get_logger
@@ -247,7 +247,7 @@ def create_anthropic_router(
                 response = await chat_handler.handle_request(chat_request)
                 return convert_to_anthropic_response(response, request_obj.model)
 
-        except RouterException as e:
+        except RoutingException as e:
             logger.error(f"Router error: {e}")
             raise HTTPException(
                 status_code=e.status_code,
