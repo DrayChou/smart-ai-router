@@ -145,6 +145,25 @@ def create_status_monitor_router(
             if isinstance(model, str):
                 model_name = model
                 model_dict = {"name": model_name, "id": model_name}
+                
+                # 🔧 修复：为字符串格式的模型获取pricing信息
+                try:
+                    from core.utils.cost_estimator import CostEstimator
+                    estimator = CostEstimator()
+                    model_pricing = estimator._get_model_pricing(channel_id, model_name)
+                    if model_pricing and 'input' in model_pricing and 'output' in model_pricing:
+                        # 根据单位正确设置价格
+                        pricing_unit = model_pricing.get('unit', 'per_token')
+                        if pricing_unit == 'per_million_tokens':
+                            model_dict["input_price"] = model_pricing['input']
+                            model_dict["output_price"] = model_pricing['output']
+                        else:
+                            model_dict["input_price"] = model_pricing['input'] * 1000000
+                            model_dict["output_price"] = model_pricing['output'] * 1000000
+                except Exception as e:
+                    logger.debug(f"Failed to get pricing for {model_name}: {e}")
+                    model_dict["input_price"] = None
+                    model_dict["output_price"] = None
             else:
                 model_name = model.get("name", model.get("id", "unknown"))
                 model_dict = model
@@ -163,6 +182,7 @@ def create_status_monitor_router(
                 "pricing": {
                     "input": model_dict.get("input_price"),
                     "output": model_dict.get("output_price"),
+                    "unit": "per_million_tokens"  # 统一单位标识
                 },
             }
 
@@ -249,27 +269,29 @@ def create_status_monitor_router(
                             currency_discount_info = f"{exchange_config.rate:.1f}x ({discount_percentage}% 折扣)"
                     
                     if model_pricing and 'input' in model_pricing and 'output' in model_pricing:
-                        # 如果有精确的定价信息，使用它来计算每百万token的价格
-                        # 但总成本使用路由器的估算（包含汇率折扣）
-                        input_price_per_token = model_pricing['input']
-                        output_price_per_token = model_pricing['output']
+                        # 获取原始价格数据
+                        input_price = model_pricing['input']
+                        output_price = model_pricing['output']
+                        pricing_unit = model_pricing.get('unit', 'per_token')  # 检查单位
                         
-                        # 应用汇率折扣到单价（如果有）
+                        # 应用汇率折扣（如果有）
                         if hasattr(channel, 'currency_exchange') and channel.currency_exchange:
                             rate = getattr(channel.currency_exchange, 'rate', 1.0)
-                            input_price_per_token *= rate
-                            output_price_per_token *= rate
+                            if rate > 0 and rate != 1.0:
+                                input_price *= rate
+                                output_price *= rate
                         
-                        # 转换为每百万token的价格用于前端显示
-                        # 🔧 修复：检测并修正100倍错误放大问题
-                        if input_price_per_token > 0.01:  # 如果每token价格异常高(>$0.01)
-                            # 发现了100倍错误放大，数据可能已经是错误的per-million格式
-                            input_price_per_million = input_price_per_token / 100  # 修正100倍错误
-                            output_price_per_million = output_price_per_token / 100
+                        # 🔧 修复：根据实际单位进行正确转换
+                        if pricing_unit == 'per_million_tokens':
+                            # 数据已经是每百万token格式，直接使用
+                            input_price_per_million = input_price
+                            output_price_per_million = output_price
+                            logger.debug(f"💰 Using per_million_tokens data: {model_name} | input: ${input_price}/1M, output: ${output_price}/1M")
                         else:
-                            # 正常转换流程：每token价格转为每百万token价格
-                            input_price_per_million = input_price_per_token * 1000000
-                            output_price_per_million = output_price_per_token * 1000000
+                            # 数据是每token格式，需要转换
+                            input_price_per_million = input_price * 1000000
+                            output_price_per_million = output_price * 1000000
+                            logger.debug(f"💰 Converting per_token data: {model_name} | input: ${input_price_per_million}/1M, output: ${output_price_per_million}/1M")
                         
                         cost_info = {
                             "total": estimated_cost,  # 使用路由器估算的总成本

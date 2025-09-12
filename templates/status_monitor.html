@@ -361,7 +361,7 @@
                                                 </div>
                                             </td>
                                             <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                <div v-if="result.estimated_cost.input">
+                                                <div v-if="result.estimated_cost && (result.estimated_cost.input !== null && result.estimated_cost.input !== undefined)">
                                                     <div class="font-mono">{{ formatCost(result.estimated_cost.input) }}</div>
                                                     <div v-if="result.estimated_cost.currency_discount" class="text-xs text-green-600">
                                                         💰 {{ result.estimated_cost.currency_discount }}折扣
@@ -754,10 +754,28 @@
                 },
                 
                 formatCost(cost) {
-                    if (!cost || cost === 0) return 'Free'
+                    // 🔧 修复：增强数据验证
+                    if (!cost || cost === null || cost === undefined) {
+                        return '未知'
+                    }
+                    
+                    // 转换为数字并验证
+                    const costNum = parseFloat(cost)
+                    if (isNaN(costNum) || costNum < 0) {
+                        return '无效'
+                    }
+                    
+                    if (costNum === 0) {
+                        return '免费'
+                    }
+                    
+                    // 检查异常高价格（可能是数据错误）
+                    if (costNum > 10000) {
+                        return '异常高价'
+                    }
                     
                     // 后端返回每百万token价格，直接使用
-                    const costPerMillion = cost
+                    const costPerMillion = costNum
                     
                     if (costPerMillion < 0.01) {
                         // 小于0.01的，显示4位小数

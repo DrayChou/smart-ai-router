@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-修复的SiliconFlow HTML解析脚本
+SiliconFlow HTML解析脚本 - 统一格式版本
 
-处理JSON中的额外数据问题
+基于parse_siliconflow_fixed.py，输出统一格式而不是旧格式
 """
 
 import json
@@ -15,6 +15,12 @@ from datetime import datetime
 # 添加项目根目录到路径
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
+
+# 导入统一格式定义
+from core.pricing.unified_format import (
+    UnifiedModelData, UnifiedPricingFile, Architecture, Pricing,
+    ModelCategory, DataSource, ModelCapabilityInference
+)
 
 
 def extract_and_parse_json(html_content):
@@ -37,7 +43,6 @@ def extract_and_parse_json(html_content):
     json_str = json_str.replace("\\\\", "\\")
 
     # 尝试找到第一个完整的JSON数组结构
-    # 通常数据以 [ 开始，我们需要找到匹配的 ]
     if not json_str.startswith("["):
         print("JSON不以数组开始，查找数组开始位置...")
         return None
@@ -147,11 +152,18 @@ def find_models_recursive(data, path="root", max_depth=10):
     return None
 
 
-def process_model_data(models_list):
-    """处理模型数据"""
-    print(f"开始处理 {len(models_list)} 个模型...")
-
-    models_data = {}
+def convert_to_unified_format(models_list, exchange_rate=0.14):
+    """将SiliconFlow模型数据转换为统一格式"""
+    print(f"开始转换 {len(models_list)} 个模型为统一格式...")
+    
+    # 创建统一格式文件
+    unified_file = UnifiedPricingFile(
+        provider="siliconflow",
+        source="siliconflow_html_parsed",
+        description=f"SiliconFlow HTML解析数据，包含{len(models_list)}个真实模型信息"
+    )
+    
+    capability_inference = ModelCapabilityInference()
     success_count = 0
 
     for i, model in enumerate(models_list):
@@ -164,40 +176,81 @@ def process_model_data(models_list):
                 print(f"模型 {i} 缺少modelName字段")
                 continue
 
-            model_name = model.get("modelName")
+            model_id = model.get("modelName")
 
-            # 基础数据
-            input_price = float(model.get("inputPrice", 0))
-            output_price = float(model.get("outputPrice", 0))
-            context_len = int(model.get("contextLen", 32768))
-            size = int(model.get("size", 0))
+            # 价格转换: 元/M tokens → USD/token
+            input_price_yuan_per_m = float(model.get("inputPrice", 0))
+            output_price_yuan_per_m = float(model.get("outputPrice", 0))
+            
+            input_price_usd_per_token = (input_price_yuan_per_m * exchange_rate) / 1_000_000
+            output_price_usd_per_token = (output_price_yuan_per_m * exchange_rate) / 1_000_000
 
-            # 能力标志
-            function_call = model.get("functionCallSupport", False)
-            vision = model.get("vlm", False)
-            json_mode = model.get("jsonModeSupport", False)
-            fim_completion = model.get("fimCompletionSupport", False)
-            prefix_completion = model.get("chatPrefixCompletionSupport", False)
-
-            # 类型和标签
+            # 基本信息
+            context_length = int(model.get("contextLen", 32768))
+            unified_model = UnifiedModelData(
+                id=model_id,
+                name=model.get("DisplayName", model_id),
+                parameter_count=None,  # SiliconFlow不直接提供参数数量
+                context_length=context_length,
+                description=model.get("description", ""),
+                data_source=DataSource.SILICONFLOW,
+                last_updated=datetime.now()
+            )
+            
+            # 架构信息推断
             model_type = model.get("type", "text")
             sub_type = model.get("subType", "chat")
-            tags = model.get("tags", [])
+            vision_support = model.get("vlm", False)
+            
+            modality = "text->text"
+            input_modalities = ["text"]
+            output_modalities = ["text"]
+            
+            # 检查多模态能力
+            if vision_support:
+                modality = "text+image->text"
+                input_modalities.append("image")
+            
+            if model_type == 'audio':
+                if sub_type == 'text-to-speech':
+                    modality = "text->audio"
+                    output_modalities = ["audio"]
+                elif sub_type == 'speech-to-text':
+                    modality = "audio->text"
+                    input_modalities = ["audio"]
+            
+            unified_model.architecture = Architecture(
+                modality=modality,
+                input_modalities=input_modalities,
+                output_modalities=output_modalities
+            )
 
-            # 构建能力
-            capabilities = ["chat"] if model_type == "text" else []
+            # 定价信息
+            is_free = input_price_yuan_per_m == 0 and output_price_yuan_per_m == 0
+            unified_model.pricing = Pricing(
+                prompt=input_price_usd_per_token,
+                completion=output_price_usd_per_token,
+                original_currency="CNY",
+                exchange_rate=exchange_rate,
+                confidence_level=0.9  # SiliconFlow数据较可信
+            )
 
-            if function_call:
+            # 能力推断
+            capabilities = []
+            if model_type == "text":
+                capabilities.append("chat")
+            
+            if model.get("functionCallSupport", False):
                 capabilities.append("function_calling")
-            if vision:
+            if vision_support:
                 capabilities.append("vision")
-            if json_mode:
+            if model.get("jsonModeSupport", False):
                 capabilities.append("json_mode")
-            if fim_completion:
+            if model.get("fimCompletionSupport", False):
                 capabilities.append("fim_completion")
-            if prefix_completion:
+            if model.get("chatPrefixCompletionSupport", False):
                 capabilities.append("prefix_completion")
-
+            
             # 处理非文本模型
             if model_type == "audio":
                 capabilities = ["audio", "tts"]
@@ -210,72 +263,41 @@ def process_model_data(models_list):
             elif model_type == "image":
                 capabilities = ["image"]
 
-            # 分类
-            category = "standard"
-            description = "标准模型"
+            unified_model.capabilities = list(set(capabilities))  # 去重
+            
+            # 分类推断
+            model_size = int(model.get("size", 0))
+            if is_free:
+                unified_model.category = ModelCategory.FREE
+            elif vision_support:
+                unified_model.category = ModelCategory.VISION
+            elif model_type != "text":
+                unified_model.category = ModelCategory.PREMIUM
+            elif model_size >= 50:
+                unified_model.category = ModelCategory.XLARGE
+            elif model_size >= 10:
+                unified_model.category = ModelCategory.LARGE
+            elif max(input_price_yuan_per_m, output_price_yuan_per_m) >= 15:
+                unified_model.category = ModelCategory.PREMIUM
+            else:
+                unified_model.category = capability_inference.infer_category_from_params(
+                    None, context_length
+                )
 
-            if input_price == 0 and output_price == 0:
-                category = "free"
-                description = "免费"
-            elif model_name.lower().startswith("pro/"):
-                category = "pro"
-                description = "Pro版本"
-            elif size >= 500:
-                category = "xxlarge"
-                description = "超超大模型"
-            elif size >= 50:
-                category = "xlarge"
-                description = "超大模型"
-            elif size >= 10:
-                category = "large"
-                description = "大模型"
-            elif vision:
-                category = "vision"
-                description = "多模态视觉模型"
-            elif max(input_price, output_price) >= 15:
-                category = "premium"
-                description = "高端模型"
-            elif max(input_price, output_price) >= 5:
-                if category == "standard":
-                    category = "large"
-                description = "高性能模型"
-
-            if model_type != "text":
-                description = f"{model_type}生成模型"
-
-            models_data[model_name] = {
-                "input_price_per_m": input_price,
-                "output_price_per_m": output_price,
-                "context_length": context_len,
-                "capabilities": list(set(capabilities)),
-                "category": category,
-                "description": description,
-                "model_size": size,
-                "function_call_support": function_call,
-                "vision_support": vision,
-                "json_mode_support": json_mode,
-                "fim_completion_support": fim_completion,
-                "prefix_completion_support": prefix_completion,
-                "tags": tags,
-                "type": model_type,
-                "subType": sub_type,
-                "display_name": model.get("DisplayName", model_name),
-                "status": model.get("status", "normal"),
-            }
-
+            unified_file.models[model_id] = unified_model
             success_count += 1
 
         except Exception as e:
-            print(f"处理模型 {i} ({model.get('modelName', 'unknown')}) 时出错: {e}")
+            print(f"转换模型 {i} ({model.get('modelName', 'unknown')}) 时出错: {e}")
             continue
 
-    print(f"成功处理 {success_count} 个模型")
-    return models_data
+    print(f"成功转换 {success_count} 个模型为统一格式")
+    return unified_file
 
 
 def main():
     """主函数"""
-    print("=== SiliconFlow HTML修复解析脚本 ===")
+    print("=== SiliconFlow HTML统一格式解析脚本 ===")
 
     html_path = project_root / "cache" / "siliconflow" / "model.html"
 
@@ -300,73 +322,31 @@ def main():
         print("未能提取到模型数据")
         return 1
 
-    # 处理模型
-    models_data = process_model_data(models_list)
+    # 转换为统一格式
+    unified_file = convert_to_unified_format(models_list)
 
-    if not models_data:
-        print("未能处理模型数据")
+    if not unified_file or not unified_file.models:
+        print("未能转换模型数据")
         return 1
 
-    # 生成配置
-    config = {
-        "provider": "SiliconFlow",
-        "currency": "CNY",
-        "currency_symbol": "￥",
-        "unit": "1M tokens",
-        "exchange_rate_to_usd": 0.14,
-        "last_updated": datetime.now().strftime("%Y-%m-%d"),
-        "pricing_source": "https://siliconflow.cn/pricing",
-        "data_source": "HTML Cache from SiliconFlow Website (Fixed Parser)",
-        "extraction_timestamp": datetime.now().isoformat(),
-        "models": models_data,
-        "categories": {
-            "free": {
-                "name": "免费模型",
-                "description": "完全免费使用，适合测试和轻量级应用",
-            },
-            "pro": {
-                "name": "Pro版本",
-                "description": "专业版本，提供更好的性能和稳定性",
-            },
-            "standard": {
-                "name": "标准收费",
-                "description": "标准定价模型，平衡性能和成本",
-            },
-            "large": {"name": "大模型", "description": "参数量较大的模型，性能更强"},
-            "xlarge": {"name": "超大模型", "description": "超大参数量模型，顶级性能"},
-            "xxlarge": {
-                "name": "超超大模型",
-                "description": "最大参数量模型，极致性能",
-            },
-            "vision": {
-                "name": "视觉模型",
-                "description": "支持图像理解和处理的多模态模型",
-            },
-            "premium": {"name": "高端模型", "description": "高端定价，顶级性能和功能"},
-        },
-    }
+    # 保存统一格式文件
+    output_path = project_root / "config" / "pricing" / "siliconflow_unified.json"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # 保存文件
-    config_path = project_root / "config" / "pricing" / "siliconflow_unified.json"
-    config_path.parent.mkdir(parents=True, exist_ok=True)
-
-    if config_path.exists():
+    if output_path.exists():
         backup_path = (
-            config_path.parent
+            output_path.parent
             / f"siliconflow_unified_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
         )
         import shutil
-
-        shutil.copy2(config_path, backup_path)
+        shutil.copy2(output_path, backup_path)
         print(f"已备份到: {backup_path}")
 
-    with open(config_path, "w", encoding="utf-8") as f:
-        json.dump(config, f, indent=2, ensure_ascii=False)
+    unified_file.save_to_file(output_path)
+    print(f"统一格式文件已保存: {output_path}")
 
-    print(f"配置文件已保存: {config_path}")
-
-    # 统计信息
-    print_statistics(models_data)
+    # 打印统计信息
+    print_statistics(unified_file.models)
 
     return 0
 
@@ -374,7 +354,7 @@ def main():
 def print_statistics(models_data):
     """打印统计信息"""
     print("\n" + "=" * 60)
-    print("SiliconFlow 模型统计 (来自HTML真实数据)")
+    print("SiliconFlow 模型统计 (统一格式)")
     print("=" * 60)
 
     total = len(models_data)
@@ -387,18 +367,18 @@ def print_statistics(models_data):
     function_models = []
     long_context = []
 
-    for name, data in models_data.items():
-        cat = data.get("category", "unknown")
+    for model_id, model_data in models_data.items():
+        cat = model_data.category.value
         categories[cat] = categories.get(cat, 0) + 1
 
-        if cat == "free":
-            free_models.append((name, data.get("context_length", 0)))
-        if data.get("vision_support"):
-            vision_models.append(name)
-        if data.get("function_call_support"):
-            function_models.append(name)
-        if data.get("context_length", 0) >= 128000:  # 128K+
-            long_context.append((name, data.get("context_length", 0)))
+        if model_data.category == ModelCategory.FREE:
+            free_models.append((model_id, model_data.context_length or 0))
+        if 'vision' in (model_data.capabilities or []):
+            vision_models.append(model_id)
+        if 'function_calling' in (model_data.capabilities or []):
+            function_models.append(model_id)
+        if model_data.context_length and model_data.context_length >= 128000:  # 128K+
+            long_context.append((model_id, model_data.context_length))
 
     print(f"\n分类分布:")
     for cat, count in sorted(categories.items(), key=lambda x: x[1], reverse=True):
@@ -408,41 +388,35 @@ def print_statistics(models_data):
     print(f"\n免费模型: {len(free_models)} 个")
     if free_models[:3]:
         print("   前3个免费模型:")
-        for name, ctx in sorted(free_models, key=lambda x: x[1], reverse=True)[:3]:
-            print(f"     * {name}: {ctx:,} tokens")
+        for model_id, ctx in sorted(free_models, key=lambda x: x[1], reverse=True)[:3]:
+            print(f"     * {model_id}: {ctx:,} tokens")
 
     print(f"\n视觉模型: {len(vision_models)} 个")
     if vision_models[:3]:
         print("   视觉模型:")
-        for name in vision_models[:3]:
-            print(f"     * {name}")
+        for model_id in vision_models[:3]:
+            print(f"     * {model_id}")
 
     print(f"\n函数调用: {len(function_models)} 个")
 
     print(f"\n长上下文: {len(long_context)} 个 (>=128K)")
     if long_context:
         print("   长上下文模型:")
-        for name, ctx in sorted(long_context, key=lambda x: x[1], reverse=True):
-            print(f"     * {name}: {ctx:,} tokens")
-
-    # 关键统计
-    context_lengths = [data.get("context_length", 0) for data in models_data.values()]
-    if context_lengths:
-        print(f"\n上下文长度统计:")
-        print(f"   最短: {min(context_lengths):,} tokens")
-        print(f"   最长: {max(context_lengths):,} tokens")
-        print(f"   平均: {sum(context_lengths)//len(context_lengths):,} tokens")
+        for model_id, ctx in sorted(long_context, key=lambda x: x[1], reverse=True):
+            print(f"     * {model_id}: {ctx:,} tokens")
 
     # 价格统计
-    free_count = len(
-        [
-            m
-            for m in models_data.values()
-            if m.get("input_price_per_m", 0) == 0
-            and m.get("output_price_per_m", 0) == 0
-        ]
-    )
-    paid_count = total - free_count
+    free_count = 0
+    paid_count = 0
+    
+    for model_data in models_data.values():
+        if (model_data.pricing and 
+            model_data.pricing.prompt == 0 and 
+            model_data.pricing.completion == 0):
+            free_count += 1
+        else:
+            paid_count += 1
+    
     print(f"\n价格分布:")
     print(f"   免费模型: {free_count} 个 ({(free_count/total)*100:.1f}%)")
     print(f"   付费模型: {paid_count} 个 ({(paid_count/total)*100:.1f}%)")

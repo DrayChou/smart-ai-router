@@ -4,6 +4,7 @@
 """
 
 import asyncio
+import time
 from typing import Dict, Any, Optional
 import logging
 
@@ -18,8 +19,6 @@ from .tasks.model_discovery import run_model_discovery, get_model_discovery_task
 from .tasks.pricing_discovery import run_pricing_discovery, get_pricing_discovery_task
 from .tasks.service_health_check import run_health_check_task, ServiceHealthChecker
 
-# SiliconFlow定价现在使用HTML解析的静态配置文件 (config/pricing/siliconflow_pricing_from_html.json)
-# Doubao pricing now uses static configuration (removed dynamic scraping)
 from ..utils.api_key_validator import run_api_key_validation_task
 
 logger = logging.getLogger(__name__)
@@ -121,10 +120,6 @@ class TaskManager:
                 run_immediately=False,
             )
             logger.info(f"已添加缓存清理任务，间隔 {interval/3600}h")
-
-        # 5. SiliconFlow定价 - 现在使用HTML解析的静态配置文件 (config/pricing/siliconflow_pricing_from_html.json)
-        # 移除了动态抓取任务，改用HTML解析维护的准确价格数据
-        logger.info("SiliconFlow定价使用HTML解析静态配置文件，已移除动态抓取任务")
 
         # 6. 豆包定价 - 现在使用静态配置文件 (doubao_pricing_accurate.json)
         # 移除了动态抓取任务，改用手动维护的准确价格数据
@@ -279,10 +274,6 @@ class TaskManager:
         except Exception as e:
             logger.error(f"缓存清理任务异常: {e}")
             return {"success": False, "error": str(e)}
-
-    # SiliconFlow定价任务已移除 - 现在使用HTML解析的静态配置文件 (config/pricing/siliconflow_pricing_from_html.json)
-
-    # 豆包定价任务已移除 - 现在使用静态配置文件 (cache/doubao_pricing_accurate.json)
 
     async def _run_stats_report_task(self):
         """运行统计报告任务"""

@@ -1,0 +1,581 @@
+{
+  "provider": "doubao",
+  "source": "volcanic_engine_official",
+  "currency": "CNY",
+  "unit": "per_token",
+  "format_version": "2.0",
+  "last_updated": "2025-01-12T12:00:00Z",
+  "description": "豆包(Doubao)大模型完整定价配置，包含架构、能力、阶梯定价等详细信息",
+  "models": {
+    "doubao-seed-1-6-vision-250815": {
+      "id": "doubao-seed-1-6-vision-250815",
+      "name": "豆包 Seed 1.6 Vision",
+      "context_length": 262144,
+      "parameter_count": null,
+      "architecture": {
+        "modality": "text+vision+video->text",
+        "input_modalities": ["text", "image", "video"],
+        "output_modalities": ["text"],
+        "tokenizer": "doubao",
+        "instruct_type": "chat"
+      },
+      "capabilities": ["chat", "vision", "video", "function_calling", "structured_output", "thinking", "gui"],
+      "category": "premium",
+      "description": "深度思考多模态模型，支持图片理解、视频理解、GUI任务处理",
+      "top_provider": {
+        "context_length": 262144,
+        "max_completion_tokens": 32768,
+        "is_moderated": true
+      },
+      "pricing": {
+        "prompt": 0.00000112,
+        "completion": 0.00001120,
+        "request": 0.0,
+        "image": 0.0
+      }
+    },
+    
+    "doubao-seed-1-6-250615": {
+      "id": "doubao-seed-1-6-250615",
+      "name": "豆包 Seed 1.6",
+      "context_length": 262144,
+      "parameter_count": null,
+      "architecture": {
+        "modality": "text+vision+video->text",
+        "input_modalities": ["text", "image", "video"],
+        "output_modalities": ["text"],
+        "tokenizer": "doubao",
+        "instruct_type": "chat"
+      },
+      "capabilities": ["chat", "vision", "video", "function_calling", "structured_output", "thinking"],
+      "category": "premium",
+      "description": "深度思考多模态模型，支持图片理解、视频理解",
+      "top_provider": {
+        "context_length": 262144,
+        "max_completion_tokens": 32768,
+        "is_moderated": true
+      },
+      "pricing": {
+        "prompt": 0.00000112,
+        "completion": 0.00001120,
+        "request": 0.0,
+        "image": 0.0
+      }
+    },
+
+    "doubao-seed-1-6-flash-250715": {
+      "id": "doubao-seed-1-6-flash-250715", 
+      "name": "豆包 Seed 1.6 Flash",
+      "context_length": 262144,
+      "parameter_count": null,
+      "architecture": {
+        "modality": "text+vision+video->text",
+        "input_modalities": ["text", "image", "video"],
+        "output_modalities": ["text"],
+        "tokenizer": "doubao",
+        "instruct_type": "chat"
+      },
+      "capabilities": ["chat", "vision", "video", "function_calling", "structured_output", "thinking", "visual_positioning"],
+      "category": "premium",
+      "description": "快速深度思考模型，支持图片理解、视觉定位、视频理解",
+      "top_provider": {
+        "context_length": 262144,
+        "max_completion_tokens": 32768,
+        "is_moderated": true
+      },
+      "pricing": {
+        "prompt": 0.00000021,
+        "completion": 0.00000210,
+        "request": 0.0,
+        "image": 0.0
+      }
+    },
+
+    "doubao-seed-1-6-thinking-250715": {
+      "id": "doubao-seed-1-6-thinking-250715",
+      "name": "豆包 Seed 1.6 Thinking",
+      "context_length": 262144,
+      "parameter_count": null,
+      "architecture": {
+        "modality": "text+vision+video->text",
+        "input_modalities": ["text", "image", "video"],
+        "output_modalities": ["text"],
+        "tokenizer": "doubao",
+        "instruct_type": "chat"
+      },
+      "capabilities": ["chat", "vision", "video", "function_calling", "structured_output", "thinking"],
+      "category": "premium", 
+      "description": "专注深度思考的模型，支持图片理解、视频理解",
+      "top_provider": {
+        "context_length": 262144,
+        "max_completion_tokens": 32768,
+        "is_moderated": true
+      },
+      "pricing": {
+        "prompt": 0.00000112,
+        "completion": 0.00001120,
+        "request": 0.0,
+        "image": 0.0
+      }
+    },
+
+    "deepseek-v3-1-250821": {
+      "id": "deepseek-v3-1-250821",
+      "name": "DeepSeek V3.1",
+      "context_length": 131072,
+      "parameter_count": null,
+      "architecture": {
+        "modality": "text->text",
+        "input_modalities": ["text"],
+        "output_modalities": ["text"],
+        "tokenizer": "deepseek",
+        "instruct_type": "chat"
+      },
+      "capabilities": ["chat", "function_calling", "thinking"],
+      "category": "large",
+      "description": "第三方DeepSeek V3.1深度思考大模型服务",
+      "top_provider": {
+        "context_length": 131072,
+        "max_completion_tokens": 32768,
+        "is_moderated": true
+      },
+      "pricing": {
+        "prompt": 0.00000560,
+        "completion": 0.00001680,
+        "request": 0.0,
+        "image": 0.0
+      }
+    },
+
+    "deepseek-r1-250528": {
+      "id": "deepseek-r1-250528",
+      "name": "DeepSeek R1",
+      "context_length": 131072,
+      "parameter_count": null,
+      "architecture": {
+        "modality": "text->text",
+        "input_modalities": ["text"],
+        "output_modalities": ["text"],
+        "tokenizer": "deepseek",
+        "instruct_type": "chat"
+      },
+      "capabilities": ["chat", "function_calling", "structured_output", "thinking", "reasoning"],
+      "category": "large",
+      "description": "第三方DeepSeek R1深度思考推理模型服务",
+      "top_provider": {
+        "context_length": 131072,
+        "max_completion_tokens": 32768,
+        "is_moderated": true
+      },
+      "pricing": {
+        "prompt": 0.00000560,
+        "completion": 0.00002240,
+        "request": 0.0,
+        "image": 0.0
+      }
+    },
+
+    "doubao-1-5-pro-32k-character-250715": {
+      "id": "doubao-1-5-pro-32k-character-250715", 
+      "name": "豆包 1.5 Pro 32K Character",
+      "context_length": 32768,
+      "parameter_count": null,
+      "architecture": {
+        "modality": "text->text",
+        "input_modalities": ["text"],
+        "output_modalities": ["text"],
+        "tokenizer": "doubao",
+        "instruct_type": "character"
+      },
+      "capabilities": ["chat", "roleplay"],
+      "category": "medium",
+      "description": "角色扮演场景增强模型",
+      "top_provider": {
+        "context_length": 32768,
+        "max_completion_tokens": 12288,
+        "is_moderated": true
+      },
+      "pricing": {
+        "prompt": 0.00000112,
+        "completion": 0.00000280,
+        "request": 0.0,
+        "image": 0.0
+      }
+    },
+
+    "doubao-1-5-pro-256k-250115": {
+      "id": "doubao-1-5-pro-256k-250115",
+      "name": "豆包 1.5 Pro 256K",
+      "context_length": 262144,
+      "parameter_count": null,
+      "architecture": {
+        "modality": "text->text",
+        "input_modalities": ["text"],
+        "output_modalities": ["text"],
+        "tokenizer": "doubao",
+        "instruct_type": "chat"
+      },
+      "capabilities": ["chat"],
+      "category": "xlarge",
+      "description": "长上下文文本生成模型",
+      "top_provider": {
+        "context_length": 262144,
+        "max_completion_tokens": 12288,
+        "is_moderated": true
+      },
+      "pricing": {
+        "prompt": 0.00000700,
+        "completion": 0.00001260,
+        "request": 0.0,
+        "image": 0.0
+      }
+    },
+
+    "doubao-1-5-lite-32k-250115": {
+      "id": "doubao-1-5-lite-32k-250115",
+      "name": "豆包 1.5 Lite 32K", 
+      "context_length": 32768,
+      "parameter_count": null,
+      "architecture": {
+        "modality": "text->text",
+        "input_modalities": ["text"],
+        "output_modalities": ["text"],
+        "tokenizer": "doubao",
+        "instruct_type": "chat"
+      },
+      "capabilities": ["chat", "function_calling"],
+      "category": "small",
+      "description": "轻量级文本生成模型",
+      "top_provider": {
+        "context_length": 32768,
+        "max_completion_tokens": 12288,
+        "is_moderated": true
+      },
+      "pricing": {
+        "prompt": 0.00000042,
+        "completion": 0.00000084,
+        "request": 0.0,
+        "image": 0.0
+      }
+    },
+
+    "kimi-k2-250711": {
+      "id": "kimi-k2-250711",
+      "name": "Kimi K2",
+      "context_length": 131072,
+      "parameter_count": null,
+      "architecture": {
+        "modality": "text->text",
+        "input_modalities": ["text"],
+        "output_modalities": ["text"],
+        "tokenizer": "kimi",
+        "instruct_type": "chat"
+      },
+      "capabilities": ["chat", "function_calling"],
+      "category": "large",
+      "description": "月之暗面第三方模型",
+      "top_provider": {
+        "context_length": 131072,
+        "max_completion_tokens": 32768,
+        "is_moderated": true
+      },
+      "pricing": {
+        "prompt": 0.00000560,
+        "completion": 0.00002240,
+        "request": 0.0,
+        "image": 0.0
+      }
+    },
+
+    "deepseek-v3-250324": {
+      "id": "deepseek-v3-250324",
+      "name": "DeepSeek V3",
+      "context_length": 131072,
+      "parameter_count": null,
+      "architecture": {
+        "modality": "text->text",
+        "input_modalities": ["text"],
+        "output_modalities": ["text"],
+        "tokenizer": "deepseek",
+        "instruct_type": "chat"
+      },
+      "capabilities": ["chat", "function_calling"],
+      "category": "large",
+      "description": "DeepSeek第三方模型",
+      "top_provider": {
+        "context_length": 131072,
+        "max_completion_tokens": 16384,
+        "is_moderated": true
+      },
+      "pricing": {
+        "prompt": 0.00000280,
+        "completion": 0.00001120,
+        "request": 0.0,
+        "image": 0.0
+      }
+    },
+
+    "doubao-pro-32k-241215": {
+      "id": "doubao-pro-32k-241215",
+      "name": "豆包 Pro 32K",
+      "context_length": 32768,
+      "parameter_count": null,
+      "architecture": {
+        "modality": "text->text",
+        "input_modalities": ["text"],
+        "output_modalities": ["text"],
+        "tokenizer": "doubao",
+        "instruct_type": "chat"
+      },
+      "capabilities": ["chat"],
+      "category": "medium",
+      "description": "豆包轻量专业版",
+      "top_provider": {
+        "context_length": 32768,
+        "max_completion_tokens": 4096,
+        "is_moderated": true
+      },
+      "pricing": {
+        "prompt": 0.00000112,
+        "completion": 0.00000280,
+        "request": 0.0,
+        "image": 0.0
+      }
+    },
+
+    "doubao-lite-32k-240828": {
+      "id": "doubao-lite-32k-240828",
+      "name": "豆包 Lite 32K",
+      "context_length": 32768,
+      "parameter_count": null,
+      "architecture": {
+        "modality": "text->text",
+        "input_modalities": ["text"],
+        "output_modalities": ["text"],
+        "tokenizer": "doubao",
+        "instruct_type": "chat"
+      },
+      "capabilities": ["chat", "function_calling"],
+      "category": "small",
+      "description": "轻量级高性价比模型",
+      "top_provider": {
+        "context_length": 32768,
+        "max_completion_tokens": 4096,
+        "is_moderated": true
+      },
+      "pricing": {
+        "prompt": 0.00000042,
+        "completion": 0.00000084,
+        "request": 0.0,
+        "image": 0.0
+      }
+    },
+
+    "doubao-lite-128k-240828": {
+      "id": "doubao-lite-128k-240828",
+      "name": "豆包 Lite 128K",
+      "context_length": 131072,
+      "parameter_count": null,
+      "architecture": {
+        "modality": "text->text",
+        "input_modalities": ["text"],
+        "output_modalities": ["text"],
+        "tokenizer": "doubao",
+        "instruct_type": "chat"
+      },
+      "capabilities": ["chat", "function_calling"],
+      "category": "medium",
+      "description": "长上下文轻量级模型",
+      "top_provider": {
+        "context_length": 131072,
+        "max_completion_tokens": 4096,
+        "is_moderated": true
+      },
+      "pricing": {
+        "prompt": 0.00000112,
+        "completion": 0.00000140,
+        "request": 0.0,
+        "image": 0.0
+      }
+    },
+
+    "doubao-1-5-vision-pro-250328": {
+      "id": "doubao-1-5-vision-pro-250328",
+      "name": "豆包 1.5 Vision Pro",
+      "context_length": 131072,
+      "parameter_count": null,
+      "architecture": {
+        "modality": "text+vision+video->text",
+        "input_modalities": ["text", "image", "video"],
+        "output_modalities": ["text"],
+        "tokenizer": "doubao",
+        "instruct_type": "chat"
+      },
+      "capabilities": ["chat", "vision", "video", "thinking"],
+      "category": "vision",
+      "description": "视觉理解专业版，支持图片理解、视频理解和深度思考",
+      "top_provider": {
+        "context_length": 131072,
+        "max_completion_tokens": 16384,
+        "is_moderated": true
+      },
+      "pricing": {
+        "prompt": 0.00000420,
+        "completion": 0.00001260,
+        "request": 0.0,
+        "image": 0.0
+      }
+    },
+
+    "doubao-1-5-vision-lite-250315": {
+      "id": "doubao-1-5-vision-lite-250315",
+      "name": "豆包 1.5 Vision Lite",
+      "context_length": 131072,
+      "parameter_count": null,
+      "architecture": {
+        "modality": "text+vision->text",
+        "input_modalities": ["text", "image"],
+        "output_modalities": ["text"],
+        "tokenizer": "doubao",
+        "instruct_type": "chat"
+      },
+      "capabilities": ["chat", "vision"],
+      "category": "vision",
+      "description": "轻量级视觉理解模型",
+      "top_provider": {
+        "context_length": 131072,
+        "max_completion_tokens": 16384,
+        "is_moderated": true
+      },
+      "pricing": {
+        "prompt": 0.00000210,
+        "completion": 0.00000630,
+        "request": 0.0,
+        "image": 0.0
+      }
+    },
+
+    "doubao-1-5-ui-tars-250428": {
+      "id": "doubao-1-5-ui-tars-250428",
+      "name": "豆包 1.5 UI Tars",
+      "context_length": 131072,
+      "parameter_count": null,
+      "architecture": {
+        "modality": "text+vision->text",
+        "input_modalities": ["text", "image"],
+        "output_modalities": ["text"],
+        "tokenizer": "doubao",
+        "instruct_type": "chat"
+      },
+      "capabilities": ["chat", "vision", "gui", "thinking", "visual_positioning"],
+      "category": "vision",
+      "description": "GUI任务处理专用模型，支持图片理解和深度思考",
+      "top_provider": {
+        "context_length": 131072,
+        "max_completion_tokens": 16384,
+        "is_moderated": true
+      },
+      "pricing": {
+        "prompt": 0.00000490,
+        "completion": 0.00001680,
+        "request": 0.0,
+        "image": 0.0
+      }
+    }
+  },
+  
+  "categories": {
+    "premium": {
+      "name": "高端模型",
+      "description": "深度思考、多模态能力的顶级模型"
+    },
+    "large": {
+      "name": "大模型", 
+      "description": "大参数量高性能模型"
+    },
+    "xlarge": {
+      "name": "超大模型",
+      "description": "超大上下文长度模型"
+    },
+    "standard": {
+      "name": "标准模型",
+      "description": "平衡性能和成本的标准模型"
+    },
+    "small": {
+      "name": "轻量模型",
+      "description": "高性价比轻量级模型"
+    },
+    "fast": {
+      "name": "快速模型",
+      "description": "响应速度优化的模型"
+    },
+    "vision": {
+      "name": "视觉模型",
+      "description": "图像和视频理解专用模型"
+    }
+  },
+
+  "doubao_extensions": {
+    "description": "豆包模型扩展信息，包含阶梯定价、速率限制、免费配额等",
+    "common_features": {
+      "free_quota": 500000,
+      "rate_limits_default": {
+        "rpm": 30000,
+        "tpm": 5000000
+      }
+    },
+    "tiered_pricing": {
+      "currency": "CNY",
+      "unit": "per_million_tokens",
+      "doubao-seed-1-6-vision-250815": {
+        "max_input_tokens": 229376,
+        "thinking_tokens": 32768,
+        "online_inference": {
+          "tier_1": {"input_range": "[0, 32k]", "input_price": 0.80, "output_price": 8.00},
+          "tier_2": {"input_range": "(32k, 128k]", "input_price": 1.20, "output_price": 16.00},
+          "tier_3": {"input_range": "(128k, 256k]", "input_price": 2.40, "output_price": 24.00}
+        }
+      },
+      "doubao-seed-1-6-250615": {
+        "max_input_tokens": 229376,
+        "thinking_tokens": 32768,
+        "online_inference": {
+          "tier_1_short": {"condition": "input[0,32k] && output[0,0.2k]", "input_price": 0.80, "output_price": 2.00},
+          "tier_1_long": {"condition": "input[0,32k] && output(0.2k,+∞)", "input_price": 0.80, "output_price": 8.00},
+          "tier_2": {"input_range": "(32k, 128k]", "input_price": 1.20, "output_price": 16.00},
+          "tier_3": {"input_range": "(128k, 256k]", "input_price": 2.40, "output_price": 24.00}
+        }
+      },
+      "doubao-seed-1-6-flash-250715": {
+        "max_input_tokens": 229376,
+        "thinking_tokens": 32768,
+        "online_inference": {
+          "tier_1": {"input_range": "[0, 32k]", "input_price": 0.15, "output_price": 1.50},
+          "tier_2": {"input_range": "(32k, 128k]", "input_price": 0.30, "output_price": 3.00},
+          "tier_3": {"input_range": "(128k, 256k]", "input_price": 0.60, "output_price": 6.00}
+        }
+      },
+      "doubao-seed-1-6-thinking-250715": {
+        "max_input_tokens": 229376,
+        "thinking_tokens": 32768,
+        "online_inference": {
+          "tier_1": {"input_range": "[0, 32k]", "input_price": 0.80, "output_price": 8.00},
+          "tier_2": {"input_range": "(32k, 128k]", "input_price": 1.20, "output_price": 16.00},
+          "tier_3": {"input_range": "(128k, 256k]", "input_price": 2.40, "output_price": 24.00}
+        }
+      },
+      "deepseek-v3-1-250821": {
+        "max_input_tokens": 98304,
+        "thinking_tokens": 32768,
+        "online_inference": {"standard": {"input_price": 4.00, "output_price": 12.00}},
+        "batch_inference": {"standard": {"input_price": 2.00, "output_price": 6.00}}
+      },
+      "deepseek-r1-250528": {
+        "max_input_tokens": 98304,
+        "thinking_tokens": 32768,
+        "online_inference": {"standard": {"input_price": 4.00, "output_price": 16.00}},
+        "batch_inference": {"standard": {"input_price": 2.00, "output_price": 8.00}}
+      }
+    }
+  }
+}

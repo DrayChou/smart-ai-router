@@ -1,6 +1,6 @@
 # Smart AI Router - 个人AI智能路由系统
 
-轻量级个人AI智能路由系统，支持**智能标签化路由**、**负标签过滤**、成本优化、智能故障转移。基于38个渠道和3400+模型的大规模路由网关。
+轻量级个人AI智能路由系统，支持**智能标签化路由**、**2层动态定价系统**、成本优化、智能故障转移。基于38个渠道和3400+模型的大规模路由网关，特色豆包(Doubao)完整定价集成。
 
 ## ✨ 核心特性
 
@@ -11,12 +11,13 @@
 🚀 **智能路由引擎** - 基于成本、参数数量、上下文长度、速度的四维评分策略，智能模型排序选择  
 🧠 **智能模型分析** - 自动提取模型参数数量(200m-670b)和上下文长度(2k-2m)，支持可配置过滤策略  
 💰 **成本优化** - 自动选择最便宜的可用渠道，支持本地模型零成本  
+💰 **2层动态定价** - 渠道专属定价 → 基准定价智能回退，豆包17模型完整集成
 💰 **成本监控** - 完整的使用跟踪和成本分析系统，帮助优化AI API费用  
 ⚡ **智能故障转移** - 401错误渠道黑名单机制，多渠道自动切换，18个渠道支持API回退  
 🎯 **模型类型过滤** - 自动过滤embedding模型，支持最小参数量和上下文长度过滤  
 🔑 **API密钥验证** - 自动检测失效密钥，智能管理渠道状态  
 🔧 **零配置启动** - 基于Pydantic的YAML配置文件，One-API数据库自动集成  
-🌏 **多Provider支持** - OpenAI, Groq, SiliconFlow, Burn Hair, 豆包, 智谱, DeepSeek, 本地Ollama/LMStudio等  
+🌏 **多Provider支持** - OpenAI, Groq, SiliconFlow, Burn Hair, 豆包(完整集成), 智谱, DeepSeek, 本地Ollama/LMStudio等  
 ⚡ **企业级性能优化** - HTTP/2连接池复用、智能TTL缓存、流式请求优化，系统响应速度提升40-70%  
 
 ## 🎯 系统表现指标
@@ -27,7 +28,7 @@
 - **故障转移**: 智能渠道黑名单，多渠道自动切换
 - **负标签过滤**: 支持 `!tagname` 语法精确排除
 - **模型评分**: 支持0.6B-235B全规格差异化评分
-- **特殊厂商**: 支持豆包EP模型、智谱GLM、DeepSeek等
+- **特殊厂商**: 豆包17模型完整集成(架构+阶梯定价)、智谱GLM、DeepSeek等
 - **性能优化**: 系统响应速度提升40-70%，连接建立时间减少50-80%，重复请求开销减少60-90%
 
 ## 🚀 快速开始
@@ -768,6 +769,78 @@ smart-ai-router/
 ├── main.py                         # 统一入口
 └── README.md                       # 项目说明
 ```
+
+## 💰 2层动态定价系统
+
+Smart AI Router 采用创新的**2层动态定价架构**，为智能路由和成本优化提供精确的定价基础。
+
+### 🏗️ 系统架构
+```
+第1层：渠道专属定价 (优先级最高)
+├── doubao_unified.json     # 豆包完整集成 ✅
+├── siliconflow_unified.json # SiliconFlow基础集成
+├── provider_pricing.json   # 其他厂商定价
+└── ...
+
+第2层：智能回退机制
+├── 豆包特殊回退 → 阶梯定价计算器
+└── 通用回退 → OpenRouter基准定价
+```
+
+### 🌟 豆包(Doubao)完整集成
+作为系统中最完善的厂商定价集成案例：
+
+- **17个核心模型**: 深度思考、多模态、视觉理解全覆盖
+- **完整架构信息**: modality、input/output模态、tokenizer等详细参数
+- **阶梯定价支持**: 根据输入长度自动调整价格，保留CNY原始定价
+- **多模态能力**: 精确标识thinking、vision、GUI、visual_positioning等
+- **扩展信息分离**: doubao_extensions包含免费配额、速率限制等运营参数
+
+#### 支持的豆包模型类型
+```bash
+# 深度思考模型 (Thinking Models)
+doubao-seed-1-6-vision-250815      # 多模态+GUI思考
+doubao-seed-1-6-flash-250715       # 高速思考
+deepseek-v3-1-250821               # 第三方推理
+
+# 视觉理解模型 (Vision Models)  
+doubao-1-5-vision-pro-250328       # 专业视觉分析
+doubao-1-5-ui-tars-250428          # GUI自动化
+
+# 大语言模型 (LLM)
+doubao-1-5-pro-256k-250115         # 长上下文
+doubao-1-5-lite-32k-250115         # 轻量高效
+```
+
+### 📊 定价查询优先级
+1. **渠道专属文件查找** (按优先级):
+   - `{provider}_unified.json` ✅ (推荐格式)
+   - `{provider}_pricing.json`
+   - `{provider}_price.json` 
+   - `{provider}.json`
+
+2. **特殊回退处理**:
+   - 豆包: 阶梯定价计算器 (支持复杂定价条件)
+   - 其他: OpenRouter基准定价
+
+3. **架构信息完整**: 每个模型包含详细的技术参数和能力标识
+
+### 🔧 使用示例
+系统会自动选择最优定价来源，用户无需特殊配置：
+
+```python
+# 系统自动处理定价查询
+from core.utils.static_pricing import get_static_pricing_loader
+
+loader = get_static_pricing_loader() 
+result = loader.get_model_pricing('doubao', 'doubao-seed-1-6-vision-250815')
+print(f"定价来源: {result.pricing_info}")  # "渠道专属 - premium"
+```
+
+### 📖 详细文档
+- **[豆包定价系统完整指南](docs/doubao_pricing_system.md)** - 17个模型详细说明
+- **[定价系统总览](docs/pricing_system.md)** - 1800+模型定价数据
+- **[SiliconFlow集成说明](docs/SiliconFlow定价系统使用说明.md)** - 基础定价集成
 
 ## 🔗 相关文档
 

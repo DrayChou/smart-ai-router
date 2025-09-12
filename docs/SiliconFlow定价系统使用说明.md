@@ -8,7 +8,7 @@
 
 ### 配置文件
 
-- `config/pricing/siliconflow_pricing_from_html.json` - 从 HTML 解析的 SiliconFlow 真实模型数据
+- `config/pricing/siliconflow_unified.json` - 从 HTML 解析的 SiliconFlow 真实模型数据 (统一格式)
 - `cache/siliconflow/model.html` - SiliconFlow 网页缓存数据（解析源）
 
 ### 脚本文件
@@ -171,7 +171,7 @@ python scripts/parse_siliconflow_fixed.py
 ### 备份策略
 
 - HTML 解析脚本会自动生成带时间戳的配置文件
-- 配置文件路径：`config/pricing/siliconflow_pricing_from_html.json`
+- 配置文件路径：`config/pricing/siliconflow_unified.json`
 - 可手动备份重要的配置版本
 
 ### 数据验证
@@ -195,7 +195,7 @@ python scripts/parse_siliconflow_fixed.py
 2. **JSON 文件不存在**
 
    ```
-   定价JSON文件不存在: config/pricing/siliconflow_pricing_from_html.json
+   定价JSON文件不存在: config/pricing/siliconflow_unified.json
    ```
 
    解决方案：运行 HTML 解析脚本生成 JSON 文件。
@@ -215,7 +215,7 @@ python scripts/parse_siliconflow_fixed.py
 成功提取JSON数据，长度: 1234567 字符
 递归搜索找到模型数据数组，包含 127 个模型
 成功解析 127 个模型的完整元数据
-配置文件已保存到: config/pricing/siliconflow_pricing_from_html.json
+配置文件已保存到: config/pricing/siliconflow_unified.json
 ```
 
 ## 扩展性

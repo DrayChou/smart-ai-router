@@ -119,7 +119,22 @@ class CostEstimator:
                 base_pricing = openrouter_pricing
                 logger.info(f"  🔧 GITHUB PROVIDER FIX: Using OpenRouter baseline instead of channel-specific pricing")
             else:
-                base_pricing = channel_specific_pricing or openrouter_pricing or self._get_pricing_from_fallback(channel, model_name)
+                # 🔧 修复：严格按照定价优先级，不允许硬编码回退
+                if channel_specific_pricing:
+                    base_pricing = channel_specific_pricing
+                    logger.info(f"  ✅ Using channel-specific pricing")
+                elif openrouter_pricing:
+                    base_pricing = openrouter_pricing
+                    logger.info(f"  ✅ Using OpenRouter baseline pricing")
+                else:
+                    # 最后尝试回退策略（只检查免费模型）
+                    fallback_pricing = self._get_pricing_from_fallback(channel, model_name)
+                    if fallback_pricing:
+                        base_pricing = fallback_pricing
+                        logger.info(f"  ✅ Using fallback pricing (free model detection)")
+                    else:
+                        base_pricing = None
+                        logger.warning(f"  ❌ No valid pricing source found")
             logger.info(f"  Base pricing: {base_pricing}")
             
             if not base_pricing:
@@ -130,7 +145,9 @@ class CostEstimator:
             final_pricing = self._apply_currency_exchange_discount(channel, base_pricing)
             logger.info(f"  Final pricing after currency discount: {final_pricing}")
             
-            logger.debug(f"PRICING: {channel_id} -> {model_name}: input=${final_pricing['input']:.6f}, output=${final_pricing['output']:.6f}")
+            # 🔧 修复：添加unit字段，明确标识这是per_token格式
+            final_pricing['unit'] = 'per_token'
+            logger.debug(f"PRICING: {channel_id} -> {model_name}: input=${final_pricing['input']:.6f}, output=${final_pricing['output']:.6f} (per_token)")
             return final_pricing
             
         except Exception as e:
@@ -241,25 +258,26 @@ class CostEstimator:
             logger.debug(f"Anthropic定价获取失败: {e}")
             return None
     
-    def _get_pricing_from_fallback(self, channel, model_name: str) -> Dict[str, float]:
-        """回退定价策略"""
-        # 基于模型名称和大小的启发式定价
-        model_lower = model_name.lower()
+    def _get_pricing_from_fallback(self, channel, model_name: str) -> Optional[Dict[str, float]]:
+        """回退定价策略 - 只使用OpenRouter基准定价，不允许硬编码价格"""
+        logger.info(f"🔄 FALLBACK: No channel-specific pricing found for {model_name}, trying OpenRouter baseline")
         
-        # 免费模型判断
-        free_keywords = ['free', '免费', 'qwen2.5-7b', 'glm-4-9b', '1.5b', '3b', '7b']
+        # 1. 尝试获取OpenRouter基准定价
+        openrouter_pricing = self._get_openrouter_base_pricing(model_name)
+        if openrouter_pricing and (openrouter_pricing.get("input", 0) > 0 or openrouter_pricing.get("output", 0) > 0):
+            logger.info(f"✅ FALLBACK: Using OpenRouter baseline for {model_name}: {openrouter_pricing}")
+            return openrouter_pricing
+        
+        # 2. 检查是否为明显的免费模型
+        model_lower = model_name.lower()
+        free_keywords = ['free', '免费', ':free']
         if any(keyword in model_lower for keyword in free_keywords):
+            logger.info(f"✅ FALLBACK: Detected free model {model_name}")
             return {"input": 0.0, "output": 0.0}
         
-        # 基于参数量估算价格
-        if any(size in model_lower for size in ['1b', '3b', '7b', '9b']):
-            return {"input": 0.0001, "output": 0.0002}  # 小模型
-        elif any(size in model_lower for size in ['14b', '32b']):
-            return {"input": 0.0007, "output": 0.0007}  # 中等模型
-        elif any(size in model_lower for size in ['70b', '72b']):
-            return {"input": 0.004, "output": 0.004}    # 大模型
-        else:
-            return {"input": 0.001, "output": 0.002}    # 默认定价
+        # 3. 如果OpenRouter也没有数据，返回None表示无法定价
+        logger.warning(f"❌ FALLBACK: No pricing available for {model_name} - neither channel-specific nor OpenRouter baseline")
+        return None
     
     def _get_openrouter_base_pricing(self, model_name: str) -> Optional[Dict[str, float]]:
         """获取OpenRouter基准定价（作为其他渠道的参考价格）"""
@@ -413,9 +431,11 @@ class CostEstimator:
         # 2. 获取定价信息
         pricing = self._get_model_pricing(channel_id, model_name)
         if not pricing:
-            pricing = {"input": 0.001, "output": 0.002}  # 极端回退
-            confidence_level = "low"
-            estimation_method = "fallback_default"
+            # 🔧 修复：如果无法获取定价，返回无效估算而不是硬编码价格
+            logger.warning(f"❌ COST ESTIMATION: No pricing available for {model_name} in {channel_id}")
+            pricing = {"input": 0.0, "output": 0.0}  # 无法定价，标记为0
+            confidence_level = "none"
+            estimation_method = "no_pricing_available"
         elif pricing.get("input", 0) == 0 and pricing.get("output", 0) == 0:
             confidence_level = "high"
             estimation_method = "free_model"

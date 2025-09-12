@@ -206,3 +206,4 @@ router_config.yaml.backup
 *.tar
 examples
 CODEBUDDY.md
+CLAUDE.md
