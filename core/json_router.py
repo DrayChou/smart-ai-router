@@ -21,24 +21,8 @@ from .yaml_config import YAMLConfigLoader, get_yaml_config_loader
 
 logger = logging.getLogger(__name__)
 
-class TagNotFoundError(Exception):
-    """标签未找到错误"""
-    def __init__(self, tags: list[str], message: str = None):
-        self.tags = tags
-        if message is None:
-            if len(tags) == 1:
-                message = f"没有找到匹配标签 '{tags[0]}' 的模型"
-            else:
-                message = f"没有找到同时匹配标签 {tags} 的模型"
-        super().__init__(message)
-
-class ParameterComparisonError(Exception):
-    """参数量比较错误"""
-    def __init__(self, query: str, message: str = None):
-        self.query = query
-        if message is None:
-            message = f"没有找到满足参数量比较 '{query}' 的模型"
-        super().__init__(message)
+# 导入统一的异常定义
+from .routing.exceptions import TagNotFoundError, ParameterComparisonError
 
 @dataclass
 class SizeFilter:
@@ -605,7 +589,6 @@ class JSONRouter:
             candidates = self._get_candidate_channels_by_auto_tags(positive_tags, negative_tags)
             if not candidates:
                 logger.error(f"IMPLICIT TAG NOT FOUND: No models found matching tags {positive_tags} excluding {negative_tags}")
-                from core.exceptions import TagNotFoundError
                 raise TagNotFoundError(positive_tags + [f"!{tag}" for tag in negative_tags])
 
             # 提取并应用大小过滤器
@@ -624,7 +607,6 @@ class JSONRouter:
 
             if not candidates:
                 logger.error("SIZE FILTERS: No candidates left after applying size filters")
-                from core.exceptions import TagNotFoundError
                 raise TagNotFoundError(positive_tags + [f"!{tag}" for tag in negative_tags])
 
             logger.info(f"IMPLICIT TAG ROUTING: Found {len(candidates)} candidate channels")
@@ -2574,11 +2556,16 @@ class JSONRouter:
             logger.info("💡 OPTIMIZATION TIP: Performance could benefit from caching strategies")
 
 # 全局路由器实例
+import threading
 _router: Optional[JSONRouter] = None
+_router_lock = threading.Lock()
 
 def get_router() -> JSONRouter:
-    """获取全局路由器实例"""
+    """获取全局路由器实例（线程安全）"""
     global _router
     if _router is None:
-        _router = JSONRouter()
+        with _router_lock:
+            # 双重检查锁定模式
+            if _router is None:
+                _router = JSONRouter()
     return _router
