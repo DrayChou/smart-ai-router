@@ -144,7 +144,7 @@ class UnifiedPricingFile:
     provider: str
     source: str
     currency: str = "USD"
-    unit: str = "per_token"
+    unit: str = "per_million_tokens"  # 🔧 默认使用更直观的百万token单位
     format_version: str = "2.0"
     last_updated: datetime = field(default_factory=datetime.now)
     description: str = ""

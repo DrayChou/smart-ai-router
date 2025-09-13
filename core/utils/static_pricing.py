@@ -166,6 +166,8 @@ class UnifiedStaticPricingLoader:
 
             pricing_data = {
                 "models": unified_data.models,
+                "unit": unified_data.unit,  # 🔧 保留单位信息，避免丢失
+                "currency": unified_data.currency,
                 "metadata": {
                     "provider": unified_data.provider,
                     "source": unified_data.source,
@@ -206,10 +208,10 @@ class UnifiedStaticPricingLoader:
         if not model_data:
             return None
 
-        # 统一价格提取逻辑
+        # 🔧 智能价格提取逻辑 - 支持多种单位自动识别和转换
         if hasattr(model_data, "pricing") and model_data.pricing:
-            input_price = model_data.pricing.prompt * 1000  # USD/1K tokens
-            output_price = model_data.pricing.completion * 1000
+            prompt_price = model_data.pricing.prompt
+            completion_price = model_data.pricing.completion
         else:
             pricing = (
                 getattr(model_data, "pricing", {})
@@ -217,11 +219,17 @@ class UnifiedStaticPricingLoader:
                 else model_data.get("pricing", {})
             )
             if isinstance(pricing, dict):
-                input_price = pricing.get("prompt", 0.0) * 1000
-                output_price = pricing.get("completion", 0.0) * 1000
+                prompt_price = pricing.get("prompt", 0.0)
+                completion_price = pricing.get("completion", 0.0)
             else:
-                input_price = 0.0
-                output_price = 0.0
+                prompt_price = 0.0
+                completion_price = 0.0
+
+        # 🔧 智能单位转换 - 根据数值大小和配置单位智能判断并转换到 USD/1K tokens
+        config_unit = pricing_data.get('unit', 'per_token')
+        input_price, output_price = self._convert_pricing_unit(
+            prompt_price, completion_price, config_unit
+        )
 
         # 获取类别
         category = (
@@ -238,6 +246,50 @@ class UnifiedStaticPricingLoader:
             pricing_info=f"渠道专属 - {category}",
             is_free=(input_price == 0.0 and output_price == 0.0),
         )
+
+    def _convert_pricing_unit(
+        self, prompt_price: float, completion_price: float, config_unit: str
+    ) -> tuple[float, float]:
+        """
+        🔧 智能定价单位转换器
+        
+        支持的输入单位:
+        - per_token: 每个token的价格
+        - per_thousand_tokens: 每千个token的价格  
+        - per_million_tokens: 每百万个token的价格
+        - per_1k_tokens: 每千个token的价格 (别名)
+        - per_1m_tokens: 每百万个token的价格 (别名)
+        
+        输出: 统一转换为 USD/1K tokens 用于内部计算
+        """
+        # 🎯 单位标准化映射
+        unit_multipliers = {
+            # 基础单位
+            "per_token": 1000.0,               # 0.000001 -> 1.0
+            "per_thousand_tokens": 1.0,        # 1.0 -> 1.0  
+            "per_million_tokens": 0.001,       # 1000.0 -> 1.0
+            # 常见别名
+            "per_1k_tokens": 1.0,
+            "per_1m_tokens": 0.001,
+            "per_k_tokens": 1.0,
+            "per_m_tokens": 0.001,
+        }
+        
+        # 🔧 根据配置单位获取转换倍数
+        multiplier = unit_multipliers.get(config_unit.lower(), 1000.0)  # 默认按per_token处理
+        
+        # 🚀 智能识别: 如果数值过小，可能是per_token单位但标注错误
+        if config_unit.lower() in ["per_million_tokens", "per_1m_tokens", "per_m_tokens"]:
+            # 预期是大数值(如 0.8, 2.0)，如果是小数值可能标注错误
+            if prompt_price < 0.001 and completion_price < 0.001:
+                logger.warning(f"检测到可能的单位标注错误: {config_unit} 但价格过小 ({prompt_price}, {completion_price})")
+                multiplier = 1000.0  # 按per_token处理
+        
+        input_price = prompt_price * multiplier
+        output_price = completion_price * multiplier
+        
+        logger.debug(f"单位转换: {config_unit} | {prompt_price:.6f} -> {input_price:.4f} USD/1K tokens")
+        return input_price, output_price
 
     def _query_doubao_pricing(
         self, model_name: str, input_tokens: int, output_tokens: int

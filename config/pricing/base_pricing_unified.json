@@ -2,7 +2,7 @@
   "provider": "base_pricing",
   "source": "openrouter_unified_extraction",
   "currency": "USD",
-  "unit": "per_token",
+  "unit": "per_million_tokens",
   "format_version": "2.0",
   "last_updated": "2025-09-12T16:33:06.728803",
   "description": "基础定价数据，提取自OpenRouter官方API，包含331个模型的完整定价和元数据信息",
@@ -29,8 +29,8 @@
         "reasoning"
       ],
       "pricing": {
-        "prompt": 1.4e-07,
-        "completion": 1.4e-06,
+        "prompt": 0.14,
+        "completion": 1.4,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -73,8 +73,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 1.4e-07,
-        "completion": 1.4e-06,
+        "prompt": 0.14,
+        "completion": 1.4,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -117,8 +117,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 1.5e-07,
-        "completion": 7.5e-07,
+        "prompt": 0.15,
+        "completion": 0.75,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -159,8 +159,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 4e-07,
-        "completion": 1.2e-06,
+        "prompt": 0.4,
+        "completion": 1.2,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -203,8 +203,8 @@
         "reasoning"
       ],
       "pricing": {
-        "prompt": 4e-07,
-        "completion": 4e-06,
+        "prompt": 0.4,
+        "completion": 4.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -287,8 +287,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 4e-08,
-        "completion": 1.6e-07,
+        "prompt": 0.04,
+        "completion": 0.16,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -415,8 +415,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.2e-06,
-        "completion": 6e-06,
+        "prompt": 1.2,
+        "completion": 6.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -457,8 +457,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3.804346e-07,
-        "completion": 1.52173896e-06,
+        "prompt": 0.380435,
+        "completion": 1.521739,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -501,8 +501,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 2.006688e-07,
-        "completion": 8.0267549538462e-07,
+        "prompt": 0.200669,
+        "completion": 0.802675,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -544,8 +544,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.8e-07,
-        "completion": 5.9e-07,
+        "prompt": 0.18,
+        "completion": 0.59,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -586,8 +586,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.25e-06,
-        "completion": 1.25e-06,
+        "prompt": 1.25,
+        "completion": 1.25,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -629,8 +629,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 5.7e-07,
-        "completion": 1.42e-06,
+        "prompt": 0.57,
+        "completion": 1.42,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -674,8 +674,8 @@
         "reasoning"
       ],
       "pricing": {
-        "prompt": 8.967387e-08,
-        "completion": 3.58695612e-07,
+        "prompt": 0.089674,
+        "completion": 0.358696,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -718,8 +718,8 @@
         "code"
       ],
       "pricing": {
-        "prompt": 2e-07,
-        "completion": 1.5e-06,
+        "prompt": 0.2,
+        "completion": 1.5,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -761,8 +761,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.27173852e-07,
-        "completion": 5.086955952e-07,
+        "prompt": 0.127174,
+        "completion": 0.508696,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -803,8 +803,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2.4999988e-07,
-        "completion": 9.99999888e-07,
+        "prompt": 0.25,
+        "completion": 1.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -848,8 +848,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3e-07,
-        "completion": 2.5e-06,
+        "prompt": 0.3,
+        "completion": 2.5,
         "request": 0.0,
         "image": 0.001238,
         "web_search": 0.0,
@@ -936,8 +936,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 2.4999988e-07,
-        "completion": 9.99999888e-07,
+        "prompt": 0.25,
+        "completion": 1.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -978,8 +978,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2.4999988e-07,
-        "completion": 9.99999888e-07,
+        "prompt": 0.25,
+        "completion": 1.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -1024,8 +1024,8 @@
         "vision"
       ],
       "pricing": {
-        "prompt": 2.5e-06,
-        "completion": 1e-05,
+        "prompt": 2.5,
+        "completion": 10.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -1067,8 +1067,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 4e-07,
-        "completion": 2e-06,
+        "prompt": 0.4,
+        "completion": 2.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -1109,8 +1109,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 7e-08,
-        "completion": 2.8e-07,
+        "prompt": 0.07,
+        "completion": 0.28,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -1153,8 +1153,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.4e-07,
-        "completion": 5.6e-07,
+        "prompt": 0.14,
+        "completion": 0.56,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -1196,8 +1196,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 5e-07,
-        "completion": 1.8e-06,
+        "prompt": 0.5,
+        "completion": 1.8,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -1239,8 +1239,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2e-07,
-        "completion": 4e-07,
+        "prompt": 0.2,
+        "completion": 0.4,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -1281,8 +1281,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2e-06,
-        "completion": 8e-06,
+        "prompt": 2.0,
+        "completion": 8.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -1327,8 +1327,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 1.25e-06,
-        "completion": 1e-05,
+        "prompt": 1.25,
+        "completion": 10.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -1371,8 +1371,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.25e-06,
-        "completion": 1e-05,
+        "prompt": 1.25,
+        "completion": 10.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -1416,8 +1416,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2.5e-07,
-        "completion": 2e-06,
+        "prompt": 0.25,
+        "completion": 2.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -1460,8 +1460,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 5e-08,
-        "completion": 4e-07,
+        "prompt": 0.05,
+        "completion": 0.4,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.01,
@@ -1544,8 +1544,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 7.2e-08,
-        "completion": 2.8e-07,
+        "prompt": 0.072,
+        "completion": 0.28,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -1628,8 +1628,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 4e-08,
-        "completion": 1.5e-07,
+        "prompt": 0.04,
+        "completion": 0.15,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -1672,8 +1672,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.5e-05,
-        "completion": 7.5e-05,
+        "prompt": 15.0,
+        "completion": 75.0,
         "request": 0.0,
         "image": 0.024,
         "web_search": 0.01,
@@ -1716,8 +1716,8 @@
         "code"
       ],
       "pricing": {
-        "prompt": 3e-07,
-        "completion": 9e-07,
+        "prompt": 0.3,
+        "completion": 0.9,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -1762,8 +1762,8 @@
         "code"
       ],
       "pricing": {
-        "prompt": 7.065214e-08,
-        "completion": 2.82608664e-07,
+        "prompt": 0.070652,
+        "completion": 0.282609,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -1807,8 +1807,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 7.065214e-08,
-        "completion": 2.82608664e-07,
+        "prompt": 0.070652,
+        "completion": 0.282609,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -1849,8 +1849,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 4.12499802e-07,
-        "completion": 1.6499998152e-06,
+        "prompt": 0.4125,
+        "completion": 1.65,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -1933,8 +1933,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.4e-07,
-        "completion": 8.6e-07,
+        "prompt": 0.14,
+        "completion": 0.86,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -1977,8 +1977,8 @@
         "reasoning"
       ],
       "pricing": {
-        "prompt": 9.74999532e-08,
-        "completion": 3.8999995632e-07,
+        "prompt": 0.0975,
+        "completion": 0.39,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -2020,8 +2020,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1e-07,
-        "completion": 1e-07,
+        "prompt": 0.1,
+        "completion": 0.1,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -2108,8 +2108,8 @@
         "code"
       ],
       "pricing": {
-        "prompt": 2.4999988e-07,
-        "completion": 9.99999888e-07,
+        "prompt": 0.25,
+        "completion": 1.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -2152,8 +2152,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1e-07,
-        "completion": 2e-07,
+        "prompt": 0.1,
+        "completion": 0.2,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -2198,8 +2198,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1e-07,
-        "completion": 4e-07,
+        "prompt": 0.1,
+        "completion": 0.4,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -2240,8 +2240,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 9.74999532e-08,
-        "completion": 3.8999995632e-07,
+        "prompt": 0.0975,
+        "completion": 0.39,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -2282,8 +2282,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 8.5e-07,
-        "completion": 3.4e-06,
+        "prompt": 0.85,
+        "completion": 3.4,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -2366,8 +2366,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.4e-07,
-        "completion": 2.49e-06,
+        "prompt": 0.14,
+        "completion": 2.49,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -2411,8 +2411,8 @@
         "reasoning"
       ],
       "pricing": {
-        "prompt": 3.5e-08,
-        "completion": 1.38e-07,
+        "prompt": 0.035,
+        "completion": 0.138,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -2453,8 +2453,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 4e-07,
-        "completion": 2e-06,
+        "prompt": 0.4,
+        "completion": 2.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -2495,8 +2495,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 7e-08,
-        "completion": 2.8e-07,
+        "prompt": 0.07,
+        "completion": 0.28,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -2580,8 +2580,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3e-06,
-        "completion": 1.5e-05,
+        "prompt": 3.0,
+        "completion": 15.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -2710,8 +2710,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 3e-08,
-        "completion": 3e-08,
+        "prompt": 0.03,
+        "completion": 0.03,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -2794,8 +2794,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 9e-07,
-        "completion": 1.9e-06,
+        "prompt": 0.9,
+        "completion": 1.9,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -2836,8 +2836,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 9e-07,
-        "completion": 1.9e-06,
+        "prompt": 0.9,
+        "completion": 1.9,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -2880,8 +2880,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 4.2e-07,
-        "completion": 1.25e-06,
+        "prompt": 0.42,
+        "completion": 1.25,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -2923,8 +2923,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2.8e-07,
-        "completion": 1.1e-06,
+        "prompt": 0.28,
+        "completion": 1.1,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -2966,8 +2966,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 4e-07,
-        "completion": 7e-07,
+        "prompt": 0.4,
+        "completion": 0.7,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -3008,8 +3008,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2.5e-07,
-        "completion": 1e-06,
+        "prompt": 0.25,
+        "completion": 1.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -3098,8 +3098,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 5e-08,
-        "completion": 1e-07,
+        "prompt": 0.05,
+        "completion": 0.1,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -3141,8 +3141,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3e-07,
-        "completion": 1.65e-06,
+        "prompt": 0.3,
+        "completion": 1.65,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -3187,8 +3187,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1e-07,
-        "completion": 4e-07,
+        "prompt": 0.1,
+        "completion": 0.4,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -3233,8 +3233,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3e-07,
-        "completion": 2.5e-06,
+        "prompt": 0.3,
+        "completion": 2.5,
         "request": 0.0,
         "image": 0.001238,
         "web_search": 0.0,
@@ -3279,8 +3279,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.25e-06,
-        "completion": 1e-05,
+        "prompt": 1.25,
+        "completion": 10.0,
         "request": 0.0,
         "image": 0.00516,
         "web_search": 0.0,
@@ -3365,8 +3365,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2.9e-07,
-        "completion": 1.15e-06,
+        "prompt": 0.29,
+        "completion": 1.15,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -3409,8 +3409,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2e-05,
-        "completion": 8e-05,
+        "prompt": 20.0,
+        "completion": 80.0,
         "request": 0.0,
         "image": 0.0153,
         "web_search": 0.0,
@@ -3452,8 +3452,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3e-07,
-        "completion": 5e-07,
+        "prompt": 0.3,
+        "completion": 0.5,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -3494,8 +3494,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3e-06,
-        "completion": 1.5e-05,
+        "prompt": 3.0,
+        "completion": 15.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -3536,8 +3536,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 5e-07,
-        "completion": 1.5e-06,
+        "prompt": 0.5,
+        "completion": 1.5,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -3578,8 +3578,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2e-06,
-        "completion": 5e-06,
+        "prompt": 2.0,
+        "completion": 5.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -3622,8 +3622,8 @@
         "reasoning"
       ],
       "pricing": {
-        "prompt": 2e-06,
-        "completion": 5e-06,
+        "prompt": 2.0,
+        "completion": 5.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -3668,8 +3668,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.25e-06,
-        "completion": 1e-05,
+        "prompt": 1.25,
+        "completion": 10.0,
         "request": 0.0,
         "image": 0.00516,
         "web_search": 0.0,
@@ -3754,8 +3754,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.3043472e-08,
-        "completion": 5.21739072e-08,
+        "prompt": 0.013043,
+        "completion": 0.052174,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -3838,8 +3838,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2.4999988e-07,
-        "completion": 9.99999888e-07,
+        "prompt": 0.25,
+        "completion": 1.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -3882,8 +3882,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.5e-05,
-        "completion": 7.5e-05,
+        "prompt": 15.0,
+        "completion": 75.0,
         "request": 0.0,
         "image": 0.024,
         "web_search": 0.01,
@@ -3926,8 +3926,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3e-06,
-        "completion": 1.5e-05,
+        "prompt": 3.0,
+        "completion": 15.0,
         "request": 0.0,
         "image": 0.0048,
         "web_search": 0.0,
@@ -4010,8 +4010,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3.5869548e-08,
-        "completion": 1.434782448e-07,
+        "prompt": 0.03587,
+        "completion": 0.143478,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -4094,8 +4094,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2e-08,
-        "completion": 4e-08,
+        "prompt": 0.02,
+        "completion": 0.04,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -4140,8 +4140,8 @@
         "code"
       ],
       "pricing": {
-        "prompt": 1.5e-06,
-        "completion": 6e-06,
+        "prompt": 1.5,
+        "completion": 6.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -4227,8 +4227,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.27173852e-07,
-        "completion": 5.086955952e-07,
+        "prompt": 0.127174,
+        "completion": 0.508696,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -4270,8 +4270,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 4e-07,
-        "completion": 2e-06,
+        "prompt": 0.4,
+        "completion": 2.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -4316,8 +4316,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.25e-06,
-        "completion": 1e-05,
+        "prompt": 1.25,
+        "completion": 10.0,
         "request": 0.0,
         "image": 0.00516,
         "web_search": 0.0,
@@ -4359,8 +4359,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.8e-07,
-        "completion": 1.8e-07,
+        "prompt": 0.18,
+        "completion": 0.18,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -4403,8 +4403,8 @@
         "reasoning"
       ],
       "pricing": {
-        "prompt": 9e-07,
-        "completion": 3.3e-06,
+        "prompt": 0.9,
+        "completion": 3.3,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -4445,8 +4445,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 7.5e-07,
-        "completion": 1.2e-06,
+        "prompt": 0.75,
+        "completion": 1.2,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -4489,8 +4489,8 @@
         "code"
       ],
       "pricing": {
-        "prompt": 5e-07,
-        "completion": 8e-07,
+        "prompt": 0.5,
+        "completion": 0.8,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -4533,8 +4533,8 @@
         "reasoning"
       ],
       "pricing": {
-        "prompt": 7e-08,
-        "completion": 3.5e-07,
+        "prompt": 0.07,
+        "completion": 0.35,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -4577,8 +4577,8 @@
         "code"
       ],
       "pricing": {
-        "prompt": 2.5e-07,
-        "completion": 1e-06,
+        "prompt": 0.25,
+        "completion": 1.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -4661,8 +4661,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 5e-07,
-        "completion": 2.18e-06,
+        "prompt": 0.5,
+        "completion": 2.18,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -4704,8 +4704,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.8e-07,
-        "completion": 1.8e-07,
+        "prompt": 0.18,
+        "completion": 0.18,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -4790,8 +4790,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3.5869548e-08,
-        "completion": 1.434782448e-07,
+        "prompt": 0.03587,
+        "completion": 0.143478,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -4876,8 +4876,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3.5e-08,
-        "completion": 1.38e-07,
+        "prompt": 0.035,
+        "completion": 0.138,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -4960,8 +4960,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 6e-08,
-        "completion": 2.4e-07,
+        "prompt": 0.06,
+        "completion": 0.24,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -5003,8 +5003,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3.22825932e-08,
-        "completion": 1.2913042032e-07,
+        "prompt": 0.032283,
+        "completion": 0.12913,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -5087,8 +5087,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.3e-07,
-        "completion": 6e-07,
+        "prompt": 0.13,
+        "completion": 0.6,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -5171,8 +5171,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2.4999988e-07,
-        "completion": 9.99999888e-07,
+        "prompt": 0.25,
+        "completion": 1.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -5255,8 +5255,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2.4999988e-07,
-        "completion": 9.99999888e-07,
+        "prompt": 0.25,
+        "completion": 1.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -5298,8 +5298,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3.5869548e-08,
-        "completion": 1.434782448e-07,
+        "prompt": 0.03587,
+        "completion": 0.143478,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -5341,8 +5341,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 5.5e-07,
-        "completion": 1.66e-06,
+        "prompt": 0.55,
+        "completion": 1.66,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -5386,8 +5386,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.1e-06,
-        "completion": 4.4e-06,
+        "prompt": 1.1,
+        "completion": 4.4,
         "request": 0.0,
         "image": 0.0008415,
         "web_search": 0.0,
@@ -5430,8 +5430,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2e-06,
-        "completion": 8e-06,
+        "prompt": 2.0,
+        "completion": 8.0,
         "request": 0.0,
         "image": 0.00153,
         "web_search": 0.0,
@@ -5475,8 +5475,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.1e-06,
-        "completion": 4.4e-06,
+        "prompt": 1.1,
+        "completion": 4.4,
         "request": 0.0,
         "image": 0.0008415,
         "web_search": 0.0,
@@ -5561,8 +5561,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3.5869548e-08,
-        "completion": 1.434782448e-07,
+        "prompt": 0.03587,
+        "completion": 0.143478,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -5606,8 +5606,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2e-06,
-        "completion": 8e-06,
+        "prompt": 2.0,
+        "completion": 8.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -5651,8 +5651,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 4e-07,
-        "completion": 1.6e-06,
+        "prompt": 0.4,
+        "completion": 1.6,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -5696,8 +5696,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1e-07,
-        "completion": 4e-07,
+        "prompt": 0.1,
+        "completion": 0.4,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -5739,8 +5739,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 8e-07,
-        "completion": 1.2e-06,
+        "prompt": 0.8,
+        "completion": 1.2,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -5785,8 +5785,8 @@
         "code"
       ],
       "pricing": {
-        "prompt": 8e-07,
-        "completion": 1.2e-06,
+        "prompt": 0.8,
+        "completion": 1.2,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -5871,8 +5871,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.7934774e-08,
-        "completion": 7.17391224e-08,
+        "prompt": 0.017935,
+        "completion": 0.071739,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -5959,8 +5959,8 @@
         "code"
       ],
       "pricing": {
-        "prompt": 1.5e-08,
-        "completion": 1.5e-08,
+        "prompt": 0.015,
+        "completion": 0.015,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -6049,8 +6049,8 @@
         "reasoning"
       ],
       "pricing": {
-        "prompt": 6.249997e-08,
-        "completion": 2.49999972e-07,
+        "prompt": 0.0625,
+        "completion": 0.25,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -6092,8 +6092,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3e-07,
-        "completion": 5e-07,
+        "prompt": 0.3,
+        "completion": 0.5,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -6134,8 +6134,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3e-06,
-        "completion": 1.5e-05,
+        "prompt": 3.0,
+        "completion": 15.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -6218,8 +6218,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 6e-07,
-        "completion": 1.8e-06,
+        "prompt": 0.6,
+        "completion": 1.8,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -6304,8 +6304,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.5e-07,
-        "completion": 6e-07,
+        "prompt": 0.15,
+        "completion": 0.6,
         "request": 0.0,
         "image": 0.0006684,
         "web_search": 0.0,
@@ -6390,8 +6390,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 8e-08,
-        "completion": 3e-07,
+        "prompt": 0.08,
+        "completion": 0.3,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -6434,8 +6434,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1e-07,
-        "completion": 2e-07,
+        "prompt": 0.1,
+        "completion": 0.2,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -6526,8 +6526,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 3.5869548e-08,
-        "completion": 1.434782448e-07,
+        "prompt": 0.03587,
+        "completion": 0.143478,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -6614,8 +6614,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 2.4999988e-07,
-        "completion": 9.99999888e-07,
+        "prompt": 0.25,
+        "completion": 1.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -6660,8 +6660,8 @@
         "reasoning"
       ],
       "pricing": {
-        "prompt": 0.00015,
-        "completion": 0.0006,
+        "prompt": 150.0,
+        "completion": 600.0,
         "request": 0.0,
         "image": 0.21675,
         "web_search": 0.0,
@@ -6750,8 +6750,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 3.804346e-08,
-        "completion": 1.52173896e-07,
+        "prompt": 0.038043,
+        "completion": 0.152174,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -6795,8 +6795,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 1e-06,
-        "completion": 1.5e-06,
+        "prompt": 1.0,
+        "completion": 1.5,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -6881,8 +6881,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 4e-08,
-        "completion": 8e-08,
+        "prompt": 0.04,
+        "completion": 0.08,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -6967,8 +6967,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3.532607e-08,
-        "completion": 1.41304332e-07,
+        "prompt": 0.035326,
+        "completion": 0.141304,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -7009,8 +7009,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2.5e-06,
-        "completion": 1e-05,
+        "prompt": 2.5,
+        "completion": 10.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -7054,8 +7054,8 @@
         "vision"
       ],
       "pricing": {
-        "prompt": 1.5e-07,
-        "completion": 6e-07,
+        "prompt": 0.15,
+        "completion": 0.6,
         "request": 0.0275,
         "image": 0.000217,
         "web_search": 0.0,
@@ -7099,8 +7099,8 @@
         "vision"
       ],
       "pricing": {
-        "prompt": 2.5e-06,
-        "completion": 1e-05,
+        "prompt": 2.5,
+        "completion": 10.0,
         "request": 0.035,
         "image": 0.003613,
         "web_search": 0.0,
@@ -7229,8 +7229,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 6.521736e-08,
-        "completion": 2.60869536e-07,
+        "prompt": 0.065217,
+        "completion": 0.26087,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -7271,8 +7271,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 5e-07,
-        "completion": 1e-06,
+        "prompt": 0.5,
+        "completion": 1.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -7313,8 +7313,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3.9130416e-08,
-        "completion": 1.565217216e-07,
+        "prompt": 0.03913,
+        "completion": 0.156522,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -7359,8 +7359,8 @@
         "vision"
       ],
       "pricing": {
-        "prompt": 5e-08,
-        "completion": 1e-07,
+        "prompt": 0.05,
+        "completion": 0.1,
         "request": 0.0,
         "image": 0.00017685,
         "web_search": 0.0,
@@ -7404,8 +7404,8 @@
         "reasoning"
       ],
       "pricing": {
-        "prompt": 2e-06,
-        "completion": 8e-06,
+        "prompt": 2.0,
+        "completion": 8.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.005,
@@ -7447,8 +7447,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3e-06,
-        "completion": 1.5e-05,
+        "prompt": 3.0,
+        "completion": 15.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.005,
@@ -7489,8 +7489,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2e-06,
-        "completion": 8e-06,
+        "prompt": 2.0,
+        "completion": 8.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.005,
@@ -7575,8 +7575,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.5e-07,
-        "completion": 4e-07,
+        "prompt": 0.15,
+        "completion": 0.4,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -7664,8 +7664,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 7.5e-08,
-        "completion": 3e-07,
+        "prompt": 0.075,
+        "completion": 0.3,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -7708,8 +7708,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3e-06,
-        "completion": 1.5e-05,
+        "prompt": 3.0,
+        "completion": 15.0,
         "request": 0.0,
         "image": 0.0048,
         "web_search": 0.0,
@@ -7754,8 +7754,8 @@
         "reasoning"
       ],
       "pricing": {
-        "prompt": 3e-06,
-        "completion": 1.5e-05,
+        "prompt": 3.0,
+        "completion": 15.0,
         "request": 0.0,
         "image": 0.0048,
         "web_search": 0.0,
@@ -7796,8 +7796,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2e-06,
-        "completion": 8e-06,
+        "prompt": 2.0,
+        "completion": 8.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -7838,8 +7838,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2e-07,
-        "completion": 6e-07,
+        "prompt": 0.2,
+        "completion": 0.6,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -7922,8 +7922,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.333333333333e-08,
-        "completion": 3.47826048e-08,
+        "prompt": 0.013333,
+        "completion": 0.034783,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -8006,8 +8006,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2.71739e-08,
-        "completion": 1.0869564e-07,
+        "prompt": 0.027174,
+        "completion": 0.108696,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -8049,8 +8049,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2e-08,
-        "completion": 6e-08,
+        "prompt": 0.02,
+        "completion": 0.06,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -8092,8 +8092,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.1e-06,
-        "completion": 4.4e-06,
+        "prompt": 1.1,
+        "completion": 4.4,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -8135,8 +8135,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 4e-08,
-        "completion": 4e-08,
+        "prompt": 0.04,
+        "completion": 0.04,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -8181,8 +8181,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1e-07,
-        "completion": 4e-07,
+        "prompt": 0.1,
+        "completion": 0.4,
         "request": 0.0,
         "image": 2.58e-05,
         "web_search": 0.0,
@@ -8224,8 +8224,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2.1e-07,
-        "completion": 6.3e-07,
+        "prompt": 0.21,
+        "completion": 0.63,
         "request": 0.0,
         "image": 0.0002688,
         "web_search": 0.0,
@@ -8266,8 +8266,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 4e-06,
-        "completion": 8e-06,
+        "prompt": 4.0,
+        "completion": 8.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -8309,8 +8309,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 7e-07,
-        "completion": 1.4e-06,
+        "prompt": 0.7,
+        "completion": 1.4,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -8352,8 +8352,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2e-07,
-        "completion": 2e-07,
+        "prompt": 0.2,
+        "completion": 0.2,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -8395,8 +8395,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 8e-07,
-        "completion": 3.2e-06,
+        "prompt": 0.8,
+        "completion": 3.2,
         "request": 0.0,
         "image": 0.001024,
         "web_search": 0.0,
@@ -8437,8 +8437,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 5e-08,
-        "completion": 2e-07,
+        "prompt": 0.05,
+        "completion": 0.2,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -8529,8 +8529,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 2.4999988e-07,
-        "completion": 9.99999888e-07,
+        "prompt": 0.25,
+        "completion": 1.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -8571,8 +8571,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 4e-07,
-        "completion": 1.2e-06,
+        "prompt": 0.4,
+        "completion": 1.2,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -8613,8 +8613,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.6e-06,
-        "completion": 6.4e-06,
+        "prompt": 1.6,
+        "completion": 6.4,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -8656,8 +8656,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.1e-06,
-        "completion": 4.4e-06,
+        "prompt": 1.1,
+        "completion": 4.4,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -8744,8 +8744,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 3.804346e-08,
-        "completion": 1.52173896e-07,
+        "prompt": 0.038043,
+        "completion": 0.152174,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -8787,8 +8787,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 7.5e-08,
-        "completion": 1.5e-07,
+        "prompt": 0.075,
+        "completion": 0.15,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -8871,8 +8871,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.5e-07,
-        "completion": 1.5e-07,
+        "prompt": 0.15,
+        "completion": 0.15,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -8915,8 +8915,8 @@
         "reasoning"
       ],
       "pricing": {
-        "prompt": 1e-06,
-        "completion": 5e-06,
+        "prompt": 1.0,
+        "completion": 5.0,
         "request": 0.005,
         "image": 0.0,
         "web_search": 0.0,
@@ -8958,8 +8958,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1e-06,
-        "completion": 1e-06,
+        "prompt": 1.0,
+        "completion": 1.0,
         "request": 0.005,
         "image": 0.0,
         "web_search": 0.0,
@@ -9001,8 +9001,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1e-08,
-        "completion": 1e-08,
+        "prompt": 0.01,
+        "completion": 0.01,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -9043,8 +9043,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2e-08,
-        "completion": 2e-08,
+        "prompt": 0.02,
+        "completion": 0.02,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -9129,8 +9129,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3.260868e-08,
-        "completion": 1.30434768e-07,
+        "prompt": 0.032609,
+        "completion": 0.130435,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -9213,8 +9213,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 4e-07,
-        "completion": 2e-06,
+        "prompt": 0.4,
+        "completion": 2.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -9257,8 +9257,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2e-07,
-        "completion": 1.1e-06,
+        "prompt": 0.2,
+        "completion": 1.1,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -9301,8 +9301,8 @@
         "code"
       ],
       "pricing": {
-        "prompt": 3e-07,
-        "completion": 9e-07,
+        "prompt": 0.3,
+        "completion": 0.9,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -9343,8 +9343,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 6e-08,
-        "completion": 1.4e-07,
+        "prompt": 0.06,
+        "completion": 0.14,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -9387,8 +9387,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 2.4999988e-07,
-        "completion": 9.99999888e-07,
+        "prompt": 0.25,
+        "completion": 1.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -9432,8 +9432,8 @@
         "reasoning"
       ],
       "pricing": {
-        "prompt": 6.5e-07,
-        "completion": 7.5e-07,
+        "prompt": 0.65,
+        "completion": 0.75,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -9478,8 +9478,8 @@
         "reasoning"
       ],
       "pricing": {
-        "prompt": 1.5e-05,
-        "completion": 6e-05,
+        "prompt": 15.0,
+        "completion": 60.0,
         "request": 0.0,
         "image": 0.021675,
         "web_search": 0.0,
@@ -9523,8 +9523,8 @@
         "vision"
       ],
       "pricing": {
-        "prompt": 2e-06,
-        "completion": 1e-05,
+        "prompt": 2.0,
+        "completion": 10.0,
         "request": 0.0,
         "image": 0.0036,
         "web_search": 0.0,
@@ -9565,8 +9565,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2e-06,
-        "completion": 1e-05,
+        "prompt": 2.0,
+        "completion": 10.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -9608,8 +9608,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3.75e-08,
-        "completion": 1.5e-07,
+        "prompt": 0.0375,
+        "completion": 0.15,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -9742,8 +9742,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 3.8e-08,
-        "completion": 1.2e-07,
+        "prompt": 0.038,
+        "completion": 0.12,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -9785,8 +9785,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 6e-08,
-        "completion": 2.4e-07,
+        "prompt": 0.06,
+        "completion": 0.24,
         "request": 0.0,
         "image": 9e-05,
         "web_search": 0.0,
@@ -9827,8 +9827,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3.5e-08,
-        "completion": 1.4e-07,
+        "prompt": 0.035,
+        "completion": 0.14,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -9870,8 +9870,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 8e-07,
-        "completion": 3.2e-06,
+        "prompt": 0.8,
+        "completion": 3.2,
         "request": 0.0,
         "image": 0.0012,
         "web_search": 0.0,
@@ -9913,8 +9913,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2e-07,
-        "completion": 2e-07,
+        "prompt": 0.2,
+        "completion": 0.2,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -9960,8 +9960,8 @@
         "vision"
       ],
       "pricing": {
-        "prompt": 2.5e-06,
-        "completion": 1e-05,
+        "prompt": 2.5,
+        "completion": 10.0,
         "request": 0.0,
         "image": 0.003613,
         "web_search": 0.0,
@@ -10002,8 +10002,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2e-06,
-        "completion": 6e-06,
+        "prompt": 2.0,
+        "completion": 6.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -10044,8 +10044,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2e-06,
-        "completion": 6e-06,
+        "prompt": 2.0,
+        "completion": 6.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -10087,8 +10087,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2e-06,
-        "completion": 6e-06,
+        "prompt": 2.0,
+        "completion": 6.0,
         "request": 0.0,
         "image": 0.002888,
         "web_search": 0.0,
@@ -10179,8 +10179,8 @@
         "code"
       ],
       "pricing": {
-        "prompt": 6e-08,
-        "completion": 1.5e-07,
+        "prompt": 0.06,
+        "completion": 0.15,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -10221,8 +10221,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 4.5e-06,
-        "completion": 4.5e-06,
+        "prompt": 4.5,
+        "completion": 4.5,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -10263,8 +10263,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 4e-07,
-        "completion": 4e-07,
+        "prompt": 0.4,
+        "completion": 0.4,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -10305,8 +10305,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 8e-07,
-        "completion": 4e-06,
+        "prompt": 0.8,
+        "completion": 4.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.01,
@@ -10348,8 +10348,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 8e-07,
-        "completion": 4e-06,
+        "prompt": 0.8,
+        "completion": 4.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -10391,8 +10391,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2e-06,
-        "completion": 5e-06,
+        "prompt": 2.0,
+        "completion": 5.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -10434,8 +10434,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3e-06,
-        "completion": 1.5e-05,
+        "prompt": 3.0,
+        "completion": 15.0,
         "request": 0.0,
         "image": 0.0048,
         "web_search": 0.0,
@@ -10476,8 +10476,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1e-07,
-        "completion": 1e-07,
+        "prompt": 0.1,
+        "completion": 0.1,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -10518,8 +10518,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 4e-08,
-        "completion": 4e-08,
+        "prompt": 0.04,
+        "completion": 0.04,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -10563,8 +10563,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 4e-08,
-        "completion": 1e-07,
+        "prompt": 0.04,
+        "completion": 0.1,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -10608,8 +10608,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 1.2e-07,
-        "completion": 3e-07,
+        "prompt": 0.12,
+        "completion": 0.3,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -10649,8 +10649,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2.5e-06,
-        "completion": 1e-05,
+        "prompt": 2.5,
+        "completion": 10.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -10690,8 +10690,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2.5e-06,
-        "completion": 1e-05,
+        "prompt": 2.5,
+        "completion": 10.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -10733,8 +10733,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3.75e-08,
-        "completion": 1.5e-07,
+        "prompt": 0.0375,
+        "completion": 0.15,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -10775,8 +10775,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.7e-07,
-        "completion": 4.3e-07,
+        "prompt": 0.17,
+        "completion": 0.43,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -10818,8 +10818,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3e-06,
-        "completion": 3e-06,
+        "prompt": 3.0,
+        "completion": 3.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -10906,8 +10906,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 1.2e-08,
-        "completion": 2.4e-08,
+        "prompt": 0.012,
+        "completion": 0.024,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -10950,8 +10950,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 5e-09,
-        "completion": 1e-08,
+        "prompt": 0.005,
+        "completion": 0.01,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -10996,8 +10996,8 @@
         "vision"
       ],
       "pricing": {
-        "prompt": 3.5e-07,
-        "completion": 4e-07,
+        "prompt": 0.35,
+        "completion": 0.4,
         "request": 0.0,
         "image": 0.0005058,
         "web_search": 0.0,
@@ -11042,8 +11042,8 @@
         "vision"
       ],
       "pricing": {
-        "prompt": 4.9e-08,
-        "completion": 4.9e-08,
+        "prompt": 0.049,
+        "completion": 0.049,
         "request": 0.0,
         "image": 7.948e-05,
         "web_search": 0.0,
@@ -11132,8 +11132,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 6.521736e-08,
-        "completion": 2.60869536e-07,
+        "prompt": 0.065217,
+        "completion": 0.26087,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -11175,8 +11175,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 9e-08,
-        "completion": 6e-07,
+        "prompt": 0.09,
+        "completion": 0.6,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -11219,8 +11219,8 @@
         "reasoning"
       ],
       "pricing": {
-        "prompt": 1.1e-06,
-        "completion": 4.4e-06,
+        "prompt": 1.1,
+        "completion": 4.4,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -11263,8 +11263,8 @@
         "reasoning"
       ],
       "pricing": {
-        "prompt": 1.1e-06,
-        "completion": 4.4e-06,
+        "prompt": 1.1,
+        "completion": 4.4,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -11306,8 +11306,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1e-07,
-        "completion": 1e-07,
+        "prompt": 0.1,
+        "completion": 0.1,
         "request": 0.0,
         "image": 0.0001445,
         "web_search": 0.0,
@@ -11347,8 +11347,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2.5e-06,
-        "completion": 1e-05,
+        "prompt": 2.5,
+        "completion": 10.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -11388,8 +11388,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.5e-07,
-        "completion": 6e-07,
+        "prompt": 0.15,
+        "completion": 0.6,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -11434,8 +11434,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 2e-07,
-        "completion": 2e-07,
+        "prompt": 0.2,
+        "completion": 0.2,
         "request": 0.0,
         "image": 0.0001445,
         "web_search": 0.0,
@@ -11479,8 +11479,8 @@
         "reasoning"
       ],
       "pricing": {
-        "prompt": 6.5e-07,
-        "completion": 7.5e-07,
+        "prompt": 0.65,
+        "completion": 0.75,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -11524,8 +11524,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 1e-07,
-        "completion": 1e-07,
+        "prompt": 0.1,
+        "completion": 0.1,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -11567,8 +11567,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1e-07,
-        "completion": 2.8e-07,
+        "prompt": 0.1,
+        "completion": 0.28,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -11609,8 +11609,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 7e-07,
-        "completion": 8e-07,
+        "prompt": 0.7,
+        "completion": 0.8,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -11655,8 +11655,8 @@
         "vision"
       ],
       "pricing": {
-        "prompt": 5e-06,
-        "completion": 1.5e-05,
+        "prompt": 5.0,
+        "completion": 15.0,
         "request": 0.0,
         "image": 0.007225,
         "web_search": 0.0,
@@ -11700,8 +11700,8 @@
         "reasoning"
       ],
       "pricing": {
-        "prompt": 2e-08,
-        "completion": 5e-08,
+        "prompt": 0.02,
+        "completion": 0.05,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -11746,8 +11746,8 @@
         "vision"
       ],
       "pricing": {
-        "prompt": 2.5e-06,
-        "completion": 1e-05,
+        "prompt": 2.5,
+        "completion": 10.0,
         "request": 0.0,
         "image": 0.003613,
         "web_search": 0.0,
@@ -11788,8 +11788,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2e-06,
-        "completion": 2e-06,
+        "prompt": 2.0,
+        "completion": 2.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -11833,8 +11833,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 1.5e-08,
-        "completion": 2e-08,
+        "prompt": 0.015,
+        "completion": 0.02,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -11921,8 +11921,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 8e-07,
-        "completion": 8e-07,
+        "prompt": 0.8,
+        "completion": 0.8,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -11966,8 +11966,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 1e-07,
-        "completion": 2.8e-07,
+        "prompt": 0.1,
+        "completion": 0.28,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -12050,8 +12050,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.7934774e-08,
-        "completion": 7.17391224e-08,
+        "prompt": 0.017935,
+        "completion": 0.071739,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -12096,8 +12096,8 @@
         "vision"
       ],
       "pricing": {
-        "prompt": 1.5e-07,
-        "completion": 6e-07,
+        "prompt": 0.15,
+        "completion": 0.6,
         "request": 0.0,
         "image": 0.000217,
         "web_search": 0.0,
@@ -12142,8 +12142,8 @@
         "vision"
       ],
       "pricing": {
-        "prompt": 1.5e-07,
-        "completion": 6e-07,
+        "prompt": 0.15,
+        "completion": 0.6,
         "request": 0.0,
         "image": 0.007225,
         "web_search": 0.0,
@@ -12185,8 +12185,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 6.5e-07,
-        "completion": 6.5e-07,
+        "prompt": 0.65,
+        "completion": 0.65,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -12269,8 +12269,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2e-08,
-        "completion": 3.58695612e-08,
+        "prompt": 0.02,
+        "completion": 0.03587,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -12312,8 +12312,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3e-06,
-        "completion": 1.5e-05,
+        "prompt": 3.0,
+        "completion": 15.0,
         "request": 0.0,
         "image": 0.0048,
         "web_search": 0.0,
@@ -12357,8 +12357,8 @@
         "reasoning"
       ],
       "pricing": {
-        "prompt": 1.48e-06,
-        "completion": 1.48e-06,
+        "prompt": 1.48,
+        "completion": 1.48,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -12399,8 +12399,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 9e-07,
-        "completion": 9e-07,
+        "prompt": 0.9,
+        "completion": 0.9,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -12489,8 +12489,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 2.8e-08,
-        "completion": 5.4e-08,
+        "prompt": 0.028,
+        "completion": 0.054,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -12532,8 +12532,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2.5e-08,
-        "completion": 4e-08,
+        "prompt": 0.025,
+        "completion": 0.04,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -12577,8 +12577,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 2.8e-08,
-        "completion": 5.4e-08,
+        "prompt": 0.028,
+        "completion": 0.054,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -12622,8 +12622,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 1e-07,
-        "completion": 1e-07,
+        "prompt": 0.1,
+        "completion": 0.1,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -12666,8 +12666,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 1e-06,
-        "completion": 1e-06,
+        "prompt": 1.0,
+        "completion": 1.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -12709,8 +12709,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 4e-06,
-        "completion": 6e-06,
+        "prompt": 4.0,
+        "completion": 6.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -12752,8 +12752,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 7.5e-08,
-        "completion": 3e-07,
+        "prompt": 0.075,
+        "completion": 0.3,
         "request": 0.0,
         "image": 4e-05,
         "web_search": 0.0,
@@ -12798,8 +12798,8 @@
         "vision"
       ],
       "pricing": {
-        "prompt": 2.5e-06,
-        "completion": 1e-05,
+        "prompt": 2.5,
+        "completion": 10.0,
         "request": 0.0,
         "image": 0.003613,
         "web_search": 0.0,
@@ -12844,8 +12844,8 @@
         "vision"
       ],
       "pricing": {
-        "prompt": 6e-06,
-        "completion": 1.8e-05,
+        "prompt": 6.0,
+        "completion": 18.0,
         "request": 0.0,
         "image": 0.007225,
         "web_search": 0.0,
@@ -12887,8 +12887,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2e-07,
-        "completion": 2e-07,
+        "prompt": 0.2,
+        "completion": 0.2,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -12933,8 +12933,8 @@
         "vision"
       ],
       "pricing": {
-        "prompt": 5e-06,
-        "completion": 1.5e-05,
+        "prompt": 5.0,
+        "completion": 15.0,
         "request": 0.0,
         "image": 0.007225,
         "web_search": 0.0,
@@ -12978,8 +12978,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 3e-08,
-        "completion": 6e-08,
+        "prompt": 0.03,
+        "completion": 0.06,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -13023,8 +13023,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 3e-07,
-        "completion": 4e-07,
+        "prompt": 0.3,
+        "completion": 0.4,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -13067,8 +13067,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 9e-07,
-        "completion": 9e-07,
+        "prompt": 0.9,
+        "completion": 0.9,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -13109,8 +13109,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 4.8e-07,
-        "completion": 4.8e-07,
+        "prompt": 0.48,
+        "completion": 0.48,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -13152,8 +13152,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.25e-06,
-        "completion": 5e-06,
+        "prompt": 1.25,
+        "completion": 5.0,
         "request": 0.0,
         "image": 0.0006575,
         "web_search": 0.0,
@@ -13195,8 +13195,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1e-05,
-        "completion": 3e-05,
+        "prompt": 10.0,
+        "completion": 30.0,
         "request": 0.0,
         "image": 0.01445,
         "web_search": 0.0,
@@ -13236,8 +13236,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3e-06,
-        "completion": 1.5e-05,
+        "prompt": 3.0,
+        "completion": 15.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -13277,8 +13277,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3e-06,
-        "completion": 1.5e-05,
+        "prompt": 3.0,
+        "completion": 15.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -13320,8 +13320,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 8e-07,
-        "completion": 8e-07,
+        "prompt": 0.8,
+        "completion": 0.8,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -13361,8 +13361,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1e-06,
-        "completion": 2e-06,
+        "prompt": 1.0,
+        "completion": 2.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -13402,8 +13402,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 5e-07,
-        "completion": 1.5e-06,
+        "prompt": 0.5,
+        "completion": 1.5,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -13444,8 +13444,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2.5e-07,
-        "completion": 1.25e-06,
+        "prompt": 0.25,
+        "completion": 1.25,
         "request": 0.0,
         "image": 0.0004,
         "web_search": 0.0,
@@ -13486,8 +13486,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.5e-05,
-        "completion": 7.5e-05,
+        "prompt": 15.0,
+        "completion": 75.0,
         "request": 0.0,
         "image": 0.024,
         "web_search": 0.0,
@@ -13527,8 +13527,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 5e-07,
-        "completion": 1.5e-06,
+        "prompt": 0.5,
+        "completion": 1.5,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -13568,8 +13568,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2e-06,
-        "completion": 6e-06,
+        "prompt": 2.0,
+        "completion": 6.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -13609,8 +13609,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1e-06,
-        "completion": 2e-06,
+        "prompt": 1.0,
+        "completion": 2.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -13651,8 +13651,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1e-05,
-        "completion": 3e-05,
+        "prompt": 10.0,
+        "completion": 30.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -13692,8 +13692,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2e-07,
-        "completion": 6e-07,
+        "prompt": 0.2,
+        "completion": 0.6,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -13733,8 +13733,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 2.5e-07,
-        "completion": 2.5e-07,
+        "prompt": 0.25,
+        "completion": 0.25,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -13778,8 +13778,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 8e-08,
-        "completion": 2.4e-07,
+        "prompt": 0.08,
+        "completion": 0.24,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -13820,8 +13820,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1e-06,
-        "completion": 1.75e-06,
+        "prompt": 1.0,
+        "completion": 1.75,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -13862,8 +13862,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 4e-06,
-        "completion": 5.5e-06,
+        "prompt": 4.0,
+        "completion": 5.5,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -13903,8 +13903,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": -1.0,
-        "completion": -1.0,
+        "prompt": -1000000.0,
+        "completion": -1000000.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -13945,8 +13945,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1e-05,
-        "completion": 3e-05,
+        "prompt": 10.0,
+        "completion": 30.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -13988,8 +13988,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 1.5e-06,
-        "completion": 2e-06,
+        "prompt": 1.5,
+        "completion": 2.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -14033,8 +14033,8 @@
         "chat"
       ],
       "pricing": {
-        "prompt": 1.1e-07,
-        "completion": 1.9e-07,
+        "prompt": 0.11,
+        "completion": 0.19,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -14074,8 +14074,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3e-06,
-        "completion": 4e-06,
+        "prompt": 3.0,
+        "completion": 4.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -14115,8 +14115,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 1.125e-06,
-        "completion": 1.125e-06,
+        "prompt": 1.125,
+        "completion": 1.125,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -14157,8 +14157,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 4.5e-07,
-        "completion": 6.5e-07,
+        "prompt": 0.45,
+        "completion": 0.65,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -14199,8 +14199,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 6e-08,
-        "completion": 6e-08,
+        "prompt": 0.06,
+        "completion": 0.06,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -14240,8 +14240,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 5e-07,
-        "completion": 1.5e-06,
+        "prompt": 0.5,
+        "completion": 1.5,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -14282,8 +14282,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3e-05,
-        "completion": 6e-05,
+        "prompt": 30.0,
+        "completion": 60.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,
@@ -14324,8 +14324,8 @@
       },
       "capabilities": [],
       "pricing": {
-        "prompt": 3e-05,
-        "completion": 6e-05,
+        "prompt": 30.0,
+        "completion": 60.0,
         "request": 0.0,
         "image": 0.0,
         "web_search": 0.0,

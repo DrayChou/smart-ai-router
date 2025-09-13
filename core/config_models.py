@@ -68,7 +68,7 @@ class TaskConfig(BaseModel):
 
 class Tasks(BaseModel):
     model_discovery: TaskConfig = Field(default_factory=TaskConfig)
-    pricing_discovery: TaskConfig = Field(default_factory=TaskConfig)
+    # 🗑️ Removed pricing_discovery - was generating unused cache files
     health_check: TaskConfig = Field(default_factory=TaskConfig)
     api_key_validation: TaskConfig = Field(default_factory=TaskConfig)
 

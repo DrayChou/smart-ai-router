@@ -590,11 +590,7 @@ class YAMLConfigLoader:
                 "interval_hours": self.config.tasks.model_discovery.interval_hours,
                 "run_on_startup": self.config.tasks.model_discovery.run_on_startup
             },
-            "pricing_discovery": {
-                "enabled": self.config.tasks.pricing_discovery.enabled,
-                "interval_hours": self.config.tasks.pricing_discovery.interval_hours,
-                "run_on_startup": self.config.tasks.pricing_discovery.run_on_startup
-            },
+            # 🗑️ Removed pricing_discovery - was generating unused cache files
             "health_check": {
                 "enabled": self.config.tasks.health_check.enabled,
                 "interval_minutes": self.config.tasks.health_check.interval_minutes,

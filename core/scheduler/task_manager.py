@@ -16,7 +16,7 @@ from .scheduler import (
     get_task_status,
 )
 from .tasks.model_discovery import run_model_discovery, get_model_discovery_task
-from .tasks.pricing_discovery import run_pricing_discovery, get_pricing_discovery_task
+# 🗑️ Removed pricing_discovery - was generating unused cache files
 from .tasks.service_health_check import run_health_check_task, ServiceHealthChecker
 
 from ..utils.api_key_validator import run_api_key_validation_task
@@ -59,22 +59,8 @@ class TaskManager:
             )
             logger.info(f"已添加模型发现任务，间隔 {interval/3600}h")
 
-        # 2. 定价发现任务
-        pricing_discovery_config = task_config.get("pricing_discovery", {})
-        if pricing_discovery_config.get("enabled", True):
-            interval = (
-                pricing_discovery_config.get("interval_hours", 12) * 3600
-            )  # 转换为秒
-            run_immediately = pricing_discovery_config.get("run_on_startup", False)
-
-            add_task(
-                name="pricing_discovery",
-                func=self._run_pricing_discovery_task,
-                interval_seconds=interval,
-                run_immediately=run_immediately,
-            )
-            logger.info(f"已添加定价发现任务，间隔 {interval/3600}h")
-
+        # 🗑️ Removed pricing discovery task - was generating unused cache files
+        
         # 2. API密钥验证任务
         # 2. API密钥验证任务 - 🚀 修复：正确读取配置文件的 run_on_startup 设置
         api_key_config = task_config.get("api_key_validation", {})
@@ -170,20 +156,7 @@ class TaskManager:
             logger.error(f"模型发现任务异常: {e}", exc_info=True)
             return {"success": False, "error": str(e)}
 
-    async def _run_pricing_discovery_task(self):
-        """运行定价发现任务"""
-        logger.info("开始执行定价发现任务")
-
-        try:
-            # 运行定价发现
-            result = await run_pricing_discovery()
-
-            logger.info(f"定价发现任务完成: {result}")
-            return result
-
-        except Exception as e:
-            logger.error(f"定价发现任务异常: {e}", exc_info=True)
-            return {"success": False, "error": str(e)}
+    # 🗑️ Removed _run_pricing_discovery_task - was generating unused cache files
 
     async def _run_api_key_validation_task(self):
         """运行API密钥验证任务"""
