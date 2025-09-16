@@ -1,6 +1,13 @@
 """
-Base routing classes and interfaces
-基础路由类和接口
+Base routing classes and interfaces (LEGACY)
+基础路由类和接口（遗留/可选）
+
+Note:
+- The default runtime path is tag-based routing driven by YAML configuration
+  (JSONRouter + YAMLConfigLoader).
+- This module references VirtualModelGroup etc. and is kept for optional/
+  advanced scenarios. It is not used in the default flow and may be removed
+  in a future major version if unused.
 """
 
 from abc import ABC, abstractmethod

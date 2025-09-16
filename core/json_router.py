@@ -5,6 +5,7 @@ import logging
 import random
 import re
 import time
+import threading
 from dataclasses import dataclass
 from typing import Any, Optional
 
@@ -72,8 +73,9 @@ class JSONRouter:
         self.config_loader = config_loader or get_yaml_config_loader()
         self.config = self.config_loader.config
 
-        # 标签缓存，避免重复计算
+        # 标签缓存，避免重复计算 (线程安全)
         self._tag_cache: dict[str, list[str]] = {}
+        self._tag_cache_lock = threading.RLock()
         self._available_tags_cache: Optional[set] = None
         self._available_models_cache: Optional[list[str]] = None
 
@@ -91,6 +93,14 @@ class JSONRouter:
         
         # 模型-渠道黑名单管理器
         self.blacklist_manager = get_model_blacklist_manager()
+
+        # 评分服务（提取自本类，行为保持一致）
+        try:
+            from core.services.scoring import ScoringService
+            self._scoring_service = ScoringService(self)
+        except (ImportError, AttributeError) as e:
+            logger.warning(f"Failed to import ScoringService: {e}")
+            self._scoring_service = None
 
     async def route_request(self, request: RoutingRequest) -> list[RoutingScore]:
         """
@@ -469,28 +479,27 @@ class JSONRouter:
 
         # 非tag:前缀的模型名称 - 精确匹配用户输入的完整名称
         all_enabled_channels = self.config_loader.get_enabled_channels()
-        model_cache = self.config_loader.get_model_cache()
 
         # 1. 首先尝试作为物理模型查找（精确匹配）
         physical_candidates = []
         for channel in all_enabled_channels:
-            if channel.id in model_cache:
-                discovered_info = model_cache[channel.id]
-                models_data = discovered_info.get("models_data", {}) if isinstance(discovered_info, dict) else {}
+            # 优先 API Key 级缓存，回退渠道级
+            try:
+                discovered_info = self._get_discovered_info(channel)  # type: ignore[attr-defined]
+            except AttributeError:
+                # 旧版本无 helper 时的兜底
+                discovered_info = self.config_loader.get_model_cache_by_channel(channel.id)
 
-                # 检查是否存在精确匹配的模型
-                if request.model in discovered_info.get("models", []):
-                    # 获取真实的模型ID - 可能与请求的不同（别名映射）
-                    real_model_id = request.model
-                    if models_data and request.model in models_data:
-                        model_info = models_data[request.model]
-                        real_model_id = model_info.get("id", request.model)
+            models_data = discovered_info.get("models_data", {}) if isinstance(discovered_info, dict) else {}
 
-                    logger.debug(f"PHYSICAL MODEL: Found '{request.model}' -> '{real_model_id}' in channel '{channel.name}'")
-                    physical_candidates.append(ChannelCandidate(
-                        channel=channel,
-                        matched_model=real_model_id  # 使用真实的模型ID
-                    ))
+            if isinstance(discovered_info, dict) and request.model in discovered_info.get("models", []):
+                real_model_id = request.model
+                if models_data and request.model in models_data:
+                    model_info = models_data[request.model]
+                    real_model_id = model_info.get("id", request.model)
+
+                logger.debug(f"PHYSICAL MODEL: Found '{request.model}' -> '{real_model_id}' in channel '{channel.name}'")
+                physical_candidates.append(ChannelCandidate(channel=channel, matched_model=real_model_id))
 
         # 2. 尝试完整子段标签匹配（不拆分用户输入）
         complete_segment_candidates = []
@@ -535,12 +544,14 @@ class JSONRouter:
             config_candidates = []
             for ch in config_channels:
                 real_model_id = request.model
-                if ch.id in model_cache:
-                    discovered_info = model_cache[ch.id]
-                    models_data = discovered_info.get("models_data", {}) if isinstance(discovered_info, dict) else {}
-                    if models_data and request.model in models_data:
-                        model_info = models_data[request.model]
-                        real_model_id = model_info.get("id", request.model)
+                try:
+                    discovered_info = self._get_discovered_info(ch)  # type: ignore[attr-defined]
+                except AttributeError:
+                    discovered_info = self.config_loader.get_model_cache_by_channel(ch.id)
+                models_data = discovered_info.get("models_data", {}) if isinstance(discovered_info, dict) else {}
+                if models_data and request.model in models_data:
+                    model_info = models_data[request.model]
+                    real_model_id = model_info.get("id", request.model)
 
                 config_candidates.append(ChannelCandidate(channel=ch, matched_model=real_model_id))
             return config_candidates
@@ -631,77 +642,10 @@ class JSONRouter:
         return filtered
 
     async def _score_channels(self, channels: list[ChannelCandidate], request: RoutingRequest) -> list[RoutingScore]:
-        """计算渠道评分 - 批量优化版本，支持慢查询检测"""
-        start_time = time.time()
-        channel_count = len(channels)
-
-        logger.info(f"📊 SCORING: Evaluating {channel_count} candidate channels for model '{request.model}'")
-
-        # 如果渠道数量较少，使用原有的单个评分方式
-        if channel_count < 5:
-            result = await self._score_channels_individual(channels, request)
-            elapsed_ms = (time.time() - start_time) * 1000
-            self._log_performance_metrics(channel_count, elapsed_ms, "individual")
-            return result
-
-        # 使用批量评分器进行优化
-        if not hasattr(self, '_batch_scorer'):
-            from core.utils.batch_scorer import BatchScorer
-            self._batch_scorer = BatchScorer(self)
-
-        # 批量计算所有评分，获取性能指标
-        batch_result, metrics = await self._batch_scorer.batch_score_channels(channels, request)
-
-
-        # 构建评分结果
-        scored_channels = []
-        strategy = self._get_routing_strategy(request)
-
-        logger.info(f"📊 SCORING: Using routing strategy with {len(strategy)} rules")
-        for rule in strategy:
-            logger.debug(f"📊 SCORING: Strategy rule: {rule['field']} (weight: {rule['weight']}, order: {rule['order']})")
-
-        for candidate in channels:
-            # 从批量结果中获取评分
-            scores = self._batch_scorer.get_score_for_channel(batch_result, candidate)
-
-            total_score = self._calculate_total_score(
-                strategy,
-                scores['cost_score'], scores['speed_score'], scores['quality_score'],
-                scores['reliability_score'], scores['parameter_score'], scores['context_score'],
-                scores['free_score'], scores['local_score']
-            )
-
-            # 简化日志输出
-            model_display = candidate.matched_model or candidate.channel.model_name
-            # 只在调试模式记录详细评分，生产模式减少日志噪音
-            if logger.isEnabledFor(logging.DEBUG):
-                logger.debug(f"📊 SCORE: '{candidate.channel.name}' -> '{model_display}' = {total_score:.3f} (Q:{scores['quality_score']:.2f})")
-
-            scored_channels.append(RoutingScore(
-                channel=candidate.channel, total_score=total_score,
-                cost_score=scores['cost_score'], speed_score=scores['speed_score'],
-                quality_score=scores['quality_score'], reliability_score=scores['reliability_score'],
-                reason=f"cost:{scores['cost_score']:.2f} speed:{scores['speed_score']:.2f} quality:{scores['quality_score']:.2f} reliability:{scores['reliability_score']:.2f}",
-                matched_model=candidate.matched_model,
-                # 预计算层次排序所需的额外评分
-                parameter_score=scores['parameter_score'],
-                context_score=scores['context_score'],
-                free_score=scores['free_score']
-            ))
-
-        # 使用分层优先级排序
-        scored_channels = self._hierarchical_sort(scored_channels)
-
-        # 记录性能指标
-        total_elapsed_ms = (time.time() - start_time) * 1000
-        self._log_performance_metrics(channel_count, total_elapsed_ms, "batch", metrics)
-
-        logger.info(f"🏆 SCORING RESULT: Channels ranked by score (computed in {total_elapsed_ms:.1f}ms):")
-        for i, scored in enumerate(scored_channels[:5]):  # 只显示前5个
-            logger.info(f"🏆   #{i+1}: '{scored.channel.name}' (Score: {scored.total_score:.3f})")
-
-        return scored_channels
+        """计算渠道评分 - 委托到 ScoringService，保持行为不变。"""
+        if getattr(self, "_scoring_service", None) is not None:
+            return await self._scoring_service.score(channels, request)
+        return await self._score_channels_individual(channels, request)
 
     async def _score_channels_individual(self, channels: list[ChannelCandidate], request: RoutingRequest) -> list[RoutingScore]:
         """单个渠道评分方式（用于小数量渠道）"""
@@ -746,11 +690,10 @@ class JSONRouter:
         scored_channels = self._hierarchical_sort(scored_channels)
 
         # 记录评分结果摘要
-        logger.info(f"🏆 INDIVIDUAL SCORING RESULT: Processed {len(scored_channels)} channels")
-        for i, scored in enumerate(scored_channels[:3]):  # 只显示前3个
-            logger.info(f"🏆   #{i+1}: '{scored.channel.name}' (Score: {scored.total_score:.3f})")
-
-        return scored_channels
+        # 使用 ScoringService 保持统一路径
+        if getattr(self, "_scoring_service", None) is not None:
+            return await self._scoring_service.score_individual(channels, request)
+        return []
 
     def _get_routing_strategy(self, request: RoutingRequest) -> list[dict[str, Any]]:
         """获取并解析路由策略，始终返回规则列表"""
@@ -1529,109 +1472,32 @@ class JSONRouter:
         return True
 
     def _extract_tags_from_model_name(self, model_name: str) -> list[str]:
-        """从模型名称中提取标签（带缓存）- 支持多颗粒度匹配
+        """委托到 core.services.tag_processor，统一标签提取逻辑（带本地缓存）。"""
+        try:
+            if not model_name or not isinstance(model_name, str):
+                return []
 
-        例如: "qwen/qwen3-235b-a22b:free" ->
-        - 拆分标签: ["qwen", "qwen3", "235b", "a22b", "free"]
-        - 完整子段: ["qwen3-235b-a22b"] (去掉前缀和后缀的核心名称)
-        - 合并结果: ["qwen", "qwen3", "235b", "a22b", "free", "qwen3-235b-a22b"]
-        """
-        if not model_name or not isinstance(model_name, str):
+            # Thread-safe cache access
+            with self._tag_cache_lock:
+                if model_name in self._tag_cache:
+                    return self._tag_cache[model_name]
+
+                from core.services.tag_processor import extract_tags_from_model_name as _ext
+                tags = _ext(model_name)
+                self._tag_cache[model_name] = tags
+                return tags
+        except (ImportError, AttributeError, ValueError) as e:
+            logger.warning(f"Failed to extract tags from model '{model_name}': {e}")
             return []
-
-        # 检查缓存
-        if model_name in self._tag_cache:
-            return self._tag_cache[model_name]
-
-        import re
-
-        # 1. 提取完整子段（核心模型名称）
-        complete_segments = self._extract_complete_segments(model_name)
-
-        # 2. 使用多种分隔符进行拆分: :, /, @, -, _, ,
-        separators = r'[/:@\-_,]'
-        parts = re.split(separators, model_name.lower())
-
-        # 3. 清理和过滤拆分标签
-        split_tags = []
-        for part in parts:
-            part = part.strip()
-            if part and len(part) > 1:  # 忽略单字符和空标签
-                split_tags.append(part)
-
-        # 4. 合并拆分标签和完整子段标签，去重
-        all_tags = list(dict.fromkeys(split_tags + complete_segments))  # 保持顺序去重
-
-        # 缓存结果
-        self._tag_cache[model_name] = all_tags
-        return all_tags
 
     def _extract_complete_segments(self, model_name: str) -> list[str]:
-        """从模型名称中提取完整子段（核心模型名称）
-
-        例如:
-        - "qwen/qwen3-235b-a22b:free" -> ["qwen3-235b-a22b"]
-        - "deepseek/deepseek-v3-1:pro" -> ["deepseek-v3-1"]
-        - "anthropic/claude-3-haiku@free" -> ["claude-3-haiku"]
-        - "anthropic/claude-3-haiku-20240307:free" -> ["claude-3-haiku-20240307", "claude-3-haiku"]
-        """
-        if not model_name or not isinstance(model_name, str):
+        """委托到 core.services.tag_processor，保持与外部一致。"""
+        try:
+            from core.services.tag_processor import extract_complete_segments as _seg
+            return _seg(model_name)
+        except (ImportError, AttributeError, ValueError) as e:
+            logger.warning(f"Failed to extract complete segments from '{model_name}': {e}")
             return []
-
-        import re
-
-        # 使用主要分隔符（/, :, @）分割，保留中间部分的完整性
-        main_separators = r'[/:@]'
-        segments = re.split(main_separators, model_name)
-
-        complete_segments = []
-        for segment in segments:
-            segment = segment.strip()
-            if not segment:
-                continue
-
-            # 跳过明显的前缀（提供商名称）和后缀（价格标签等）
-            segment_lower = segment.lower()
-
-            # 跳过常见的提供商前缀
-            provider_prefixes = [
-                'openai', 'anthropic', 'qwen', 'deepseek', 'google', 'meta',
-                'mistral', 'cohere', 'groq', 'together', 'fireworks',
-                'siliconflow', 'moonshot', 'ollama', 'lmstudio'
-            ]
-            if segment_lower in provider_prefixes:
-                continue
-
-            # 跳过常见的后缀标签
-            suffix_tags = [
-                'free', 'pro', 'premium', 'paid', 'api', 'chat', 'instruct',
-                'base', 'tuned', 'finetune', 'ft', 'sft', 'rlhf', 'dpo'
-            ]
-            if segment_lower in suffix_tags:
-                continue
-
-            # 跳过单字符段
-            if len(segment) <= 1:
-                continue
-
-            # 保留可能是模型核心名称的段（长度>=3，包含字母数字组合）
-            if len(segment) >= 3 and re.search(r'[a-zA-Z]', segment) and re.search(r'[\d\-]', segment):
-                # 首先添加完整的段名
-                complete_segments.append(segment.lower())
-
-                # 检查是否有日期后缀（格式: -YYYYMMDD 或 -YYYYMMDD 变种）
-                # 支持多种日期格式: -20240307, -202403, -2024-03-07 等
-                date_pattern = r'-(\d{8}|\d{6}|\d{4}-\d{2}-\d{2}|\d{4}\d{2}\d{2})$'
-                match = re.search(date_pattern, segment_lower)
-
-                if match:
-                    # 如果找到日期后缀，生成去掉日期的版本
-                    segment_without_date = segment_lower[:match.start()]
-                    if len(segment_without_date) >= 3 and segment_without_date not in complete_segments:
-                        complete_segments.append(segment_without_date)
-                        logger.debug(f"DATE EXTRACTION: '{segment}' -> added both '{segment.lower()}' and '{segment_without_date}'")
-
-        return complete_segments
 
     def _resolve_model_aliases(self, model_name: str, channel) -> str:
         """解析模型别名映射
@@ -1674,45 +1540,28 @@ class JSONRouter:
         return model_name
 
     def _extract_tags_with_aliases(self, model_name: str, channel) -> list[str]:
-        """提取模型标签，包括来自渠道别名配置的标签
+        """委托到 core.services.tag_processor，实现去重与别名富集。"""
+        try:
+            from core.services.tag_processor import extract_tags_with_aliases as _with_alias
+            return _with_alias(model_name, channel)
+        except Exception:
+            return self._extract_tags_from_model_name(model_name)
 
-        Args:
-            model_name: 模型名称
-            channel: 渠道配置对象
-
-        Returns:
-            list[str]: 包含原始标签和别名标签的完整标签列表
-        """
-        # 获取基础标签
-        base_tags = self._extract_tags_from_model_name(model_name)
-
-        if not hasattr(channel, 'model_aliases') or not channel.model_aliases:
-            return base_tags
-
-        # 收集别名标签：遍历别名映射，如果当前模型名称是映射的目标值，则将标准名称作为标签添加
-        alias_tags = []
-
-        for standard_name, channel_specific_name in channel.model_aliases.items():
-            # 如果当前模型名称匹配渠道特定名称，将标准名称作为标签添加
-            if model_name.lower() == channel_specific_name.lower():
-                # 从标准名称中提取标签
-                standard_tags = self._extract_tags_from_model_name(standard_name)
-                alias_tags.extend(standard_tags)
-                logger.debug(f"ALIAS TAGS: '{model_name}' matched '{channel_specific_name}', adding tags from '{standard_name}': {standard_tags}")
-
-            # 也支持反向匹配：如果模型名称包含标准名称的标签，也添加标准名称作为标签
-            elif any(tag in model_name.lower() for tag in self._extract_tags_from_model_name(standard_name)):
-                standard_tags = self._extract_tags_from_model_name(standard_name)
-                alias_tags.extend(standard_tags)
-                logger.debug(f"ALIAS TAGS (reverse): '{model_name}' contains tags from '{standard_name}', adding: {standard_tags}")
-
-        # 合并所有标签并去重
-        all_tags = list(dict.fromkeys(base_tags + alias_tags))
-
-        if alias_tags:
-            logger.debug(f"ALIAS ENRICHED TAGS: '{model_name}' -> base: {base_tags}, aliases: {alias_tags}, total: {all_tags}")
-
-        return all_tags
+    def _get_discovered_info(self, channel) -> dict:
+        """优先使用 API Key 级别缓存，回退到渠道级缓存。"""
+        try:
+            api_key = getattr(channel, "api_key", None) or ""
+            if api_key:
+                info = self.config_loader.get_model_cache_by_channel_and_key(channel.id, api_key)
+                if isinstance(info, dict):
+                    return info
+        except Exception:
+            pass
+        try:
+            info = self.config_loader.get_model_cache_by_channel(channel.id)
+            return info if isinstance(info, dict) else {}
+        except Exception:
+            return {}
 
     def _get_candidate_channels_by_auto_tags(self, positive_tags: list[str], negative_tags: list[str] = None) -> list[ChannelCandidate]:
         """根据正负标签获取候选渠道（严格匹配）
@@ -1911,8 +1760,11 @@ class JSONRouter:
 
         # 遍历所有有效渠道
         for channel in self.config_loader.get_enabled_channels():
-            # 🔥 修复：使用API Key级别缓存查找方法
-            discovered_info = self.config_loader.get_model_cache_by_channel(channel.id)
+            # 🔥 优先使用 API Key 级别缓存，回退到渠道级
+            try:
+                discovered_info = self._get_discovered_info(channel)  # type: ignore[attr-defined]
+            except AttributeError:
+                discovered_info = self.config_loader.get_model_cache_by_channel(channel.id)
             if not isinstance(discovered_info, dict):
                 continue
 

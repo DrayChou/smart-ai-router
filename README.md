@@ -58,6 +58,8 @@ vim config/router_config.yaml
 
 在 `router_config.yaml` 文件中配置API密钥和认证：
 
+提示：默认运行无需数据库，业务数据基于 YAML + cache/（发现/定价/Key 级缓存）。数据库表和模型为可选高级能力，默认路径不依赖。
+
 #### 基础配置
 ```yaml
 # API认证配置 (可选)
@@ -83,16 +85,16 @@ channels:
 
 ### 3. 启动服务
 
-#### 本地启动
+#### 本地启动（开发建议端口 7602）
 ```bash
-# 默认启动 (YAML模式)
-python main.py
+# 默认启动 (YAML 模式，开发建议使用 7602 端口，避免与 Docker 生产端口冲突)
+python main.py --port 7602
 
 # 指定端口
-python main.py --port 8080
+python main.py --port 7602
 
 # 调试模式
-python main.py --debug
+python main.py --port 7602 --debug
 ```
 
 #### Docker部署（推荐）
@@ -107,7 +109,10 @@ docker-compose logs -f
 docker-compose down
 ```
 
-Docker部署会自动：
+注意：
+- 端口 7601 预留给 Docker 生产环境；本地开发/调试建议使用 7602-7610。
+
+Docker 部署会自动：
 - 创建必要的目录结构
 - 配置环境变量
 - 设置健康检查
@@ -848,6 +853,7 @@ print(f"定价来源: {result.pricing_info}")  # "渠道专属 - premium"
 - **[API文档](http://127.0.0.1:7601/docs)** - 启动服务后访问
 - **[TODO列表](TODO.md)** - 开发进度和最新特性
 - **[项目说明](CLAUDE.md)** - 开发者指南
+ - **[Legacy/Optional 模块说明](docs/LEGACY.md)**
 
 ## 🎉 开始使用
 
@@ -859,6 +865,12 @@ print(f"定价来源: {result.pricing_info}")  # "渠道专属 - premium"
 
 ### 💡 快速体验
 ```bash
+# 启用/禁用渠道（持久化到 YAML 并热加载）
+curl -X POST "http://127.0.0.1:7602/status/api/channels/<channel_id>/enable?enabled=true"
+
+# 调整渠道优先级（持久化到 YAML 并热加载）
+curl -X POST "http://127.0.0.1:7602/status/api/channels/<channel_id>/priority?priority=50"
+
 # 查询免费的qwen3模型
 curl -X POST http://127.0.0.1:7601/v1/chat/completions \
   -H "Content-Type: application/json" \

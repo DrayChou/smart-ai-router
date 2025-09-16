@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-渠道评分器
-从json_router.py中提取的渠道评分功能
+渠道评分器（DEPRECATED/遗留）
+从 json_router.py 中提取的渠道评分功能。
+
+默认运行路径为 YAML + 标签路由（JSONRouter + services）。
+本模块仅为向后兼容而保留，不建议用于新代码。
 """
 import logging
 from typing import List, Dict, Any, Optional

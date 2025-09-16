@@ -1,6 +1,9 @@
 """
-Virtual Model Group data model
-虚拟模型组数据模型
+Virtual Model Group data model (LEGACY/optional)
+虚拟模型组数据模型（遗留/可选）
+
+说明：默认运行路径为 YAML + 标签路由，无需 VirtualModelGroup。
+该模型用于高级/未来场景或实验性功能，默认未启用。
 """
 
 from sqlalchemy import (

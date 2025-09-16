@@ -205,6 +205,34 @@ def create_status_monitor_router(
             "blacklisted_models": sum(1 for m in models_data if not m["available"]),
         }
 
+    @api_router.post("/api/channels/{channel_id}/enable")
+    async def set_channel_enable(channel_id: str, enabled: bool = Query(True)):
+        """启用/禁用指定渠道（持久化到 YAML 并热加载）"""
+        try:
+            ok = config_loader.set_channel_enabled(channel_id, enabled)
+            return {
+                "success": ok,
+                "channel_id": channel_id,
+                "enabled": enabled,
+            }
+        except Exception as e:
+            logger.error(f"更新渠道启用状态失败: {e}")
+            return {"success": False, "error": str(e)}
+
+    @api_router.post("/api/channels/{channel_id}/priority")
+    async def set_channel_priority(channel_id: str, priority: int = Query(100, ge=0, le=1000)):
+        """调整渠道优先级（持久化到 YAML 并热加载）"""
+        try:
+            ok = config_loader.set_channel_priority(channel_id, priority)
+            return {
+                "success": ok,
+                "channel_id": channel_id,
+                "priority": priority,
+            }
+        except Exception as e:
+            logger.error(f"更新渠道优先级失败: {e}")
+            return {"success": False, "error": str(e)}
+
     @api_router.post("/api/search")
     async def search_models(search_request: ModelSearchRequest):
         """搜索模型并返回路由顺序"""

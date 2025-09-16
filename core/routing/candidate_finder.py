@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-候选渠道查找器
-从json_router.py中提取的候选渠道查找功能
+候选渠道查找器（DEPRECATED/遗留）
+
+默认运行路径为 YAML + 标签路由（JSONRouter + services）。
+本模块仅为向后兼容而保留，不建议用于新代码。
 """
 import logging
 from typing import List, Optional

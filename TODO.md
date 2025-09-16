@@ -1,3 +1,48 @@
+# Smart AI Router - 开发 TODO 列表（状态对齐版）
+
+本节为 2025-09-16 状态核对与精简，结合 CLAUDE.md 与当前代码，标注已完成 / 过时 / 未完成；原始长期规划保留在下方以便参考。
+
+## 状态对齐（结合 CLAUDE.md：完成 / 过时 / 未完成）
+- 已完成（与 CLAUDE.md 保持一致）
+  - Provider 适配器体系：core/providers/adapters/* + adapter_manager 已具备（OpenAI/Anthropic/Groq/OpenRouter/SiliconFlow 等）。
+  - 标签化路由与性能优化：自动标签、内存索引与批量评分（memory_index、batch_scorer），符合“标签替代 Model Group、性能优先”的原则。
+  - API Key 级模型/定价缓存：core/utils/api_key_cache_manager.py + scheduler 写入 cache/api_keys/；YAML 加载器支持迁移与查询（core/yaml_config.py:200+）。
+  - 成本与统计 API：api/usage_stats.py、core/utils/usage_tracker.py；黑名单/告警监控（core/utils/channel_monitor.py）。
+  - 状态监控页面：/status + WebSocket（api/status_monitor.py，templates/status_monitor.html）。
+  - 定价系统重构与 Doubao 集成：静态+阶梯定价（static_pricing/tiered_pricing），与提交历史一致。
+  - 测试基础设施：pytest 已配置且 tests/ 覆盖面广。
+
+- 过时/需更新（与 CLAUDE.md 出入处）
+  - “测试体系建设缺失”不符：应改为“提升覆盖率、建立 CI、引入覆盖率门槛”。
+  - Model Group 与数据库驱动配置：CLAUDE.md 描述 DB 驱动和 Model Group，但现阶段以 YAML + 标签路由为主；需决定“彻底标签化（删除未用表与代码）”或“补齐 DB 实配与热更新”。
+  - 目录结构重复：同时存在 core/router 与 core/routing 与 JSONRouter 内部策略，需收敛为单一实现，避免双轨。
+  - 开发端口与文档：CLAUDE.md 约定本地 7602-7610、生产 7601；README/脚本需统一说明。
+
+- 未完成/优先推进（建议顺序）
+  1) 核心路由引擎收敛与替换（P0）
+     - 目标：以 core/router/ 策略引擎为唯一实现，替代 core/json_router.py 的同类逻辑；抽离标签解析与候选生成，删除 core/routing/* 与 JSONRouter 的重复代码。
+     - 任务：
+       - 提取标签服务（core/services/tag_processor.py），统一供路由器与 API 使用；
+       - 在 main.py 与 api/* 接入 RoutingEngine；
+       - 移除重复模块与临时适配器，保留清晰边界。
+  2) 路由阶段改用 API Key 级缓存（P0）
+     - 现状：发现阶段已按 Key 缓存，但 JSONRouter 仍按渠道级读取（如 core/json_router.py:1915, 1989）。
+     - 任务：路由时使用 get_model_cache_by_channel_and_key()；在调用链中透传 API Key 至成本估算与候选生成。
+  3) CI 与质量闸（P1）
+     - 新增 GitHub Actions：ruff/black/isort/mypy/pytest + 缓存/coverage；设立最小覆盖率（如 70%）与必过门槛。
+  4) 配置与数据库对齐（P1，与 CLAUDE.md 对齐）
+     - 【已选方案 A】彻底标签化与 YAML 驱动：
+       - 文档与代码对齐：CLAUDE.md 已改为 YAML + 标签路由为默认路径；数据库为可选高级能力
+       - 清理遗留：移除文档中以 Model Group 为主的叙述；标注 core/router/base.py 等涉及 VirtualModelGroup 的代码为“LEGACY/可选”
+       - 确保运行路径不依赖 DB：默认不初始化数据库、不要求表结构
+  5) Web 管理面增强（P1）
+     - 基于 /status 扩展：渠道/Key 可视化、启停/优先级、预算视图；与 usage_stats/alerts 联动。
+  6) 智能预算管理（P1）
+     - 结合 usage_stats 与 cost_estimator：全局/渠道/Key 预算、超限告警、自动策略切换；个人用场景优先。
+  7) 错误处理一致化（P1）
+     - 与 core/utils/exception_handler 对齐，统一错误分类与返回格式；完善审计与可观测性。
+  8) 动态定价策略扩展（P2）
+     - 按时间段、配额使用、需求等进行策略化调整（CLAUDE.md 的“动态价格策略”）；从 Doubao 扩展到更多 Provider。
 # Smart AI Router - 开发 TODO 列表 (2025 年更新版)
 
 ## 📋 项目开发进度

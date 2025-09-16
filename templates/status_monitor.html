@@ -236,6 +236,21 @@
                                         <div class="text-gray-900">{{ channel.available_models }}/{{ channel.total_models }} 可用</div>
                                         <div class="text-gray-500">{{ channel.blacklisted_models }} 被屏蔽</div>
                                     </div>
+                                    <div class="flex items-center space-x-2">
+                                        <button @click="toggleChannel(channel)"
+                                                class="px-2 py-1 text-xs rounded border"
+                                                :class="channel.enabled ? 'bg-green-50 border-green-300 text-green-700' : 'bg-gray-50 border-gray-300 text-gray-700'">
+                                            {{ channel.enabled ? '已启用' : '已禁用' }}
+                                        </button>
+                                        <input type="number" min="0" max="1000" step="1"
+                                               v-model.number="channel._newPriority"
+                                               class="w-20 border border-gray-300 rounded px-2 py-1 text-xs"
+                                               :placeholder="channel.priority">
+                                        <button @click="updatePriority(channel)"
+                                                class="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">
+                                            保存优先级
+                                        </button>
+                                    </div>
                                     <button @click="viewChannelModels(channel)" 
                                             class="text-blue-600 hover:text-blue-900 text-sm font-medium">
                                         查看模型
@@ -599,7 +614,7 @@
                 async loadChannels() {
                     try {
                         const response = await axios.get('/status/api/channels')
-                        this.channels = response.data.channels
+                        this.channels = response.data.channels.map(c => ({...c, _newPriority: c.priority}))
                         this.channelsStats = {
                             total_channels: response.data.total_channels,
                             healthy_channels: response.data.healthy_channels
@@ -607,6 +622,31 @@
                         this.tabs[1].count = this.channels.length
                     } catch (error) {
                         console.error('加载渠道数据失败:', error)
+                    }
+                },
+                async toggleChannel(channel) {
+                    try {
+                        const target = !channel.enabled
+                        const res = await axios.post(`/status/api/channels/${channel.id}/enable`, null, { params: { enabled: target }})
+                        if (res.data && res.data.success) {
+                            channel.enabled = target
+                            this.$forceUpdate()
+                        }
+                    } catch (e) {
+                        console.error('切换渠道启用状态失败:', e)
+                    }
+                },
+                async updatePriority(channel) {
+                    try {
+                        const val = Number(channel._newPriority)
+                        if (Number.isNaN(val)) return
+                        const res = await axios.post(`/status/api/channels/${channel.id}/priority`, null, { params: { priority: val }})
+                        if (res.data && res.data.success) {
+                            channel.priority = val
+                            this.$forceUpdate()
+                        }
+                    } catch (e) {
+                        console.error('更新优先级失败:', e)
                     }
                 },
                 

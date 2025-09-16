@@ -1,5 +1,8 @@
 """
-核心路由引擎 - 从原json_router.py拆分出来的主要路由逻辑
+核心路由引擎（DEPRECATED/遗留） - 从原 json_router.py 拆分出来的主要路由逻辑
+
+默认运行路径为 YAML + 标签路由（JSONRouter + services）。
+本模块仅为向后兼容而保留，不建议用于新代码。
 """
 import logging
 from typing import Optional

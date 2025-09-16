@@ -629,6 +629,69 @@ class YAMLConfigLoader:
             capabilities=["text", "function_calling"]
         )
 
+    # --- Simple mutation helpers for YAML-first workflow ---
+    def set_channel_enabled(self, channel_id: str, enabled: bool) -> bool:
+        """Enable/disable a channel and persist to YAML, then reload config.
+
+        This edits the YAML file directly to keep truth in one place, then
+        refreshes the in-memory Pydantic config and maps.
+        """
+        try:
+            from copy import deepcopy
+            import yaml as _yaml
+
+            with open(self.config_path, 'r', encoding='utf-8') as f:
+                raw = _yaml.safe_load(f) or {}
+
+            changed = False
+            for ch in raw.get('channels', []):
+                if ch.get('id') == channel_id:
+                    ch['enabled'] = bool(enabled)
+                    changed = True
+                    break
+
+            if not changed:
+                logger.warning(f"Channel '{channel_id}' not found in YAML; no changes applied")
+                return False
+
+            # Save back and reload Pydantic config
+            self._save_config_to_file(raw)
+            self.config = self._load_and_validate_config()
+            self.channels_map = {ch.id: ch for ch in self.config.channels}
+            logger.info(f"Configuration updated: channel '{channel_id}' enabled={enabled}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to update channel enabled flag: {e}")
+            return False
+
+    def set_channel_priority(self, channel_id: str, priority: int) -> bool:
+        """Set channel priority and persist to YAML, then reload config."""
+        try:
+            import yaml as _yaml
+
+            with open(self.config_path, 'r', encoding='utf-8') as f:
+                raw = _yaml.safe_load(f) or {}
+
+            changed = False
+            for ch in raw.get('channels', []):
+                if ch.get('id') == channel_id:
+                    ch['priority'] = int(priority)
+                    changed = True
+                    break
+
+            if not changed:
+                logger.warning(f"Channel '{channel_id}' not found in YAML; no changes applied")
+                return False
+
+            self._save_config_to_file(raw)
+            self.config = self._load_and_validate_config()
+            self.channels_map = {ch.id: ch for ch in self.config.channels}
+            logger.info(f"Configuration updated: channel '{channel_id}' priority={priority}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to update channel priority: {e}")
+            return False
+
 
     @property
     def config_data(self) -> Dict[str, Any]:
