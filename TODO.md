@@ -13,7 +13,7 @@
 
 1. Core routing engine consolidation / 核心路由引擎整合
    - ✅ Split `core/json_router.py` into mixins and shared types under `core/router/*`. / ✅ 已拆分 `core/json_router.py`，核心逻辑迁移到 `core/router/*` 的 mixin 与类型模块。
-   - Remove legacy duplicates in `core/routing/*` or rewire them to reuse the new services. / 清理 `core/routing/*` 中的遗留实现，或重写以复用新服务。
+   - ✅ Retired legacy modules under `core/routing/*`; update docs/tests to reflect JSONRouter-only flow. / ✅ 已移除 `core/routing/*` 遗留模块，后续同步文档与测试以反映 JSONRouter 单一路径。
    - Wire `main.py` and `api/*` to a single RoutingEngine with dependency injection. / 通过依赖注入让 `main.py` 和 `api/*` 接入统一的 RoutingEngine。
 2. Complete API key aware routing path / 完成 API Key 感知的路由路径
    - Update call sites still using channel cache only (`core/json_router.py:1841`, `api/status_monitor.py:95`) to rely on `_get_discovered_info` / `get_model_cache_by_channel_and_key`. / 修正仍仅读取渠道级缓存的调用（如 `core/json_router.py:1841`、`api/status_monitor.py:95`），统一改用 `_get_discovered_info` / `get_model_cache_by_channel_and_key`。

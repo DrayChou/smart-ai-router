@@ -4,15 +4,14 @@ Models API endpoints
 """
 
 import time
-from typing import List, Optional
+from typing import Dict, List, Optional, Set
 
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from core.json_router import JSONRouter
+from core.json_router import get_router
 from core.utils.logger import get_logger
 from core.yaml_config import YAMLConfigLoader
-from core.services import get_model_service
 
 from core.utils.memory_index import get_memory_index
 
@@ -79,13 +78,13 @@ class ModelsResponse(BaseModel):
 # 创建路由器
 router = APIRouter(prefix="/v1", tags=["models"])
 
-def create_models_router(config_loader: YAMLConfigLoader, json_router: JSONRouter) -> APIRouter:
+def create_models_router(config_loader: YAMLConfigLoader) -> APIRouter:
+    json_router = get_router()
     """创建模型相关的API路由"""
 
     @router.get("/models", response_model=ModelsResponse)
     async def list_models() -> ModelsResponse:
         """返回所有可用的模型，包含详细信息"""
-        model_service = get_model_service()
         all_models = set()
         model_channels_map = {}  # 记录模型对应的所有渠道信息
 
@@ -115,152 +114,82 @@ def create_models_router(config_loader: YAMLConfigLoader, json_router: JSONRoute
         channels = {channel.id: channel for channel in channels_list}
         memory_index = get_memory_index()
 
-        for model_id in sorted(list(all_models)):
-            # 获取模型的详细信息（使用新的服务架构）
-            base_model_info = model_service.get_model_info(model_id)
-            
-            # 构建基础能力信息
-            capabilities = None
-            if base_model_info and base_model_info.capabilities:
-                capabilities = ModelCapabilities(
-                    supports_vision=base_model_info.capabilities.supports_vision,
-                    supports_function_calling=base_model_info.capabilities.supports_function_calling,
-                    supports_code_generation=base_model_info.capabilities.supports_code_generation,
-                    supports_streaming=base_model_info.capabilities.supports_streaming
-                )
-
-            # 获取模型支持的所有渠道
-            channel_list = []
+        for model_id in sorted(all_models):
+            aggregated_tags: Set[str] = set()
+            channel_list: List[ChannelInfo] = []
             channel_ids = model_channels_map.get(model_id, [])
+            parameter_count: Optional[int] = None
+            context_length: Optional[int] = None
+            model_capabilities: Optional[ModelCapabilities] = None
 
             for channel_id in channel_ids:
-                if channel_id in channels:
-                    channel = channels[channel_id]
-                    
-                    # 获取该渠道对该模型的特定信息（可能包含覆盖）
-                    channel_model_info = model_service.get_model_info(model_id, channel_id=channel_id)
+                channel = channels.get(channel_id)
+                if not channel:
+                    continue
 
-                    # 构建成本信息（应用汇率折扣）
-                    cost_info = None
-                    if hasattr(channel, 'cost_per_token') and channel.cost_per_token:
-                        try:
-                            # 优先使用增强的CostEstimator（包含汇率折扣）
-                            from core.utils.cost_estimator import CostEstimator
-                            estimator = CostEstimator()
-                            model_pricing = estimator._get_model_pricing(channel.id, model_id)
-                            
-                            if model_pricing and 'input' in model_pricing and 'output' in model_pricing:
-                                cost_info = ChannelCost(
-                                    input=model_pricing['input'],
-                                    output=model_pricing['output']
-                                )
-                                logger.info(f"💰 MODELS API: Applied currency discount for {channel.id} | {model_id} | input: ${model_pricing['input']:,.6f}, output: ${model_pricing['output']:,.6f}")
-                            else:
-                                # 回退到静态定价
-                                cost_info = ChannelCost(
-                                    input=channel.cost_per_token.get('input'),
-                                    output=channel.cost_per_token.get('output')
-                                )
-                        except Exception as e:
-                            logger.warning(f"Cost estimation failed for {channel.id}, using static pricing: {e}")
-                            # 回退到静态定价
-                            cost_info = ChannelCost(
-                                input=channel.cost_per_token.get('input'),
-                                output=channel.cost_per_token.get('output')
-                            )
+                model_info = memory_index.get_model_info(channel_id, model_id)
+                if not model_info:
+                    continue
 
-                    # 构建渠道特定的能力信息和tags
-                    channel_capabilities = None
-                    channel_context = None
-                    channel_specific_tags = [channel.id]  # 至少包含渠道ID
-                    
-                    # 添加渠道名称作为标签（如果与ID不同）
-                    if channel.name and channel.name.lower() != channel.id.lower():
-                        channel_specific_tags.append(channel.name.lower())
-                    
-                    if channel_model_info:
-                        if channel_model_info.capabilities:
-                            channel_capabilities = ModelCapabilities(
-                                supports_vision=channel_model_info.capabilities.supports_vision,
-                                supports_function_calling=channel_model_info.capabilities.supports_function_calling,
-                                supports_code_generation=channel_model_info.capabilities.supports_code_generation,
-                                supports_streaming=channel_model_info.capabilities.supports_streaming
-                            )
-                        if channel_model_info.specs and channel_model_info.specs.context_length:
-                            channel_context = channel_model_info.specs.context_length
-                        # 添加渠道模型特定的tags（如果有的话）
-                        if channel_model_info.tags:
-                            channel_specific_tags.extend(channel_model_info.tags)
+                aggregated_tags.update(model_info.tags)
 
-                    channel_list.append(ChannelInfo(
+                specs = model_info.specs or {}
+                parameter_count = parameter_count or specs.get("parameter_count")
+                context_length = context_length or specs.get("context_length")
+
+                channel_caps = None
+                if model_info.capabilities:
+                    channel_caps = ModelCapabilities(
+                        supports_vision=model_info.capabilities.get("vision", False),
+                        supports_function_calling=model_info.capabilities.get("function_calling", False),
+                        supports_code_generation=model_info.capabilities.get("code_generation", False),
+                        supports_streaming=model_info.capabilities.get("streaming", False),
+                    )
+                    if model_capabilities is None:
+                        model_capabilities = channel_caps
+
+                cost_info = None
+                if model_info.pricing:
+                    input_cost = model_info.pricing.get("input") or model_info.pricing.get("prompt")
+                    output_cost = model_info.pricing.get("output") or model_info.pricing.get("completion")
+                    if input_cost is not None or output_cost is not None:
+                        cost_info = ChannelCost(input=input_cost, output=output_cost)
+
+                channel_list.append(
+                    ChannelInfo(
                         id=channel.id,
                         name=channel.name,
-                        provider=getattr(channel, 'provider', None),
-                        tags=getattr(channel, 'tags', None),
-                        priority=getattr(channel, 'priority', None),
-                        capabilities=getattr(channel, 'capabilities', None),
+                        provider=channel.provider,
+                        tags=channel.tags,
+                        priority=getattr(channel, "priority", None),
+                        capabilities=getattr(channel, "capabilities", None),
                         cost_per_token=cost_info,
-                        channel_context_length=channel_context,
-                        channel_capabilities=channel_capabilities,
-                        channel_tags=channel_specific_tags
-                    ))
+                        channel_context_length=specs.get("context_length"),
+                        channel_capabilities=channel_caps,
+                        channel_tags=sorted(model_info.tags),
+                    )
+                )
 
-            # 构建模型基础信息
-            parameter_count = None
-            parameter_size_text = None
-            context_length = None
-            context_text = None
-            input_price = None
-            output_price = None
-            model_tags = None
+            if not channel_list:
+                continue
 
-            if base_model_info:
-                if base_model_info.specs:
-                    parameter_count = base_model_info.specs.parameter_count
-                    parameter_size_text = base_model_info.specs.parameter_size_text
-                    context_length = base_model_info.specs.context_length
-                    context_text = base_model_info.specs.context_text
-                if base_model_info.pricing:
-                    input_price = base_model_info.pricing.input_price
-                    output_price = base_model_info.pricing.output_price
-                if base_model_info.tags:
-                    model_tags = list(base_model_info.tags)
-            
-            # 从内存索引获取模型的自动提取tags（如果没有从base_model_info获取到）
-            if not model_tags and memory_index:
-                try:
-                    # 不使用渠道的provider字段，因为它表示API协议兼容性而非模型提供商
-                    # 让标签生成器从模型名称本身推断真实的提供商信息
-                    extracted_tags = memory_index._generate_model_tags(model_id, "")
-                    if extracted_tags:
-                        # 过滤掉空字符串标签
-                        model_tags = [tag for tag in extracted_tags if tag and tag.strip()]
-                except Exception as e:
-                    logger.debug(f"Failed to get tags for model {model_id}: {e}")
-                    pass
-
-            models_data.append(ModelInfo(
-                id=model_id,
-                created=current_time,
-                owned_by="smart-ai-router",
-                name=model_id,
-                model_type="model_group" if model_id.startswith("auto:") or model_id.startswith("tag:") else "model",
-                available=True,
-                
-                # 模型详细信息
-                parameter_count=parameter_count,
-                parameter_size_text=parameter_size_text,
-                context_length=context_length,
-                context_text=context_text,
-                capabilities=capabilities,
-                input_price=input_price,
-                output_price=output_price,
-                tags=model_tags,
-                
-                # 渠道信息
-                channels=channel_list if channel_list else None,
-                channel_count=len(channel_list) if channel_list else 0
-            ))
+            owner = channel_list[0].provider or "smart-ai-router"
+            models_data.append(
+                ModelInfo(
+                    id=model_id,
+                    created=current_time,
+                    owned_by=owner,
+                    name=model_id,
+                    model_type="model_group" if model_id.startswith("auto:") or model_id.startswith("tag:") else "model",
+                    available=True,
+                    parameter_count=parameter_count,
+                    context_length=context_length,
+                    capabilities=model_capabilities,
+                    tags=sorted(aggregated_tags),
+                    channels=channel_list,
+                    channel_count=len(channel_list),
+                )
+            )
 
         return ModelsResponse(data=models_data, total_models=len(models_data))
 
