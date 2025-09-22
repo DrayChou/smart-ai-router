@@ -4,6 +4,7 @@
 import yaml
 import json
 import asyncio
+import threading
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
@@ -172,6 +173,27 @@ class YAMLConfigLoader:
             logger.error(f"Failed to save config to {self.config_path}: {e}")
             raise
 
+    def _schedule_cache_migration(self, raw_cache: Dict[str, Any]) -> None:
+        """Schedule cache migration regardless of event loop availability."""
+        async def _runner():
+            await self._migrate_cache_background(raw_cache)
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            logger.info("No event loop available for background migration, spawning worker thread")
+
+            def _thread_target():
+                try:
+                    asyncio.run(_runner())
+                except Exception as exc:
+                    logger.error("BACKGROUND MIGRATION: Threaded migration failed: %s", exc)
+                    self._migration_in_progress = False
+
+            threading.Thread(target=_thread_target, name="cache-migration", daemon=True).start()
+        else:
+            loop.create_task(_runner())
+
     def _load_model_cache_from_disk(self):
         """从磁盘加载模型发现任务的缓存（同步版本，为兼容性保留）"""
         try:
@@ -191,11 +213,7 @@ class YAMLConfigLoader:
                         self._migration_in_progress = True
                         
                         # 🚀 启动后台迁移任务（不阻塞启动）
-                        try:
-                            asyncio.create_task(self._migrate_cache_background(raw_cache))
-                        except RuntimeError:
-                            # 如果没有事件循环，跳过后台迁移
-                            logger.info("No event loop available for background migration, skipping")
+                        self._schedule_cache_migration(raw_cache)
                     else:
                         self.model_cache = raw_cache
                         if not self._needs_cache_migration(raw_cache):

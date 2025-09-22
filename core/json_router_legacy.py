@@ -27,7 +27,13 @@ class JSONRouter:
             routing_request = RoutingRequest(
                 model=request_data.get('model', ''),
                 messages=request_data.get('messages', []),
-                strategy=request_data.get('strategy')
+                temperature=request_data.get('temperature'),
+                max_tokens=request_data.get('max_tokens'),
+                stream=bool(request_data.get('stream', False)),
+                functions=request_data.get('functions'),
+                required_capabilities=request_data.get('required_capabilities') or [],
+                data=request_data,
+                strategy=request_data.get('strategy'),
             )
             
             # 调用新的服务层
@@ -46,12 +52,20 @@ class JSONRouter:
         
         for score in results:
             legacy_result = {
-                'channel_id': score.channel_id,
+                'channel_id': score.channel.id,
                 'total_score': score.total_score,
-                'scores': score.scores,
-                'estimated_cost': score.estimated_cost,
-                'estimated_tokens': score.estimated_tokens,
-                'matched_model': score.matched_model
+                'scores': {
+                    'cost_score': score.cost_score,
+                    'speed_score': score.speed_score,
+                    'quality_score': score.quality_score,
+                    'reliability_score': score.reliability_score,
+                    'parameter_score': score.parameter_score,
+                    'context_score': score.context_score,
+                    'free_score': score.free_score,
+                },
+                'estimated_cost': None,
+                'estimated_tokens': None,
+                'matched_model': score.matched_model,
             }
             legacy_results.append(legacy_result)
         

@@ -4,7 +4,7 @@
 """
 
 import logging
-from typing import Dict, Any, Optional, Type
+from typing import Any, Dict, Optional, Tuple, Type
 from ..providers.base import BaseAdapter
 from ..providers.adapters.openai import OpenAIAdapter
 from ..providers.adapters.anthropic import AnthropicAdapter
@@ -20,51 +20,70 @@ class AdapterManager:
     """适配器管理器 - 智能选择和使用合适的Provider适配器"""
     
     def __init__(self):
-        self._adapters = {}
+        self._adapter_registry: Dict[str, Type[BaseAdapter]] = {}
+        self._adapter_cache: Dict[Tuple[str, str, str], BaseAdapter] = {}
         self._register_adapters()
-    
+
     def _register_adapters(self):
-        """注册所有可用的适配器"""
-        # 按优先级注册，更专用的适配器优先
-        self._adapters = {
-            "openrouter": OpenRouterAdapter(),
-            "anthropic": AnthropicAdapter(),
-            "groq": GroqAdapter(), 
-            "openai": OpenAIAdapter(),  # 默认OpenAI兼容适配器
+        """注册所有可用的适配器 (按名称映射到类)."""
+        registry: Dict[str, Type[BaseAdapter]] = {
+            "openrouter": OpenRouterAdapter,
+            "anthropic": AnthropicAdapter,
+            "groq": GroqAdapter,
+            "openai": OpenAIAdapter,
         }
-        logger.info(f"注册了 {len(self._adapters)} 个适配器")
-    
-    def get_adapter_for_channel(self, channel: Channel, provider: Any) -> BaseAdapter:
-        """为指定渠道选择最合适的适配器"""
+        # 兼容通过完整类名查找的配置
+        registry.update({
+            "openrouteradapter": OpenRouterAdapter,
+            "anthropicadapter": AnthropicAdapter,
+            "groqadapter": GroqAdapter,
+            "openaiadapter": OpenAIAdapter,
+        })
+        self._adapter_registry = registry
+        unique = {name for name in registry.keys() if not name.endswith('adapter')}
+        logger.info("注册了 %d 个适配器", len(unique))
+
+    def _select_adapter_class(self, channel: Channel, provider: Any) -> Type[BaseAdapter]:
         provider_name = getattr(provider, 'name', channel.provider).lower()
-        base_url = channel.base_url or getattr(provider, 'base_url', '')
-        
-        # 1. 优先匹配专用适配器
-        for adapter_name, adapter in self._adapters.items():
-            if hasattr(adapter, 'is_provider_match') and adapter.is_provider_match(provider_name, base_url):
-                logger.debug(f"✅ 选择专用适配器: {adapter_name} for {provider_name}")
-                return adapter
-        
-        # 2. 基于provider名称匹配
-        if provider_name in self._adapters:
-            logger.debug(f"✅ 选择匹配适配器: {provider_name}")
-            return self._adapters[provider_name]
-        
-        # 3. 基于base_url特征匹配
+        base_url = (channel.base_url or getattr(provider, 'base_url', '') or '').lower()
+        adapter_name = getattr(provider, 'adapter_class', None)
+
+        if isinstance(adapter_name, str):
+            lookup = adapter_name.lower()
+            if lookup in self._adapter_registry:
+                return self._adapter_registry[lookup]
+
+        if 'openrouter' in provider_name or 'openrouter' in base_url:
+            return self._adapter_registry['openrouter']
+        if 'anthropic' in provider_name or 'anthropic' in base_url:
+            return self._adapter_registry['anthropic']
+        if 'groq' in provider_name or 'groq' in base_url:
+            return self._adapter_registry['groq']
+
+        return self._adapter_registry['openai']
+
+    def _build_adapter_config(self, channel: Channel, provider: Any) -> Dict[str, Any]:
+        config: Dict[str, Any]
+        if hasattr(provider, 'dict'):
+            config = provider.dict()  # type: ignore[assignment]
+        else:
+            config = {}
+
+        base_url = channel.base_url or config.get('base_url') or getattr(provider, 'base_url', '')
         if base_url:
-            if "openrouter.ai" in base_url.lower():
-                logger.debug(f"✅ 基于URL选择OpenRouter适配器: {base_url}")
-                return self._adapters["openrouter"]
-            elif "anthropic" in base_url.lower():
-                logger.debug(f"✅ 基于URL选择Anthropic适配器: {base_url}")
-                return self._adapters["anthropic"]
-            elif "groq" in base_url.lower():
-                logger.debug(f"✅ 基于URL选择Groq适配器: {base_url}")
-                return self._adapters["groq"]
-        
-        # 4. 默认使用OpenAI兼容适配器
-        logger.debug(f"🔄 使用默认OpenAI适配器: {provider_name}")
-        return self._adapters["openai"]
+            config['base_url'] = base_url
+        config.setdefault('default_headers', {})
+        return config
+
+    def _get_adapter_instance(self, adapter_cls: Type[BaseAdapter], channel: Channel, provider: Any) -> BaseAdapter:
+        base_url = channel.base_url or getattr(provider, 'base_url', '') or ''
+        cache_key = (adapter_cls.__name__, getattr(provider, 'name', channel.provider), base_url)
+        adapter = self._adapter_cache.get(cache_key)
+        if adapter is None:
+            config = self._build_adapter_config(channel, provider)
+            adapter = adapter_cls(getattr(provider, 'name', channel.provider), config)
+            self._adapter_cache[cache_key] = adapter
+        return adapter
     
     def prepare_request_with_adapter(
         self,
@@ -74,8 +93,8 @@ class AdapterManager:
         matched_model: Optional[str] = None
     ) -> Dict[str, Any]:
         """使用适配器准备请求"""
-        # 选择合适的适配器
-        adapter = self.get_adapter_for_channel(channel, provider)
+        adapter_cls = self._select_adapter_class(channel, provider)
+        adapter = self._get_adapter_instance(adapter_cls, channel, provider)
         
         # 构建ChatRequest对象（如果还不是）
         if not isinstance(request, ChatRequest):

@@ -8,7 +8,7 @@ from typing import Optional
 from core.config_models import Channel
 from core.router.types import ChannelCandidate, RoutingRequest
 from core.routing.exceptions import TagNotFoundError
-from core.routing.size_filters import apply_size_filters, parse_size_filter
+from core.router.size_filters import apply_size_filters, parse_size_filter
 
 logger = logging.getLogger(__name__)
 

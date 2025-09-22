@@ -264,11 +264,12 @@ class BlacklistRecoveryManager:
     def _get_channel_by_id(self, channel_id: str) -> Optional[Channel]:
         """根据ID获取渠道信息"""
         try:
-            all_channels = self.config_loader.get_all_channels()
-            return next((ch for ch in all_channels if ch.id == channel_id), None)
+            for channel in self.config_loader.get_enabled_channels():
+                if channel.id == channel_id:
+                    return channel
         except Exception as e:
             logger.error(f"Error getting channel {channel_id}: {e}")
-            return None
+        return None
     
     async def _extend_blacklist(self, entry: ModelChannelBlacklistEntry, failed_attempts: int):
         """延长黑名单时间"""
