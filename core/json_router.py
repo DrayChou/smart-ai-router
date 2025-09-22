@@ -8,7 +8,7 @@ from typing import Any, Optional
 from core.router.mixins.candidate import CandidateDiscoveryMixin
 from core.router.mixins.scoring import ScoringMixin
 from core.router.types import ChannelCandidate, RoutingRequest, RoutingScore
-from core.routing.exceptions import ParameterComparisonError, TagNotFoundError
+from core.exceptions import ParameterComparisonError, TagNotFoundError
 from core.utils.capability_mapper import get_capability_mapper
 from core.utils.channel_cache_manager import get_channel_cache_manager
 from core.utils.local_model_capabilities import get_capability_detector

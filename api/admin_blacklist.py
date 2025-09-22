@@ -20,6 +20,8 @@ router = APIRouter(prefix="/admin/blacklist", tags=["Admin - Blacklist Managemen
 
 class BlacklistEntryResponse(BaseModel):
     """黑名单条目响应模型"""
+    model_config = {"protected_namespaces": ()}
+
     channel_id: str
     model_name: str
     error_type: str
@@ -55,6 +57,8 @@ class RecoveryStatsResponse(BaseModel):
 
 class BlacklistManagementRequest(BaseModel):
     """黑名单管理请求模型"""
+    model_config = {"protected_namespaces": ()}
+
     channel_id: str
     model_name: str
     action: str  # "remove", "extend", "permanent"
@@ -63,6 +67,8 @@ class BlacklistManagementRequest(BaseModel):
 
 class HealthReportResponse(BaseModel):
     """健康报告响应模型"""
+    model_config = {"protected_namespaces": ()}
+
     timestamp: datetime
     total_channels: int
     healthy_channels: int

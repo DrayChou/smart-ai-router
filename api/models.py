@@ -44,6 +44,8 @@ class ChannelInfo(BaseModel):
     channel_tags: Optional[List[str]] = None
 
 class ModelInfo(BaseModel):
+    model_config = {"protected_namespaces": ()}
+
     id: str
     object: str = "model"
     created: int

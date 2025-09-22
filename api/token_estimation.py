@@ -26,6 +26,8 @@ class ChatMessage(BaseModel):
     content: str
 
 class TokenEstimationRequest(BaseModel):
+    model_config = {"protected_namespaces": ()}
+
     messages: List[ChatMessage]
     model_family: str = "gpt"
     optimization_strategy: str = "balanced"  # cost_first, quality_first, speed_first, balanced
@@ -41,12 +43,16 @@ class TokenEstimationResponse(BaseModel):
     optimization_strategy: str
 
 class ModelPricingRequest(BaseModel):
+    model_config = {"protected_namespaces": ()}
+
     model_name: str
     provider: str
     input_tokens: int
     output_tokens: int
 
 class ModelPricingResponse(BaseModel):
+    model_config = {"protected_namespaces": ()}
+
     model_name: str
     provider: str
     input_tokens: int

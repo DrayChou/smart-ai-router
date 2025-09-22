@@ -43,6 +43,7 @@ class ModelSearchRequest(BaseModel):
 
 class ChannelTestRequest(BaseModel):
     """渠道测试请求"""
+    model_config = {"protected_namespaces": ()}
 
     channel_id: str
     model_name: Optional[str] = None
@@ -91,10 +92,16 @@ def create_status_monitor_router(
                 channel.id
             )
 
-            # 估算总模型数（从缓存中获取）
-            channel_cache = config_loader.get_model_cache_by_channel(channel.id)
-            models = channel_cache.get("models", [])
-            total_models = len(models)
+            # 估算总模型数（从API Key级缓存中获取）
+            channel_cache = config_loader.get_model_cache_by_channel_and_key(channel.id, channel.api_key)
+            if channel_cache:
+                models = channel_cache.get("models", [])
+                total_models = len(models)
+            else:
+                # 回退到渠道级缓存
+                channel_cache = config_loader.get_model_cache_by_channel(channel.id)
+                models = channel_cache.get("models", [])
+                total_models = len(models)
             
 
             channels_data.append(

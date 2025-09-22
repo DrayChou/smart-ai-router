@@ -5,7 +5,7 @@ import logging
 from typing import Optional
 
 from core.router.types import ChannelCandidate, RoutingRequest
-from core.routing.exceptions import ParameterComparisonError
+from core.exceptions import ParameterComparisonError
 
 logger = logging.getLogger(__name__)
 

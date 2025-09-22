@@ -28,6 +28,7 @@ from core.middleware.logging import LoggingMiddleware, RequestContextMiddleware
 from core.utils.audit_logger import initialize_audit_logger, get_audit_logger
 from core.middleware.audit import AuditMiddleware, SecurityAuditMiddleware
 from core.utils.logging_integration import enable_smart_logging, get_enhanced_logger
+from core.middleware.exception_middleware import ExceptionHandlerMiddleware
 
 # API路由模块
 from api.chat import create_chat_router
@@ -49,6 +50,7 @@ import logging
 from pathlib import Path
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
+from contextlib import asynccontextmanager
 
 # 添加项目根目录到 Python 路径
 sys.path.insert(0, str(Path(__file__).parent))
@@ -58,6 +60,112 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+
+async def _startup_refresh_minimal(config_loader):
+    """精简版启动刷新"""
+    try:
+        # 🚀 FIXED: 不清除已加载的模型缓存，避免导致路由失败
+        # 只清除路由器的内部缓存（标签缓存等），保留模型数据
+        if len(config_loader.model_cache) > 0:
+            logger.info(
+                f"[MINIMAL] Model cache already loaded with {len(config_loader.model_cache)} entries, skipping clear"
+            )
+
+            # 🚀 性能优化：预构建内存索引（避免请求时重建）
+            from core.utils.memory_index import (
+                get_memory_index,
+                rebuild_index_if_needed,
+            )
+            from core.scheduler.tasks.model_discovery import get_merged_config
+
+            try:
+                # 获取渠道配置用于标签继承
+                merged_config = get_merged_config()
+                channel_configs = merged_config.get("channels", [])
+
+                # 预构建内存索引
+                memory_index = get_memory_index()
+                stats = rebuild_index_if_needed(
+                    config_loader.model_cache,
+                    force_rebuild=True,
+                    channel_configs=channel_configs,
+                )
+
+                logger.info(
+                    f"🚀 PREBUILT MEMORY INDEX: {stats.total_models} models, {stats.total_tags} tags ready for routing"
+                )
+            except Exception as e:
+                logger.warning(f"[MINIMAL] Memory index prebuild failed: {e}")
+        else:
+            logger.warning(
+                "[MINIMAL] Model cache is empty, this may cause routing failures"
+            )
+
+        # 只清除路由器的查询缓存，不清除模型数据缓存
+        from core.json_router import get_router
+        router = get_router()
+        router.clear_cache()
+        logger.info("[MINIMAL] Router query cache cleared, model data preserved")
+    except Exception as e:
+        logger.error(f"[MINIMAL] Startup refresh failed: {e}")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """应用生命周期管理"""
+    # 启动阶段
+    try:
+        # 获取配置和路由器（应该已经在全局范围内初始化）
+        config_loader = get_yaml_config_loader()
+
+        initialize_admin_auth(config_loader)
+        logger.info("[MINIMAL] Admin authentication initialized")
+
+        tasks_config = config_loader.get_tasks_config()
+        await initialize_background_tasks(tasks_config, config_loader)
+        logger.info("[MINIMAL] Background tasks initialized")
+
+        # 启动黑名单恢复服务
+        await start_recovery_service()
+        logger.info("[MINIMAL] Blacklist recovery service started")
+
+        audit_logger = get_audit_logger()
+        if audit_logger:
+            config_info = {
+                "mode": "minimal",
+                "providers": len(config_loader.config.providers),
+                "channels": len(config_loader.config.channels),
+                "auth_enabled": config_loader.config.auth.enabled,
+            }
+            audit_logger.log_system_startup("0.3.0-minimal", config_info)
+
+        # 自动刷新缓存
+        await _startup_refresh_minimal(config_loader)
+
+        logger.info(
+            "[MINIMAL] Smart AI Router started in MINIMAL mode with 8 core endpoints"
+        )
+
+    except Exception as e:
+        logger.error(f"[ERROR] Failed to initialize: {e}")
+        raise
+
+    yield
+
+    # 关闭阶段
+    try:
+        # 停止黑名单恢复服务
+        await stop_recovery_service()
+        logger.info("[MINIMAL] Blacklist recovery service stopped")
+
+        await stop_background_tasks()
+        await close_global_pool()
+        await close_global_cache()
+        await shutdown_logging()
+        logger.info("[MINIMAL] Smart AI Router shutdown complete")
+    except Exception as e:
+        logger.error(f"[ERROR] Error during shutdown: {e}")
 
 
 def create_minimal_app() -> FastAPI:
@@ -104,9 +212,11 @@ def create_minimal_app() -> FastAPI:
         version="0.3.0-minimal",
         docs_url="/docs",
         redoc_url="/redoc",
+        lifespan=lifespan,
     )
 
     # 添加中间件
+    app.add_middleware(ExceptionHandlerMiddleware)  # 统一异常处理，放在最外层
     app.add_middleware(LoggingMiddleware)
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(AuditMiddleware)
@@ -128,105 +238,6 @@ def create_minimal_app() -> FastAPI:
     # 创建聊天处理器
     chat_handler = ChatCompletionHandler(config_loader, router)
 
-    # --- 应用生命周期事件 ---
-
-    @app.on_event("startup")
-    async def startup_event() -> None:
-        """应用启动事件"""
-        try:
-            initialize_admin_auth(config_loader)
-            logger.info("[MINIMAL] Admin authentication initialized")
-
-            tasks_config = config_loader.get_tasks_config()
-            await initialize_background_tasks(tasks_config, config_loader)
-            logger.info("[MINIMAL] Background tasks initialized")
-
-            # 启动黑名单恢复服务
-            await start_recovery_service()
-            logger.info("[MINIMAL] Blacklist recovery service started")
-
-            audit_logger = get_audit_logger()
-            if audit_logger:
-                config_info = {
-                    "mode": "minimal",
-                    "providers": len(config_loader.config.providers),
-                    "channels": len(config_loader.config.channels),
-                    "auth_enabled": config_loader.config.auth.enabled,
-                }
-                audit_logger.log_system_startup("0.3.0-minimal", config_info)
-
-            # 自动刷新缓存
-            await _startup_refresh_minimal()
-
-            logger.info(
-                "[MINIMAL] Smart AI Router started in MINIMAL mode with 8 core endpoints"
-            )
-
-        except Exception as e:
-            logger.error(f"[ERROR] Failed to initialize: {e}")
-
-    @app.on_event("shutdown")
-    async def shutdown_event() -> None:
-        """应用关闭事件"""
-        try:
-            # 停止黑名单恢复服务
-            await stop_recovery_service()
-            logger.info("[MINIMAL] Blacklist recovery service stopped")
-
-            await stop_background_tasks()
-            await close_global_pool()
-            await close_global_cache()
-            await shutdown_logging()
-            logger.info("[MINIMAL] Smart AI Router shutdown complete")
-        except Exception as e:
-            logger.error(f"[ERROR] Error during shutdown: {e}")
-
-    async def _startup_refresh_minimal():
-        """精简版启动刷新"""
-        try:
-            # 🚀 FIXED: 不清除已加载的模型缓存，避免导致路由失败
-            # 只清除路由器的内部缓存（标签缓存等），保留模型数据
-            if len(config_loader.model_cache) > 0:
-                logger.info(
-                    f"[MINIMAL] Model cache already loaded with {len(config_loader.model_cache)} entries, skipping clear"
-                )
-
-                # 🚀 性能优化：预构建内存索引（避免请求时重建）
-                from core.utils.memory_index import (
-                    get_memory_index,
-                    rebuild_index_if_needed,
-                )
-                from core.scheduler.tasks.model_discovery import get_merged_config
-
-                try:
-                    # 获取渠道配置用于标签继承
-                    merged_config = get_merged_config()
-                    channel_configs = merged_config.get("channels", [])
-
-                    # 预构建内存索引
-                    memory_index = get_memory_index()
-                    stats = rebuild_index_if_needed(
-                        config_loader.model_cache,
-                        force_rebuild=True,
-                        channel_configs=channel_configs,
-                    )
-
-                    logger.info(
-                        f"🚀 PREBUILT MEMORY INDEX: {stats.total_models} models, {stats.total_tags} tags ready for routing"
-                    )
-                except Exception as e:
-                    logger.warning(f"[MINIMAL] Memory index prebuild failed: {e}")
-            else:
-                logger.warning(
-                    "[MINIMAL] Model cache is empty, this may cause routing failures"
-                )
-
-            # 只清除路由器的查询缓存，不清除模型数据缓存
-            router.clear_cache()
-            logger.info("[MINIMAL] Router query cache cleared, model data preserved")
-        except Exception as e:
-            logger.error(f"[MINIMAL] Startup refresh failed: {e}")
-
     # ===== 注册API路由模块 =====
 
     # 健康检查路由
@@ -234,7 +245,7 @@ def create_minimal_app() -> FastAPI:
     app.include_router(health_router)
 
     # 模型列表路由
-    models_router = create_models_router(config_loader, router)
+    models_router = create_models_router(config_loader)
     app.include_router(models_router)
 
     # 聊天完成路由

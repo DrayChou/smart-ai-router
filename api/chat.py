@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException
 from core.exceptions import RoutingException
 from core.handlers.chat_handler import ChatCompletionHandler, ChatCompletionRequest
 from core.utils.logger import get_logger
+from core.utils.exception_handler import ExternalAPIError, ValidationError
 # Removed duplicate log_request import - logging handled by chat_handler
 
 logger = get_logger(__name__)
@@ -21,43 +22,9 @@ def create_chat_router(chat_handler: ChatCompletionHandler) -> APIRouter:
     @router.post("/chat/completions")
     async def chat_completions(request: ChatCompletionRequest):
         """聊天完成API - 核心功能"""
-        start_time = time.time()
-        try:
-            response = await chat_handler.handle_request(request)
-            
-            # Single point of logging - no duplicates
-            pass
-            
-            return response
-        except RoutingException as e:
-            # Record router error to status monitor
-            duration_ms = (time.time() - start_time) * 1000
-            from .status_monitor import log_request
-            log_request(
-                method="POST",
-                path="/v1/chat/completions",
-                status_code=e.status_code,
-                duration_ms=duration_ms,
-                model=request.model,
-                channel=None,
-                error=str(e)
-            )
-            logger.error(f"Router error: {e}")
-            raise HTTPException(status_code=e.status_code, detail=e.message)
-        except Exception as e:
-            # Record unexpected error to status monitor
-            duration_ms = (time.time() - start_time) * 1000
-            from .status_monitor import log_request
-            log_request(
-                method="POST",
-                path="/v1/chat/completions",
-                status_code=500,
-                duration_ms=duration_ms,
-                model=request.model,
-                channel=None,
-                error=str(e)
-            )
-            logger.error(f"Unexpected error in chat completions: {e}", exc_info=True)
-            raise HTTPException(status_code=500, detail=str(e))
+        # 统一异常处理现在由 ExceptionHandlerMiddleware 处理
+        # 无需在这里手动捕获异常，中间件会自动处理并记录到状态监控
+        response = await chat_handler.handle_request(request)
+        return response
 
     return router

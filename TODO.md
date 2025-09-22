@@ -13,16 +13,15 @@
 
 1. Core routing engine consolidation / 核心路由引擎整合
    - ✅ Split `core/json_router.py` into mixins and shared types under `core/router/*`. / ✅ 已拆分 `core/json_router.py`，核心逻辑迁移到 `core/router/*` 的 mixin 与类型模块。
-   - ✅ Retired legacy modules under `core/routing/*`; update docs/tests to reflect JSONRouter-only flow. / ✅ 已移除 `core/routing/*` 遗留模块，后续同步文档与测试以反映 JSONRouter 单一路径。
-   - Wire `main.py` and `api/*` to a single RoutingEngine with dependency injection. / 通过依赖注入让 `main.py` 和 `api/*` 接入统一的 RoutingEngine。
+   - ✅ Fully retired legacy modules under `core/routing/*` and updated imports to use new router structure. / ✅ 完全移除 `core/routing/*` 遗留模块并更新所有导入引用至新路由器结构。
+   - Wire `main.py` and `api/*` to a single RoutingEngine with dependency injection (RouterService wrapper in place; update FastAPI routers and middleware next). / 通过依赖注入让 `main.py` 和 `api/*` 接入统一的 RoutingEngine（RouterService 已就绪，后续同步 FastAPI 路由与中间件）。
 2. Complete API key aware routing path / 完成 API Key 感知的路由路径
-   - Update call sites still using channel cache only (`core/json_router.py:1841`, `api/status_monitor.py:95`) to rely on `_get_discovered_info` / `get_model_cache_by_channel_and_key`. / 修正仍仅读取渠道级缓存的调用（如 `core/json_router.py:1841`、`api/status_monitor.py:95`），统一改用 `_get_discovered_info` / `get_model_cache_by_channel_and_key`。
+   - Update call sites still using channel cache only (`api/status_monitor.py:95`) to rely on `_get_discovered_info` / `get_model_cache_by_channel_and_key`. / 修正仍仅读取渠道级缓存的调用（如 `api/status_monitor.py:95`），统一改用 `_get_discovered_info` / `get_model_cache_by_channel_and_key`。
    - Ensure chat handlers and scoring propagate the request API key for cost estimation and monitoring. / 确保聊天处理与评分链路向下传递请求的 API Key，用于成本估算与监控。
 3. CI and quality gate / CI 与质量门禁
-   - Add GitHub Actions for `ruff`, `black`, `isort`, `mypy`, and `pytest` with caching. / 新增 GitHub Actions，执行 `ruff`、`black`、`isort`、`mypy`、`pytest` 并启用缓存。
-   - Collect coverage and fail builds below the agreed threshold. / 统计覆盖率并在低于约定阈值时使构建失败。
+   - ✅ Added GitHub Actions for `ruff`, `black`, `isort`, `mypy`, and `pytest` with caching and coverage collection (70% threshold). / ✅ 新增 GitHub Actions，执行 `ruff`、`black`、`isort`、`mypy`、`pytest` 并启用缓存和覆盖率收集（70% 阈值）。
 4. Unified error handling / 统一错误处理
-   - Apply `core/utils/exception_handler.py` to API routers and handlers so responses share one schema and severity/category tagging. / 在 API 路由与处理器中使用 `core/utils/exception_handler.py`，统一返回结构与错误级别/类别标记。
+   - ✅ Applied `core/utils/exception_handler.py` via `ExceptionHandlerMiddleware` to all API endpoints with unified response schema and severity/category tagging. / ✅ 通过 `ExceptionHandlerMiddleware` 在所有 API 端点应用 `core/utils/exception_handler.py`，实现统一返回结构与错误级别/类别标记。
 
 ## P1 - Mid Term Focus / P1 - 中期重点
 
@@ -35,6 +34,8 @@
   - Use `core/utils/usage_tracker.py` data to enforce spend thresholds, send alerts, and auto switch strategies when limits reach. / 利用 `core/utils/usage_tracker.py` 数据设置支出阈值、发送告警并在触及阈值时自动切换策略。
 - Observability upgrade / 可观测性升级
   - Export Prometheus metrics, standardise trace/log fields, and separate debug log channels. / 输出 Prometheus 指标，规范追踪/日志字段，并划分调试日志通道。
+- Dependency upgrades / 依赖升级
+  - Plan migration to SQLAlchemy 2.x, Pydantic 2.x, and python-json-logger new import path to remove deprecation warnings. / 规划升级 SQLAlchemy 2.x、Pydantic 2.x 以及 python-json-logger 新路径，消除弃用警告。
 
 ## P2+ - Longer Term / P2+ - 长期规划
 

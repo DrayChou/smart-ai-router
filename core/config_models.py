@@ -15,6 +15,8 @@ class Provider(BaseModel):
     capabilities: List[str] = []
 
 class Channel(BaseModel):
+    model_config = {"protected_namespaces": ()}
+
     id: str
     name: str
     provider: str
@@ -67,6 +69,8 @@ class TaskConfig(BaseModel):
     max_concurrent_checks: Optional[int] = None
 
 class Tasks(BaseModel):
+    model_config = {"protected_namespaces": ()}
+
     model_discovery: TaskConfig = Field(default_factory=TaskConfig)
     # 🗑️ Removed pricing_discovery - was generating unused cache files
     health_check: TaskConfig = Field(default_factory=TaskConfig)

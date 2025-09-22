@@ -24,16 +24,18 @@ class OpenRouterAdapter(OpenAIAdapter):
     - OpenRouter特定的模型路由选项
     """
 
-    def __init__(self):
-        super().__init__()
-        self.provider_name = "openrouter"
-        self.base_url = "https://openrouter.ai/api/v1"
+    def __init__(self, provider_name: str, config: Dict[str, Any]):
+        config = dict(config or {})
+        base_url = config.get("base_url") or "https://openrouter.ai/api"
+        config["base_url"] = base_url.rstrip('/')
+        super().__init__(provider_name, config)
 
-    def is_provider_match(self, provider: str, base_url: str = None) -> bool:
+    @staticmethod
+    def is_provider_match(provider: str, base_url: str = None) -> bool:
         """判断是否匹配OpenRouter服务商"""
-        return provider.lower() in ["openrouter", "openrouter.ai"] or (
-            base_url and "openrouter.ai" in base_url.lower()
-        )
+        provider_lower = provider.lower() if provider else ""
+        base = base_url.lower() if base_url else ""
+        return "openrouter" in provider_lower or "openrouter.ai" in base
 
     def transform_request(self, request: ChatRequest) -> Dict[str, Any]:
         """转换为OpenRouter格式请求，添加价格优先排序支持"""
