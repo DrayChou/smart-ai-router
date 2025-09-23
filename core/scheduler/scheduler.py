@@ -7,7 +7,7 @@ import asyncio
 import logging
 import time
 from datetime import datetime, timedelta
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ class TaskScheduler:
     """任务调度器"""
 
     def __init__(self):
-        self.tasks: Dict[str, Dict] = {}
+        self.tasks: dict[str, dict] = {}
         self.running = False
         self._loop_task = None
 
@@ -77,7 +77,7 @@ class TaskScheduler:
             self.tasks[name]["enabled"] = False
             logger.info(f"已禁用任务 '{name}'")
 
-    async def _run_task(self, name: str, task_info: Dict):
+    async def _run_task(self, name: str, task_info: dict):
         """执行单个任务"""
         func = task_info["func"]
         kwargs = task_info["kwargs"]
@@ -190,7 +190,7 @@ class TaskScheduler:
 
         logger.info("任务调度器已停止")
 
-    def get_task_status(self) -> Dict[str, Any]:
+    def get_task_status(self) -> dict[str, Any]:
         """获取任务状态"""
         status = {
             "scheduler_running": self.running,
@@ -258,7 +258,7 @@ async def stop_scheduler():
     await scheduler.stop()
 
 
-def get_task_status() -> Dict[str, Any]:
+def get_task_status() -> dict[str, Any]:
     """获取任务状态的便捷函数"""
     scheduler = get_scheduler()
     return scheduler.get_task_status()

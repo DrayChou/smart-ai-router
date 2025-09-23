@@ -4,7 +4,7 @@ FastAPI exception middleware for unified error handling
 
 import logging
 import time
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -14,8 +14,6 @@ from core.exceptions import RoutingException
 from core.utils.exception_handler import (
     AuthenticationError,
     ConfigurationError,
-    ErrorCategory,
-    ErrorSeverity,
     ExternalAPIError,
     NetworkError,
     ResourceError,
@@ -127,7 +125,7 @@ class ExceptionHandlerMiddleware(BaseHTTPMiddleware):
 
     def _create_error_response(
         self, exc: SmartRouterException, request: Request, duration_ms: float
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """创建统一的错误响应格式"""
         return {
             "error": {

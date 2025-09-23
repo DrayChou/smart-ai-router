@@ -12,7 +12,7 @@ Note:
 
 from abc import ABC, abstractmethod
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from core.models.channel import Channel
 from core.models.virtual_model import VirtualModelGroup
@@ -30,7 +30,7 @@ class RoutingScore:
         quality_score: float,
         reliability_score: float,
         reason: str = "",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ):
         self.channel = channel
         self.score = score  # 综合评分 (0.0-1.0, 越高越好)
@@ -52,8 +52,8 @@ class RoutingRequest:
         self,
         model_group: VirtualModelGroup,
         prompt_tokens: int,
-        required_capabilities: Optional[List[str]] = None,
-        user_preferences: Optional[Dict[str, Any]] = None,
+        required_capabilities: Optional[list[str]] = None,
+        user_preferences: Optional[dict[str, Any]] = None,
         budget_limit: Optional[Decimal] = None,
         priority: str = "balanced",  # cost, speed, quality, balanced
     ):
@@ -74,8 +74,8 @@ class BaseRoutingStrategy(ABC):
 
     @abstractmethod
     async def calculate_scores(
-        self, channels: List[Channel], request: RoutingRequest
-    ) -> List[RoutingScore]:
+        self, channels: list[Channel], request: RoutingRequest
+    ) -> list[RoutingScore]:
         """
         计算渠道评分
 
@@ -89,8 +89,8 @@ class BaseRoutingStrategy(ABC):
         pass
 
     def filter_channels(
-        self, channels: List[Channel], request: RoutingRequest
-    ) -> List[Channel]:
+        self, channels: list[Channel], request: RoutingRequest
+    ) -> list[Channel]:
         """
         过滤渠道 (基础过滤逻辑)
 
@@ -161,7 +161,7 @@ class RoutingEngine:
     """智能路由引擎"""
 
     def __init__(self):
-        self.strategies: Dict[str, BaseRoutingStrategy] = {}
+        self.strategies: dict[str, BaseRoutingStrategy] = {}
         self.default_strategy = "multi_layer"
 
     def register_strategy(self, strategy: BaseRoutingStrategy):
@@ -174,7 +174,7 @@ class RoutingEngine:
 
     async def select_channel(
         self,
-        channels: List[Channel],
+        channels: list[Channel],
         request: RoutingRequest,
         strategy_name: Optional[str] = None,
     ) -> Optional[RoutingScore]:
@@ -210,11 +210,11 @@ class RoutingEngine:
 
     async def get_ranked_channels(
         self,
-        channels: List[Channel],
+        channels: list[Channel],
         request: RoutingRequest,
         strategy_name: Optional[str] = None,
         limit: Optional[int] = None,
-    ) -> List[RoutingScore]:
+    ) -> list[RoutingScore]:
         """
         获取排序后的渠道列表
 

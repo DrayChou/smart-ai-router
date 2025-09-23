@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import Any, Optional
 
 from core.exceptions import ParameterComparisonError, TagNotFoundError
 from core.router.mixins.candidate import CandidateDiscoveryMixin
@@ -26,14 +25,14 @@ logger = logging.getLogger(__name__)
 class JSONRouter(CandidateDiscoveryMixin, ScoringMixin):
     """基于Pydantic验证后配置的路由器"""
 
-    def __init__(self, config_loader: Optional[YAMLConfigLoader] = None):
+    def __init__(self, config_loader: YAMLConfigLoader | None = None):
         self.config_loader = config_loader or get_yaml_config_loader()
         self.config = self.config_loader.config
 
         self._tag_cache: dict[str, list[str]] = {}
         self._tag_cache_lock = threading.RLock()
-        self._available_tags_cache: Optional[set] = None
-        self._available_models_cache: Optional[list[str]] = None
+        self._available_tags_cache: set | None = None
+        self._available_models_cache: list[str] | None = None
 
         self.unified_registry = get_unified_model_registry()
         self.model_analyzer = get_model_analyzer()
@@ -250,7 +249,7 @@ class JSONRouter(CandidateDiscoveryMixin, ScoringMixin):
         logger.info("Router cache cleared")
 
     def update_channel_health(
-        self, channel_id: str, success: bool, latency: Optional[float] = None
+        self, channel_id: str, success: bool, latency: float | None = None
     ) -> None:
         """更新渠道健康状态"""
         self.config_loader.update_channel_health(channel_id, success, latency)
@@ -264,7 +263,7 @@ __all__ = [
 ]
 
 
-_router: Optional[JSONRouter] = None
+_router: JSONRouter | None = None
 _router_lock = threading.Lock()
 
 

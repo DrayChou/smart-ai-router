@@ -5,10 +5,10 @@
 """
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Optional
 
 from .logger import get_logger  # 现有的日志系统
-from .smart_logging import SmartLogFilter, get_smart_logger, setup_smart_logging
+from .smart_logging import SmartLogFilter, get_smart_logger
 
 
 class SmartLoggingIntegration:
@@ -97,7 +97,7 @@ class SmartLoggingIntegration:
 
     def _remove_smart_filters(self) -> None:
         """移除智能过滤器"""
-        for logger_name, logger in self.enhanced_loggers.items():
+        for _logger_name, logger in self.enhanced_loggers.items():
             for handler in logger.handlers:
                 # 移除SmartLogFilter类型的过滤器
                 handler.filters = [
@@ -189,7 +189,7 @@ def log_api_request(
     logger: logging.Logger,
     method: str,
     url: str,
-    headers: Optional[Dict] = None,
+    headers: Optional[dict] = None,
     body: Optional[str] = None,
     **context,
 ) -> None:
@@ -269,7 +269,6 @@ def log_channel_operation(
         error: 错误信息
         **context: 额外上下文
     """
-    status = "SUCCESS" if success else "FAILED"
     message = f"CHANNEL {operation.upper()}: {channel_id}"
 
     if model:
@@ -298,7 +297,7 @@ def log_cost_info(
     cost: float,
     model: str,
     channel_id: str,
-    tokens: Dict[str, int] = None,
+    tokens: dict[str, int] = None,
     **context,
 ) -> None:
     """

@@ -5,7 +5,7 @@
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 
 class DataSource(Enum):
@@ -27,7 +27,7 @@ class ModelCapabilities:
     supports_code_generation: bool = True  # 默认支持
     supports_streaming: bool = True  # 默认支持
 
-    def to_legacy_dict(self) -> Dict[str, bool]:
+    def to_legacy_dict(self) -> dict[str, bool]:
         """转换为旧版格式（兼容现有代码）"""
         return {
             "vision": self.supports_vision,
@@ -101,17 +101,17 @@ class ModelInfo:
     pricing: ModelPricing = field(default_factory=ModelPricing)
 
     # 元信息
-    tags: Set[str] = field(default_factory=set)
+    tags: set[str] = field(default_factory=set)
     quality_score: float = 0.5
     data_source: DataSource = DataSource.BASIC_INFERENCE
     is_local: bool = False
 
     # OpenRouter原始数据（用于调试）
     modality: Optional[str] = None
-    input_modalities: List[str] = field(default_factory=list)
-    output_modalities: List[str] = field(default_factory=list)
+    input_modalities: list[str] = field(default_factory=list)
+    output_modalities: list[str] = field(default_factory=list)
 
-    def extract_tags_from_name(self) -> Set[str]:
+    def extract_tags_from_name(self) -> set[str]:
         """从模型名称自动提取标签"""
         import re
 
@@ -135,7 +135,7 @@ class ModelInfo:
 
         return tags
 
-    def matches_tags(self, required_tags: List[str]) -> bool:
+    def matches_tags(self, required_tags: list[str]) -> bool:
         """检查是否匹配所有必需标签"""
         if not required_tags:
             return True
@@ -149,7 +149,7 @@ class ModelInfo:
 
         return True
 
-    def update_from_provider_override(self, provider_overrides: Dict[str, Any]) -> None:
+    def update_from_provider_override(self, provider_overrides: dict[str, Any]) -> None:
         """应用提供商级别覆盖"""
         if pricing := provider_overrides.get("pricing"):
             if pricing.get("input_price") is not None:
@@ -171,7 +171,7 @@ class ModelInfo:
 
 
 # 工厂函数，简化创建
-def create_model_info_from_openrouter(openrouter_data: Dict[str, Any]) -> ModelInfo:
+def create_model_info_from_openrouter(openrouter_data: dict[str, Any]) -> ModelInfo:
     """从OpenRouter数据创建ModelInfo"""
     model_id = openrouter_data.get("id", "")
 

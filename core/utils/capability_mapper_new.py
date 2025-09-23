@@ -4,7 +4,7 @@
 """
 
 import logging
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ class CapabilityMapperWrapper:
         """保持原有初始化接口"""
         self.config_path = config_path or "config/model_capabilities.json"
 
-    def predict_capabilities(self, model_name: str, provider: str) -> Dict[str, bool]:
+    def predict_capabilities(self, model_name: str, provider: str) -> dict[str, bool]:
         """
         预测模型能力 - 兼容原接口
         内部调用统一模型服务
@@ -27,8 +27,8 @@ class CapabilityMapperWrapper:
         return fallback
 
     def get_capability_requirements(
-        self, request_data: Dict[str, Any]
-    ) -> Dict[str, bool]:
+        self, request_data: dict[str, Any]
+    ) -> dict[str, bool]:
         """分析请求数据，确定需要的能力 - 兼容原接口"""
         requirements = {
             "vision": False,
@@ -62,26 +62,26 @@ class CapabilityMapperWrapper:
         return requirements
 
     def find_compatible_models(
-        self, models: List[str], requirements: Dict[str, bool], provider: str = ""
-    ) -> List[str]:
+        self, models: list[str], requirements: dict[str, bool], provider: str = ""
+    ) -> list[str]:
         """从模型列表中找出兼容的模型 - 兼容原接口"""
         return []
 
     def add_model_override(
-        self, model_name: str, capabilities: Dict[str, bool]
+        self, model_name: str, capabilities: dict[str, bool]
     ) -> None:
         """添加模型能力覆盖 - 兼容原接口"""
         # TODO: 在新架构中实现覆盖机制
         logger.info(f"模型能力覆盖请求: {model_name} -> {capabilities}")
 
     def update_provider_capabilities(
-        self, provider: str, capabilities: Dict[str, bool]
+        self, provider: str, capabilities: dict[str, bool]
     ) -> None:
         """更新提供商默认能力 - 兼容原接口"""
         # TODO: 在新架构中实现提供商能力更新
         logger.info(f"提供商能力更新请求: {provider} -> {capabilities}")
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """获取能力映射统计信息 - 兼容原接口"""
         return {
             "vision_models_count": 0,
@@ -96,7 +96,7 @@ class CapabilityMapperWrapper:
         """保存能力映射到配置文件 - 兼容原接口"""
         logger.info("配置保存请求 (新架构中自动管理)")
 
-    def _basic_fallback(self, model_name: str, provider: str) -> Dict[str, bool]:
+    def _basic_fallback(self, model_name: str, provider: str) -> dict[str, bool]:
         """基础回退逻辑"""
         model_lower = model_name.lower()
         provider_lower = provider.lower()

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 SiliconFlow Provider Adapter - 统一格式版本
 
@@ -9,7 +8,7 @@ import logging
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import httpx
 
@@ -28,7 +27,7 @@ class SiliconFlowModelPricing:
     output_price: float  # USD per token
     context_length: Optional[int] = None
     description: Optional[str] = None
-    capabilities: Optional[List[str]] = None
+    capabilities: Optional[list[str]] = None
 
 
 class SiliconFlowAdapter(BaseAdapter):
@@ -43,12 +42,12 @@ class SiliconFlowAdapter(BaseAdapter):
             }
         super().__init__(provider_name, config)
         self.base_url = "https://api.siliconflow.cn"
-        self._cached_pricing: Optional[Dict[str, SiliconFlowModelPricing]] = None
+        self._cached_pricing: Optional[dict[str, SiliconFlowModelPricing]] = None
 
         # 只使用统一格式文件
         self.unified_pricing_path = Path("config/pricing/siliconflow_unified.json")
 
-    async def discover_models(self, api_key: str, timeout: int = 30) -> List[str]:
+    async def discover_models(self, api_key: str, timeout: int = 30) -> list[str]:
         """发现SiliconFlow可用模型"""
         try:
             headers = {
@@ -86,7 +85,7 @@ class SiliconFlowAdapter(BaseAdapter):
             logger.error(f"从统一格式配置文件加载模型列表失败: {e}")
             return []
 
-    async def _load_unified_pricing(self) -> Dict[str, SiliconFlowModelPricing]:
+    async def _load_unified_pricing(self) -> dict[str, SiliconFlowModelPricing]:
         """加载统一格式定价数据"""
         if self._cached_pricing:
             return self._cached_pricing
@@ -152,7 +151,7 @@ class SiliconFlowAdapter(BaseAdapter):
             logger.error(f"加载统一格式定价数据失败: {e}")
             raise
 
-    async def get_model_pricing(self, model_name: str) -> Optional[Dict[str, Any]]:
+    async def get_model_pricing(self, model_name: str) -> Optional[dict[str, Any]]:
         """获取特定模型的定价信息"""
         try:
             pricing_data = await self._load_unified_pricing()
@@ -178,7 +177,7 @@ class SiliconFlowAdapter(BaseAdapter):
             logger.error(f"获取模型定价失败 ({model_name}): {e}")
             return None
 
-    async def list_models(self, api_key: str, timeout: int = 30) -> List[ModelInfo]:
+    async def list_models(self, api_key: str, timeout: int = 30) -> list[ModelInfo]:
         """列出所有可用模型"""
         try:
             models = await self.discover_models(api_key, timeout)

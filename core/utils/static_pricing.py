@@ -6,14 +6,13 @@
 架构：第1层渠道专属定价 → 第2层OpenRouter基准定价回退
 """
 
-import json
 import logging
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Optional
 
-from .tiered_pricing import TieredPricingCalculator, get_pricing_calculator
+from .tiered_pricing import get_pricing_calculator
 
 logger = logging.getLogger(__name__)
 
@@ -42,12 +41,12 @@ class UnifiedStaticPricingLoader:
         self.base_pricing_data = self._load_base_pricing()
 
         # 第1层：渠道专属定价缓存（动态加载）
-        self.channel_pricing_cache: Dict[str, Dict[str, Any]] = {}
+        self.channel_pricing_cache: dict[str, dict[str, Any]] = {}
 
         # 特殊处理器（豆包阶梯定价）
         self.doubao_calculator = get_pricing_calculator()
 
-    def _load_base_pricing(self) -> Dict[str, Any]:
+    def _load_base_pricing(self) -> dict[str, Any]:
         """加载第2层OpenRouter基准定价数据"""
         try:
             if not self.base_pricing_file.exists():
@@ -148,7 +147,7 @@ class UnifiedStaticPricingLoader:
 
     def _load_channel_pricing(
         self, provider_key: str, file_path: Path
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """动态加载渠道定价数据（带缓存）"""
         if provider_key in self.channel_pricing_cache:
             return self.channel_pricing_cache[provider_key]
@@ -188,7 +187,7 @@ class UnifiedStaticPricingLoader:
             return {}
 
     def _extract_pricing_from_unified_format(
-        self, pricing_data: Dict[str, Any], model_name: str, provider_name: str
+        self, pricing_data: dict[str, Any], model_name: str, provider_name: str
     ) -> Optional[StaticPricingResult]:
         """从统一格式中提取定价信息（消除重复代码）"""
 
@@ -336,14 +335,14 @@ class UnifiedStaticPricingLoader:
             self.base_pricing_data, model_name, "openrouter_base"
         )
 
-    def list_siliconflow_models(self) -> Dict[str, Any]:
+    def list_siliconflow_models(self) -> dict[str, Any]:
         """列出SiliconFlow模型（兼容性方法）"""
         siliconflow_data = self._load_channel_pricing(
             "siliconflow", self.pricing_dir / "siliconflow_unified.json"
         )
         return siliconflow_data.get("models", {})
 
-    def list_base_pricing_models(self) -> Dict[str, Any]:
+    def list_base_pricing_models(self) -> dict[str, Any]:
         """列出所有基础定价模型"""
         return self.base_pricing_data.get("models", {})
 
@@ -353,7 +352,7 @@ class UnifiedStaticPricingLoader:
 
     def get_free_models(
         self, provider: Optional[str] = None
-    ) -> Dict[str, StaticPricingResult]:
+    ) -> dict[str, StaticPricingResult]:
         """获取免费模型列表"""
         free_models = {}
 
@@ -426,7 +425,7 @@ def get_provider_pricing(
     model_name: str,
     input_tokens: int = 10000,
     output_tokens: int = 2000,
-) -> Optional[Tuple[float, float, str]]:
+) -> Optional[tuple[float, float, str]]:
     """便捷函数：获取提供商模型定价"""
     loader = get_static_pricing_loader()
     result = loader.get_model_pricing(

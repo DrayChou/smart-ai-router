@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from core.router.mixins.parameter import ParameterComparisonMixin
 from core.router.mixins.tag import TagRoutingMixin
@@ -101,7 +100,7 @@ class CandidateDiscoveryMixin(ParameterComparisonMixin, TagRoutingMixin):
 
     def _lookup_configured_channels(
         self, request: RoutingRequest
-    ) -> Optional[list[ChannelCandidate]]:
+    ) -> list[ChannelCandidate] | None:
         config_channels = self.config_loader.get_channels_by_model(request.model)
         if not config_channels:
             return None

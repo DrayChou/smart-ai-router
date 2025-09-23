@@ -120,9 +120,7 @@ def create_gemini_router(
             authorization: Optional[str] = Header(None, alias="Authorization"),
             x_goog_api_key: Optional[str] = Header(None, alias="x-goog-api-key"),
         ):
-            """Gemini Generate Content API - {version}版本""".format(
-                version=version.upper()
-            )
+            f"""Gemini Generate Content API - {version.upper()}版本"""
 
             # 验证认证 - 支持多种方式
             api_key = None
@@ -164,7 +162,7 @@ def create_gemini_router(
                             "status": "FAILED",
                         }
                     },
-                )
+                ) from e
             except Exception as e:
                 logger.error(
                     f"Unexpected error in Gemini generateContent: {e}", exc_info=True
@@ -178,7 +176,7 @@ def create_gemini_router(
                             "status": "FAILED",
                         }
                     },
-                )
+                ) from e
 
         @router_instance.post("/models/{model}:streamGenerateContent")
         async def stream_generate_content(
@@ -187,9 +185,7 @@ def create_gemini_router(
             authorization: Optional[str] = Header(None, alias="Authorization"),
             x_goog_api_key: Optional[str] = Header(None, alias="x-goog-api-key"),
         ):
-            """Gemini Stream Generate Content API - {version}版本""".format(
-                version=version.upper()
-            )
+            f"""Gemini Stream Generate Content API - {version.upper()}版本"""
 
             # 验证认证 - 支持多种方式
             api_key = None
@@ -241,7 +237,7 @@ def create_gemini_router(
                             "status": "FAILED",
                         }
                     },
-                )
+                ) from e
             except Exception as e:
                 logger.error(
                     f"Unexpected error in Gemini streamGenerateContent: {e}",
@@ -256,7 +252,7 @@ def create_gemini_router(
                             "status": "FAILED",
                         }
                     },
-                )
+                ) from e
 
     # 为v1和v1beta版本注册路由
     _register_routes(v1_router, "v1")
@@ -430,7 +426,7 @@ async def stream_gemini_response(
                         # 错误消息
                         yield f"data: {json.dumps(chunk_data)}\n\n"
                         return
-                except:
+                except (json.JSONDecodeError, ValueError):
                     # 如果不是JSON，当作普通处理
                     continue
             else:

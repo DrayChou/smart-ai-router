@@ -9,10 +9,9 @@ can be reused without pulling router internals.
 from __future__ import annotations
 
 import re
-from typing import List
 
 
-def extract_complete_segments(model_name: str) -> List[str]:
+def extract_complete_segments(model_name: str) -> list[str]:
     """Extract complete core segments from a model name.
 
     Examples:
@@ -25,7 +24,7 @@ def extract_complete_segments(model_name: str) -> List[str]:
     main_separators = r"[/:@]"
     segments = re.split(main_separators, model_name)
 
-    complete_segments: List[str] = []
+    complete_segments: list[str] = []
     for segment in segments:
         segment = segment.strip()
         if not segment:
@@ -96,7 +95,7 @@ def extract_complete_segments(model_name: str) -> List[str]:
     return complete_segments
 
 
-def extract_tags_from_model_name(model_name: str) -> List[str]:
+def extract_tags_from_model_name(model_name: str) -> list[str]:
     """Extract tags from model name, including core complete segments.
 
     Uses separators: ':', '/', '@', '-', '_', ','.
@@ -108,7 +107,7 @@ def extract_tags_from_model_name(model_name: str) -> List[str]:
     separators = r"[/:@\-_,]"
     parts = re.split(separators, model_name.lower())
 
-    split_tags: List[str] = []
+    split_tags: list[str] = []
     for part in parts:
         part = part.strip()
         if part and len(part) > 1:
@@ -119,7 +118,7 @@ def extract_tags_from_model_name(model_name: str) -> List[str]:
     return all_tags
 
 
-def extract_tags_with_aliases(model_name: str, channel) -> List[str]:
+def extract_tags_with_aliases(model_name: str, channel) -> list[str]:
     """Extract tags with channel alias enrichment.
 
     If channel defines model_aliases mapping from standard names to
@@ -129,7 +128,7 @@ def extract_tags_with_aliases(model_name: str, channel) -> List[str]:
     if not hasattr(channel, "model_aliases") or not channel.model_aliases:
         return base_tags
 
-    alias_tags: List[str] = []
+    alias_tags: list[str] = []
     for standard_name, channel_specific_name in channel.model_aliases.items():
         if model_name.lower() == str(channel_specific_name).lower():
             alias_tags.extend(extract_tags_from_model_name(standard_name))

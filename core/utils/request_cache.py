@@ -7,10 +7,9 @@ import asyncio
 import hashlib
 import json
 import logging
-import time
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from ..config_models import Channel
 
@@ -23,11 +22,11 @@ class RequestFingerprint:
 
     model: str
     routing_strategy: str = "balanced"
-    required_capabilities: Optional[List[str]] = None
+    required_capabilities: Optional[list[str]] = None
     min_context_length: Optional[int] = None
     max_cost_per_1k: Optional[float] = None
     prefer_local: bool = False
-    exclude_providers: Optional[List[str]] = None
+    exclude_providers: Optional[list[str]] = None
     # 新增影响路由的参数
     max_tokens: Optional[int] = None
     temperature: Optional[float] = None
@@ -65,7 +64,7 @@ class CachedModelSelection:
     """缓存的模型选择结果"""
 
     primary_channel: Channel
-    backup_channels: List[Channel]
+    backup_channels: list[Channel]
     selection_reason: str
     cost_estimate: float
     created_at: datetime
@@ -74,7 +73,7 @@ class CachedModelSelection:
     last_used_at: Optional[datetime] = None
     # 新增：存储实际匹配的模型名（对于标签路由很重要）
     primary_matched_model: Optional[str] = None
-    backup_matched_models: Optional[List[str]] = None
+    backup_matched_models: Optional[list[str]] = None
 
     def is_expired(self) -> bool:
         """检查是否已过期"""
@@ -117,7 +116,7 @@ class RequestModelCache:
         self.cleanup_interval = cleanup_interval_seconds
 
         # 缓存存储: {cache_key: CachedModelSelection}
-        self._cache: Dict[str, CachedModelSelection] = {}
+        self._cache: dict[str, CachedModelSelection] = {}
 
         # 统计信息
         self._stats = {"hits": 0, "misses": 0, "invalidations": 0, "cleanup_runs": 0}
@@ -176,12 +175,12 @@ class RequestModelCache:
         self,
         fingerprint: RequestFingerprint,
         primary_channel: Channel,
-        backup_channels: List[Channel],
+        backup_channels: list[Channel],
         selection_reason: str,
         cost_estimate: float,
         ttl_seconds: Optional[int] = None,
         primary_matched_model: Optional[str] = None,
-        backup_matched_models: Optional[List[str]] = None,
+        backup_matched_models: Optional[list[str]] = None,
     ) -> str:
         """缓存模型选择结果"""
 
@@ -295,7 +294,7 @@ class RequestModelCache:
     def _cleanup_expired_sync(self):
         """清理过期缓存（内部同步方法）"""
         expired_keys = []
-        now = datetime.now()
+        datetime.now()
 
         for cache_key, cached_result in list(self._cache.items()):
             if cached_result.is_expired():
@@ -326,7 +325,7 @@ class RequestModelCache:
             del self._cache[lru_key]
             logger.debug(f"🗑️  LRU EVICTED: {lru_key}")
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """获取缓存统计信息"""
         total_requests = self._stats["hits"] + self._stats["misses"]
         hit_rate = (

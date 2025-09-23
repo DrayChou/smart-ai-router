@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 
@@ -19,7 +19,7 @@ _router_service = get_router_service()
 _config_loader = get_yaml_config_loader()
 
 
-def _build_routing_request(payload: Dict[str, Any]) -> RoutingRequest:
+def _build_routing_request(payload: dict[str, Any]) -> RoutingRequest:
     return RoutingRequest(
         model=payload.get("model", ""),
         messages=payload.get("messages", []),
@@ -34,7 +34,7 @@ def _build_routing_request(payload: Dict[str, Any]) -> RoutingRequest:
 
 
 @router.post("/chat/completions")
-async def chat_completions(request_data: Dict[str, Any]) -> Dict[str, Any]:
+async def chat_completions(request_data: dict[str, Any]) -> dict[str, Any]:
     """OpenAI-compatible chat completion routing endpoint."""
     routing_request = _build_routing_request(request_data)
     scores = await _router_service.route_request(routing_request)
@@ -48,7 +48,7 @@ async def chat_completions(request_data: Dict[str, Any]) -> Dict[str, Any]:
     channel = best.channel
     now = datetime.now()
 
-    response: Dict[str, Any] = {
+    response: dict[str, Any] = {
         "id": f"chatcmpl-{now.strftime('%Y%m%d%H%M%S')}",
         "object": "chat.completion",
         "created": int(now.timestamp()),
@@ -86,7 +86,7 @@ async def chat_completions(request_data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 @router.get("/models")
-async def list_models() -> Dict[str, Any]:
+async def list_models() -> dict[str, Any]:
     """Return a simple list of available models and tags."""
     json_router = get_router()
     models = json_router.get_available_models()
@@ -106,27 +106,27 @@ async def list_models() -> Dict[str, Any]:
 
 
 @router.get("/health")
-async def health_check() -> Dict[str, Any]:
+async def health_check() -> dict[str, Any]:
     now = datetime.now()
     return {"status": "healthy", "timestamp": now.isoformat(), "version": "0.3.0"}
 
 
 @router.get("/admin/config")
-async def get_config_summary() -> Dict[str, Any]:
+async def get_config_summary() -> dict[str, Any]:
     config_service = get_config_service()
     return config_service.get_config_summary()
 
 
 @router.get("/admin/cache/stats")
-async def get_cache_stats() -> Dict[str, Any]:
+async def get_cache_stats() -> dict[str, Any]:
     cache_service = get_cache_service()
     return cache_service.get_cache_stats()
 
 
 @router.post("/admin/cache/clear")
 async def clear_cache(
-    namespace: Optional[str] = None, background_tasks: Optional[BackgroundTasks] = None
-) -> Dict[str, Any]:
+    namespace: str | None = None, background_tasks: BackgroundTasks | None = None
+) -> dict[str, Any]:
     cache_service = get_cache_service()
     target_namespace = namespace or "default"
     await cache_service.clear_namespace(target_namespace)
@@ -143,7 +143,7 @@ async def clear_cache(
 
 
 @router.get("/admin/routing/strategies")
-async def get_routing_strategies() -> Dict[str, Any]:
+async def get_routing_strategies() -> dict[str, Any]:
     routing_config = getattr(_config_loader.config, "routing", None)
     custom_strategies = {}
     default_strategies = [
@@ -167,7 +167,7 @@ async def get_routing_strategies() -> Dict[str, Any]:
 
 
 @router.post("/admin/routing/test")
-async def test_routing(request_data: Dict[str, Any]) -> Dict[str, Any]:
+async def test_routing(request_data: dict[str, Any]) -> dict[str, Any]:
     routing_request = _build_routing_request(request_data)
     scores = await _router_service.route_request(routing_request)
 
@@ -201,9 +201,9 @@ async def test_routing(request_data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 @router.get("/admin/channels")
-async def get_channels_info() -> Dict[str, Any]:
+async def get_channels_info() -> dict[str, Any]:
     channels = _config_loader.get_enabled_channels()
-    channel_info: List[Dict[str, Any]] = []
+    channel_info: list[dict[str, Any]] = []
 
     for channel in channels:
         channel_info.append(

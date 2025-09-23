@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 请求间隔管理器 - 确保渠道遵守最小请求间隔
 """
@@ -7,7 +6,6 @@ import asyncio
 import logging
 import time
 from collections import defaultdict
-from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +20,9 @@ class RequestIntervalManager:
 
     def __init__(self):
         # 存储每个渠道的最后请求时间
-        self._last_request_times: Dict[str, float] = {}
+        self._last_request_times: dict[str, float] = {}
         # 线程锁确保并发安全
-        self._locks: Dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+        self._locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 
     async def wait_if_needed(self, channel_id: str, min_interval: int) -> bool:
         """
@@ -125,7 +123,7 @@ class RequestIntervalManager:
         if channel_id in self._locks:
             del self._locks[channel_id]
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         """
         获取管理器统计信息
 

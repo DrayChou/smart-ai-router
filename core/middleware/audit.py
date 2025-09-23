@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 审计日志中间件 - 自动记录API请求和响应的审计信息
 """
@@ -135,7 +134,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
             if self._is_admin_request(path) and method in ["POST", "PUT", "DELETE"]:
                 self._audit_admin_operation(request, method, path, status_code)
 
-        except Exception as e:
+        except Exception:
             # 审计记录失败不应影响业务流程
             pass
 

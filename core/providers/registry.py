@@ -3,7 +3,7 @@ Provider适配器注册中心
 管理所有可用的Provider适配器
 """
 
-from typing import Any, Dict, Optional, Type
+from typing import Any, Optional
 
 from core.utils.logger import get_logger
 
@@ -20,8 +20,8 @@ class ProviderRegistry:
     """Provider适配器注册中心"""
 
     def __init__(self):
-        self._adapters: Dict[str, Type[BaseAdapter]] = {}
-        self._instances: Dict[str, BaseAdapter] = {}
+        self._adapters: dict[str, type[BaseAdapter]] = {}
+        self._instances: dict[str, BaseAdapter] = {}
         self._register_builtin_adapters()
 
     def _register_builtin_adapters(self):
@@ -33,7 +33,7 @@ class ProviderRegistry:
 
         logger.info(f"注册了{len(self._adapters)}个内置适配器")
 
-    def register(self, adapter_class_name: str, adapter_class: Type[BaseAdapter]):
+    def register(self, adapter_class_name: str, adapter_class: type[BaseAdapter]):
         """
         注册适配器类
 
@@ -47,7 +47,7 @@ class ProviderRegistry:
         self._adapters[adapter_class_name] = adapter_class
         logger.info(f"注册适配器: {adapter_class_name}")
 
-    def get_adapter_class(self, adapter_class_name: str) -> Optional[Type[BaseAdapter]]:
+    def get_adapter_class(self, adapter_class_name: str) -> Optional[type[BaseAdapter]]:
         """
         获取适配器类
 
@@ -60,7 +60,7 @@ class ProviderRegistry:
         return self._adapters.get(adapter_class_name)
 
     def create_adapter(
-        self, provider_name: str, adapter_class_name: str, config: Dict[str, Any]
+        self, provider_name: str, adapter_class_name: str, config: dict[str, Any]
     ) -> BaseAdapter:
         """
         创建适配器实例
@@ -103,7 +103,7 @@ class ProviderRegistry:
         instance_key = f"{provider_name}:{adapter_class_name}"
         return self._instances.get(instance_key)
 
-    def list_adapters(self) -> Dict[str, Type[BaseAdapter]]:
+    def list_adapters(self) -> dict[str, type[BaseAdapter]]:
         """
         列出所有已注册的适配器
 
@@ -112,7 +112,7 @@ class ProviderRegistry:
         """
         return self._adapters.copy()
 
-    def list_instances(self) -> Dict[str, BaseAdapter]:
+    def list_instances(self) -> dict[str, BaseAdapter]:
         """
         列出所有已创建的适配器实例
 
@@ -142,7 +142,7 @@ def get_provider_registry() -> ProviderRegistry:
     return provider_registry
 
 
-def register_adapter(adapter_class_name: str, adapter_class: Type[BaseAdapter]):
+def register_adapter(adapter_class_name: str, adapter_class: type[BaseAdapter]):
     """
     注册适配器的便捷函数
 
@@ -154,7 +154,7 @@ def register_adapter(adapter_class_name: str, adapter_class: Type[BaseAdapter]):
 
 
 def create_adapter_from_config(
-    provider_name: str, provider_config: Dict[str, Any]
+    provider_name: str, provider_config: dict[str, Any]
 ) -> BaseAdapter:
     """
     从配置创建适配器实例

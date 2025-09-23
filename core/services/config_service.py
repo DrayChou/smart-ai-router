@@ -6,7 +6,7 @@
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional
 
 import yaml
 
@@ -19,7 +19,7 @@ class ConfigService:
     def __init__(self, config_file: Optional[str] = None):
         self.config_file = config_file or "config/config.yaml"
         self.config_path = Path(self.config_file)
-        self._config_cache: Optional[Dict[str, Any]] = None
+        self._config_cache: Optional[dict[str, Any]] = None
 
         logger.info(f"配置服务初始化完成，配置文件: {self.config_path}")
 
@@ -42,16 +42,16 @@ class ConfigService:
 
         return value
 
-    def get_providers(self) -> Dict[str, Any]:
+    def get_providers(self) -> dict[str, Any]:
         """获取所有提供商配置"""
         return self.get_config("providers", {})
 
-    def get_provider_config(self, provider_name: str) -> Dict[str, Any]:
+    def get_provider_config(self, provider_name: str) -> dict[str, Any]:
         """获取指定提供商配置"""
         providers = self.get_providers()
         return providers.get(provider_name, {})
 
-    def get_channels(self, provider_name: str = None) -> List[Dict[str, Any]]:
+    def get_channels(self, provider_name: str = None) -> list[dict[str, Any]]:
         """获取渠道配置"""
         if provider_name:
             provider_config = self.get_provider_config(provider_name)
@@ -69,7 +69,7 @@ class ConfigService:
 
         return all_channels
 
-    def get_routing_strategies(self) -> Dict[str, Any]:
+    def get_routing_strategies(self) -> dict[str, Any]:
         """获取路由策略配置"""
         return self.get_config("routing_strategies", {})
 
@@ -78,7 +78,7 @@ class ConfigService:
         provider_config = self.get_provider_config(provider_name)
         return provider_config.get("enabled", False)
 
-    def get_system_config(self) -> Dict[str, Any]:
+    def get_system_config(self) -> dict[str, Any]:
         """获取系统配置"""
         return self.get_config("system", {})
 
@@ -106,7 +106,7 @@ class ConfigService:
         self._config_cache = None
         logger.info("配置已重新加载")
 
-    def validate_config(self) -> List[str]:
+    def validate_config(self) -> list[str]:
         """验证配置有效性，返回错误列表"""
         errors = []
 
@@ -139,7 +139,7 @@ class ConfigService:
 
         return errors
 
-    def get_config_summary(self) -> Dict[str, Any]:
+    def get_config_summary(self) -> dict[str, Any]:
         """获取配置摘要信息"""
         try:
             config = self._load_config()
@@ -164,7 +164,7 @@ class ConfigService:
         except Exception as e:
             return {"config_file": str(self.config_path), "error": str(e)}
 
-    def _load_config(self) -> Dict[str, Any]:
+    def _load_config(self) -> dict[str, Any]:
         """加载配置文件"""
         if self._config_cache is not None:
             return self._config_cache
@@ -175,7 +175,7 @@ class ConfigService:
                 self._config_cache = {}
                 return self._config_cache
 
-            with open(self.config_path, "r", encoding="utf-8") as f:
+            with open(self.config_path, encoding="utf-8") as f:
                 config = yaml.safe_load(f) or {}
 
             self._config_cache = config

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 黑名单恢复管理器 - 自动检测和恢复被拉黑的模型-渠道组合
 """
@@ -7,7 +6,7 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 
 import httpx
 
@@ -40,7 +39,7 @@ class BlacklistRecoveryManager:
     def __init__(self):
         self.config_loader = get_yaml_config_loader()
         self.blacklist_manager = get_model_blacklist_manager()
-        self.recovery_history: List[RecoveryAttempt] = []
+        self.recovery_history: list[RecoveryAttempt] = []
 
         # 恢复配置
         self.recovery_interval = 300  # 5分钟检查一次
@@ -125,7 +124,7 @@ class BlacklistRecoveryManager:
 
     def _find_recovery_candidates(
         self,
-    ) -> List[Tuple[str, str, ModelChannelBlacklistEntry]]:
+    ) -> list[tuple[str, str, ModelChannelBlacklistEntry]]:
         """找到恢复候选项"""
         candidates = []
         current_time = datetime.now()
@@ -160,7 +159,7 @@ class BlacklistRecoveryManager:
         return candidates
 
     def _should_attempt_recovery(
-        self, entry: ModelChannelBlacklistEntry, recent_attempts: List[RecoveryAttempt]
+        self, entry: ModelChannelBlacklistEntry, recent_attempts: list[RecoveryAttempt]
     ) -> bool:
         """判断是否应该尝试恢复"""
         # 认证错误通常不会自动恢复
@@ -250,7 +249,7 @@ class BlacklistRecoveryManager:
 
     async def _health_check_model(
         self, channel: Channel, model_name: str
-    ) -> Tuple[bool, Optional[float], Optional[str]]:
+    ) -> tuple[bool, Optional[float], Optional[str]]:
         """对特定模型执行健康检查"""
         start_time = datetime.now()
 
@@ -293,7 +292,7 @@ class BlacklistRecoveryManager:
                                 f"Model {model_name} not found in available models",
                             )
 
-                    except Exception as e:
+                    except Exception:
                         # 如果无法解析响应，但HTTP状态正常，认为渠道可用
                         return True, response_time, None
                 else:
@@ -336,7 +335,7 @@ class BlacklistRecoveryManager:
             f"🔄 Extended blacklist for {entry.model_name}@{entry.channel_id} by {extended_duration}s"
         )
 
-    def get_recovery_stats(self) -> Dict[str, any]:
+    def get_recovery_stats(self) -> dict[str, any]:
         """获取恢复统计信息"""
         recent_attempts = [
             attempt

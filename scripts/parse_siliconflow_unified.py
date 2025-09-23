@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 SiliconFlow HTML解析脚本 - 统一格式版本
 
@@ -319,7 +318,7 @@ def main():
     print(f"读取HTML文件: {html_path}")
 
     try:
-        with open(html_path, "r", encoding="utf-8") as f:
+        with open(html_path, encoding="utf-8") as f:
             html_content = f.read()
         print(f"文件大小: {len(html_content):,} 字符")
     except Exception as e:
@@ -392,7 +391,7 @@ def print_statistics(models_data):
         if model_data.context_length and model_data.context_length >= 128000:  # 128K+
             long_context.append((model_id, model_data.context_length))
 
-    print(f"\n分类分布:")
+    print("\n分类分布:")
     for cat, count in sorted(categories.items(), key=lambda x: x[1], reverse=True):
         percentage = (count / total) * 100
         print(f"  {cat:>10}: {count:>3} 个 ({percentage:>4.1f}%)")
@@ -431,7 +430,7 @@ def print_statistics(models_data):
         else:
             paid_count += 1
 
-    print(f"\n价格分布:")
+    print("\n价格分布:")
     print(f"   免费模型: {free_count} 个 ({(free_count/total)*100:.1f}%)")
     print(f"   付费模型: {paid_count} 个 ({(paid_count/total)*100:.1f}%)")
 

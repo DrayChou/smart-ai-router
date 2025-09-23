@@ -12,15 +12,13 @@ import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 import httpx
 
 from core.utils.smart_cache import (
     cache_get,
-    cache_get_or_set,
     cache_set,
-    get_smart_cache,
 )
 
 logger = logging.getLogger(__name__)
@@ -70,9 +68,9 @@ class ServiceHealthChecker:
         self.latency_cache_file = self.cache_dir / "latency_stats.json"
 
         # 健康检查数据
-        self.health_results: Dict[str, HealthCheckResult] = {}
-        self.provider_health: Dict[str, ProviderHealth] = {}
-        self.health_history: List[Dict] = []
+        self.health_results: dict[str, HealthCheckResult] = {}
+        self.provider_health: dict[str, ProviderHealth] = {}
+        self.health_history: list[dict] = []
 
         # 加载现有数据
         self._load_cache()
@@ -84,7 +82,7 @@ class ServiceHealthChecker:
         """加载缓存的健康检查数据"""
         try:
             if self.health_cache_file.exists():
-                with open(self.health_cache_file, "r", encoding="utf-8") as f:
+                with open(self.health_cache_file, encoding="utf-8") as f:
                     data = json.load(f)
                     self.health_results = {
                         k: HealthCheckResult(**v)
@@ -97,7 +95,7 @@ class ServiceHealthChecker:
                 logger.info(f"已加载健康检查缓存: {len(self.health_results)} 个渠道")
 
             if self.health_history_file.exists():
-                with open(self.health_history_file, "r", encoding="utf-8") as f:
+                with open(self.health_history_file, encoding="utf-8") as f:
                     self.health_history = json.load(f)
                     # 只保留最近24小时的历史记录
                     cutoff = datetime.now() - timedelta(hours=24)
@@ -140,7 +138,7 @@ class ServiceHealthChecker:
             logger.error(f"保存健康检查缓存失败: {e}")
 
     def _select_test_model(
-        self, channel: Dict[str, Any], available_models: List[str]
+        self, channel: dict[str, Any], available_models: list[str]
     ) -> Optional[str]:
         """为渠道选择最适合的测试模型"""
         if not available_models:
@@ -189,7 +187,7 @@ class ServiceHealthChecker:
         return available_models[0] if available_models else None
 
     async def _test_channel_health_via_models(
-        self, channel: Dict[str, Any]
+        self, channel: dict[str, Any]
     ) -> HealthCheckResult:
         """通过/models接口测试渠道健康状态（优先方案）"""
         channel_id = channel.get("id", "unknown")
@@ -295,7 +293,7 @@ class ServiceHealthChecker:
             return await self._test_channel_health_via_dummy_model(channel)
 
     async def _test_channel_health_via_dummy_model(
-        self, channel: Dict[str, Any]
+        self, channel: dict[str, Any]
     ) -> HealthCheckResult:
         """通过虚假模型请求测试渠道健康状态（备用方案）"""
         channel_id = channel.get("id", "unknown")
@@ -437,9 +435,9 @@ class ServiceHealthChecker:
 
     async def check_all_channels(
         self,
-        channels: List[Dict[str, Any]],
-        discovered_models: Dict[str, List[Dict]] = None,
-    ) -> Dict[str, HealthCheckResult]:
+        channels: list[dict[str, Any]],
+        discovered_models: dict[str, list[dict]] = None,
+    ) -> dict[str, HealthCheckResult]:
         """检查所有渠道的健康状态"""
         if not channels:
             logger.warning("没有可检查的渠道")
@@ -459,7 +457,7 @@ class ServiceHealthChecker:
 
             # 优化策略：优先使用/models接口进行健康检查
             # 这样既能检查健康状态，又能顺便更新模型列表，还不浪费token
-            channel_id = channel.get("id", "unknown")
+            channel.get("id", "unknown")
 
             # 直接使用新的健康检查方法
             task = self._test_channel_health_via_models(channel)
@@ -556,7 +554,7 @@ class ServiceHealthChecker:
         total_channels = len(self.health_results)
         healthy_channels = sum(1 for r in self.health_results.values() if r.success)
 
-        logger.info(f"=== 健康检查完成 ===")
+        logger.info("=== 健康检查完成 ===")
         logger.info(f"总渠道数: {total_channels}")
         logger.info(f"健康渠道: {healthy_channels}")
         logger.info(f"成功率: {healthy_channels/total_channels*100:.1f}%")
@@ -575,7 +573,7 @@ class ServiceHealthChecker:
         """获取指定Provider的健康状态"""
         return self.provider_health.get(provider)
 
-    def get_healthy_channels(self, provider: Optional[str] = None) -> List[str]:
+    def get_healthy_channels(self, provider: Optional[str] = None) -> list[str]:
         """获取健康的渠道列表"""
         healthy_channels = []
         for channel_id, result in self.health_results.items():
@@ -585,7 +583,7 @@ class ServiceHealthChecker:
 
     def get_fastest_channels(
         self, provider: Optional[str] = None, limit: int = 5
-    ) -> List[Tuple[str, float]]:
+    ) -> list[tuple[str, float]]:
         """获取最快的渠道列表"""
         fast_channels = []
         for channel_id, result in self.health_results.items():
@@ -599,7 +597,7 @@ class ServiceHealthChecker:
         fast_channels.sort(key=lambda x: x[1])
         return fast_channels[:limit]
 
-    def get_health_stats(self) -> Dict[str, Any]:
+    def get_health_stats(self) -> dict[str, Any]:
         """获取健康检查统计信息"""
         total = len(self.health_results)
         healthy = sum(1 for r in self.health_results.values() if r.success)
@@ -647,8 +645,8 @@ class ServiceHealthChecker:
 
 # 主要的任务执行函数
 async def run_health_check_task(
-    channels: List[Dict[str, Any]], discovered_models: Dict[str, List[Dict]] = None
-) -> Dict[str, Any]:
+    channels: list[dict[str, Any]], discovered_models: dict[str, list[dict]] = None
+) -> dict[str, Any]:
     """运行健康检查任务"""
     checker = ServiceHealthChecker()
     results = await checker.check_all_channels(channels, discovered_models)

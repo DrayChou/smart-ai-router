@@ -1,15 +1,14 @@
-# -*- coding: utf-8 -*-
 """
 日志分析工具 - 用于分析和查询结构化日志数据
 """
-import asyncio
 import json
 import re
 from collections import Counter, defaultdict
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Union
+from typing import Any, Optional, Union
 
 
 @dataclass
@@ -32,11 +31,11 @@ class LogStats:
     """日志统计信息"""
 
     total_entries: int
-    level_counts: Dict[str, int]
-    logger_counts: Dict[str, int]
-    error_patterns: List[Dict[str, Any]]
-    request_stats: Dict[str, Any]
-    time_range: Dict[str, Optional[datetime]]
+    level_counts: dict[str, int]
+    logger_counts: dict[str, int]
+    error_patterns: list[dict[str, Any]]
+    request_stats: dict[str, Any]
+    time_range: dict[str, Optional[datetime]]
 
 
 class LogAnalyzer:
@@ -47,7 +46,7 @@ class LogAnalyzer:
         self.cache = {}
         self.cache_timeout = 300  # 5分钟缓存
 
-    async def search_logs(self, query: LogQuery) -> List[Dict[str, Any]]:
+    async def search_logs(self, query: LogQuery) -> list[dict[str, Any]]:
         """搜索日志条目"""
         results = []
         matched_count = 0
@@ -156,7 +155,7 @@ class LogAnalyzer:
 
     async def get_error_logs(
         self, hours: int = 24, limit: int = 100
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """获取最近的错误日志"""
         end_time = datetime.now()
         start_time = end_time - timedelta(hours=hours)
@@ -169,7 +168,7 @@ class LogAnalyzer:
 
     async def get_slow_requests(
         self, min_duration: float = 5.0, hours: int = 24, limit: int = 50
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """获取慢请求日志"""
         end_time = datetime.now()
         start_time = end_time - timedelta(hours=hours)
@@ -191,7 +190,7 @@ class LogAnalyzer:
 
         return slow_requests
 
-    async def get_request_timeline(self, request_id: str) -> List[Dict[str, Any]]:
+    async def get_request_timeline(self, request_id: str) -> list[dict[str, Any]]:
         """获取特定请求的完整时间线"""
         query = LogQuery(request_id=request_id, limit=1000)
         entries = await self.search_logs(query)
@@ -233,7 +232,7 @@ class LogAnalyzer:
 
         return len(entries)
 
-    async def _read_log_entries(self) -> Iterator[Dict[str, Any]]:
+    async def _read_log_entries(self) -> Iterator[dict[str, Any]]:
         """异步读取日志条目"""
         try:
             import aiofiles
@@ -241,7 +240,7 @@ class LogAnalyzer:
             if not self.log_file.exists():
                 return
 
-            async with aiofiles.open(self.log_file, "r", encoding="utf-8") as f:
+            async with aiofiles.open(self.log_file, encoding="utf-8") as f:
                 async for line in f:
                     line = line.strip()
                     if line:
@@ -257,7 +256,7 @@ class LogAnalyzer:
             if not self.log_file.exists():
                 return
 
-            with open(self.log_file, "r", encoding="utf-8") as f:
+            with open(self.log_file, encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if line:
@@ -267,7 +266,7 @@ class LogAnalyzer:
                         except json.JSONDecodeError:
                             continue
 
-    def _matches_query(self, entry: Dict[str, Any], query: LogQuery) -> bool:
+    def _matches_query(self, entry: dict[str, Any], query: LogQuery) -> bool:
         """检查日志条目是否匹配查询条件"""
         # 时间范围检查
         if query.start_time or query.end_time:
@@ -364,7 +363,7 @@ class LogDashboard:
         self.analyzer = log_analyzer
         self.alert_rules = []
 
-    async def check_alerts(self) -> List[Dict[str, Any]]:
+    async def check_alerts(self) -> list[dict[str, Any]]:
         """检查日志警报"""
         alerts = []
 
@@ -413,7 +412,7 @@ class LogDashboard:
 
     async def generate_report(
         self, start_time: datetime, end_time: datetime
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """生成日志报告"""
         stats = await self.analyzer.get_log_stats(start_time, end_time)
         error_logs = await self.analyzer.get_error_logs(

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Smart AI Router 配置管理模块
 支持同步和异步配置加载

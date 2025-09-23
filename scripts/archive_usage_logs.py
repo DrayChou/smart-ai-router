@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 使用日志归档脚本 - 定期归档旧的使用记录
 """
 
 import argparse
 import sys
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from pathlib import Path
 
 # 添加项目根目录到 Python 路径
@@ -43,7 +42,7 @@ def generate_summary_report(target_date: date = None):
 
     # 每日统计
     daily_stats = tracker.get_daily_stats(target_date)
-    print(f"今日统计:")
+    print("今日统计:")
     print(f"  总请求数: {daily_stats['total_requests']}")
     print(f"  总成本: ${daily_stats['total_cost']:.6f}")
     print(f"  总Tokens: {daily_stats['total_tokens']:,}")
@@ -72,7 +71,7 @@ def generate_summary_report(target_date: date = None):
 
     # 热门模型
     if monthly_stats["models"]:
-        print(f"\n🔥 本月热门模型 (Top 5):")
+        print("\n🔥 本月热门模型 (Top 5):")
         sorted_models = sorted(
             monthly_stats["models"].items(),
             key=lambda x: x[1]["requests"],
@@ -83,7 +82,7 @@ def generate_summary_report(target_date: date = None):
 
     # 热门渠道
     if monthly_stats["channels"]:
-        print(f"\n📡 本月热门渠道 (Top 5):")
+        print("\n📡 本月热门渠道 (Top 5):")
         sorted_channels = sorted(
             monthly_stats["channels"].items(), key=lambda x: x[1]["cost"], reverse=True
         )
@@ -92,7 +91,7 @@ def generate_summary_report(target_date: date = None):
 
     # 提供商分布
     if monthly_stats["providers"]:
-        print(f"\n🏢 提供商成本分布:")
+        print("\n🏢 提供商成本分布:")
         total_cost = monthly_stats["total_cost"]
         for provider, stats in monthly_stats["providers"].items():
             percentage = (stats["cost"] / total_cost * 100) if total_cost > 0 else 0

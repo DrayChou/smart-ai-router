@@ -1,12 +1,10 @@
-# -*- coding: utf-8 -*-
 """
 统一错误处理器
 提供错误恢复和日志记录功能
 """
 import asyncio
-import logging
 from functools import wraps
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Optional
 
 from ..utils.logger import get_logger
 from .base_exceptions import BaseRouterException, ChannelException, RoutingException
@@ -30,7 +28,7 @@ class ErrorHandler:
     def handle_exception(
         self,
         exception: Exception,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         attempt_recovery: bool = True,
     ) -> Optional[Any]:
         """处理异常的主要方法"""
@@ -66,7 +64,7 @@ class ErrorHandler:
         )
 
     def _log_error(
-        self, exception: Exception, context: Optional[Dict[str, Any]] = None
+        self, exception: Exception, context: Optional[dict[str, Any]] = None
     ) -> None:
         """记录错误日志"""
         if isinstance(exception, BaseRouterException):
@@ -86,7 +84,7 @@ class ErrorHandler:
             )
 
     def _attempt_recovery(
-        self, exception: BaseRouterException, context: Optional[Dict[str, Any]] = None
+        self, exception: BaseRouterException, context: Optional[dict[str, Any]] = None
     ) -> Optional[Any]:
         """尝试错误恢复"""
         self.error_stats["recovery_attempts"] += 1
@@ -104,7 +102,7 @@ class ErrorHandler:
             return None
 
     def _recover_routing_error(
-        self, exception: RoutingException, context: Optional[Dict[str, Any]] = None
+        self, exception: RoutingException, context: Optional[dict[str, Any]] = None
     ) -> Optional[Any]:
         """恢复路由错误"""
         if exception.error_code == ErrorCode.TAG_NOT_FOUND:
@@ -122,7 +120,7 @@ class ErrorHandler:
         return None
 
     def _recover_channel_error(
-        self, exception: ChannelException, context: Optional[Dict[str, Any]] = None
+        self, exception: ChannelException, context: Optional[dict[str, Any]] = None
     ) -> Optional[Any]:
         """恢复渠道错误"""
         if exception.error_code == ErrorCode.CHANNEL_TIMEOUT:
@@ -139,7 +137,7 @@ class ErrorHandler:
         return None
 
     def _recover_generic_error(
-        self, exception: BaseRouterException, context: Optional[Dict[str, Any]] = None
+        self, exception: BaseRouterException, context: Optional[dict[str, Any]] = None
     ) -> Optional[Any]:
         """恢复通用错误"""
         # 通用恢复策略
@@ -148,7 +146,7 @@ class ErrorHandler:
 
         return None
 
-    def _suggest_similar_tags(self, tags: list) -> Dict[str, Any]:
+    def _suggest_similar_tags(self, tags: list) -> dict[str, Any]:
         """建议相似的标签"""
         # 简化实现 - 实际可以使用模糊匹配算法
         suggestions = []
@@ -166,7 +164,7 @@ class ErrorHandler:
             "suggestions": list(set(suggestions)),
         }
 
-    def _suggest_similar_models(self, model: str) -> Dict[str, Any]:
+    def _suggest_similar_models(self, model: str) -> dict[str, Any]:
         """建议相似的模型"""
         # 简化实现
         suggestions = []
@@ -186,8 +184,8 @@ class ErrorHandler:
         }
 
     def _enable_backup_channels(
-        self, context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        self, context: Optional[dict[str, Any]] = None
+    ) -> dict[str, Any]:
         """启用备用渠道"""
         # 简化实现
         self.error_stats["recovery_successes"] += 1
@@ -198,7 +196,7 @@ class ErrorHandler:
         logger.warning(f"Marking channel {channel_id} as unhealthy due to timeout")
         # 实际实现需要更新渠道健康状态
 
-    def _refresh_api_key(self, channel_id: str) -> Optional[Dict[str, Any]]:
+    def _refresh_api_key(self, channel_id: str) -> Optional[dict[str, Any]]:
         """刷新API密钥"""
         # 简化实现
         logger.info(f"Attempting to refresh API key for channel {channel_id}")
@@ -208,7 +206,7 @@ class ErrorHandler:
             "message": "已尝试刷新API密钥",
         }
 
-    def get_error_stats(self) -> Dict[str, Any]:
+    def get_error_stats(self) -> dict[str, Any]:
         """获取错误统计"""
         return self.error_stats.copy()
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 请求前成本估算器 - Token预估优化系统
 """
@@ -8,7 +7,7 @@ import logging
 import re
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, NamedTuple, Optional, Tuple
+from typing import Any, NamedTuple, Optional
 
 from ..yaml_config import get_yaml_config_loader
 from .token_counter import TokenCounter
@@ -16,7 +15,7 @@ from .token_counter import TokenCounter
 logger = logging.getLogger(__name__)
 
 
-def normalize_model_name(model_name: str) -> List[str]:
+def normalize_model_name(model_name: str) -> list[str]:
     """
     标准化模型名称，处理日期戳后缀
 
@@ -60,7 +59,7 @@ class CostEstimate:
     output_cost: float
     total_estimated_cost: float
     cost_per_1k_tokens: float
-    pricing_info: Dict[str, Any]
+    pricing_info: dict[str, Any]
     confidence_level: str  # "high", "medium", "low"
     estimation_method: str
 
@@ -88,7 +87,7 @@ class CostEstimator:
 
     def _get_model_pricing(
         self, channel_id: str, model_name: str
-    ) -> Optional[Dict[str, float]]:
+    ) -> Optional[dict[str, float]]:
         """获取模型定价信息（支持OpenRouter基准定价和渠道折扣）"""
         try:
             # 从配置中获取渠道信息
@@ -122,16 +121,16 @@ class CostEstimator:
             if channel.provider.lower() == "github" and openrouter_pricing:
                 base_pricing = openrouter_pricing
                 logger.info(
-                    f"  🔧 GITHUB PROVIDER FIX: Using OpenRouter baseline instead of channel-specific pricing"
+                    "  🔧 GITHUB PROVIDER FIX: Using OpenRouter baseline instead of channel-specific pricing"
                 )
             else:
                 # 🔧 修复：严格按照定价优先级，不允许硬编码回退
                 if channel_specific_pricing:
                     base_pricing = channel_specific_pricing
-                    logger.info(f"  ✅ Using channel-specific pricing")
+                    logger.info("  ✅ Using channel-specific pricing")
                 elif openrouter_pricing:
                     base_pricing = openrouter_pricing
-                    logger.info(f"  ✅ Using OpenRouter baseline pricing")
+                    logger.info("  ✅ Using OpenRouter baseline pricing")
                 else:
                     # 最后尝试回退策略（只检查免费模型）
                     fallback_pricing = self._get_pricing_from_fallback(
@@ -140,11 +139,11 @@ class CostEstimator:
                     if fallback_pricing:
                         base_pricing = fallback_pricing
                         logger.info(
-                            f"  ✅ Using fallback pricing (free model detection)"
+                            "  ✅ Using fallback pricing (free model detection)"
                         )
                     else:
                         base_pricing = None
-                        logger.warning(f"  ❌ No valid pricing source found")
+                        logger.warning("  ❌ No valid pricing source found")
             logger.info(f"  Base pricing: {base_pricing}")
 
             if not base_pricing:
@@ -170,7 +169,7 @@ class CostEstimator:
 
     def _get_pricing_from_siliconflow(
         self, channel, model_name: str
-    ) -> Optional[Dict[str, float]]:
+    ) -> Optional[dict[str, float]]:
         """从SiliconFlow获取定价"""
         try:
             if "siliconflow" not in channel.provider.lower():
@@ -197,7 +196,7 @@ class CostEstimator:
 
     def _get_pricing_from_doubao(
         self, channel, model_name: str
-    ) -> Optional[Dict[str, float]]:
+    ) -> Optional[dict[str, float]]:
         """从豆包获取定价"""
         try:
             if (
@@ -230,7 +229,7 @@ class CostEstimator:
 
     def _get_pricing_from_openai(
         self, channel, model_name: str
-    ) -> Optional[Dict[str, float]]:
+    ) -> Optional[dict[str, float]]:
         """从OpenAI获取定价（基于模型名称的启发式定价）"""
         try:
             if "openai" not in channel.provider.lower():
@@ -262,7 +261,7 @@ class CostEstimator:
 
     def _get_pricing_from_anthropic(
         self, channel, model_name: str
-    ) -> Optional[Dict[str, float]]:
+    ) -> Optional[dict[str, float]]:
         """从Anthropic获取定价"""
         try:
             if "anthropic" not in channel.provider.lower():
@@ -291,7 +290,7 @@ class CostEstimator:
 
     def _get_pricing_from_fallback(
         self, channel, model_name: str
-    ) -> Optional[Dict[str, float]]:
+    ) -> Optional[dict[str, float]]:
         """回退定价策略 - 只使用OpenRouter基准定价，不允许硬编码价格"""
         logger.info(
             f"🔄 FALLBACK: No channel-specific pricing found for {model_name}, trying OpenRouter baseline"
@@ -323,7 +322,7 @@ class CostEstimator:
 
     def _get_openrouter_base_pricing(
         self, model_name: str
-    ) -> Optional[Dict[str, float]]:
+    ) -> Optional[dict[str, float]]:
         """获取OpenRouter基准定价（作为其他渠道的参考价格）"""
         try:
             # 🚀 直接使用全局model_pricing.json中已经转换的价格数据
@@ -335,7 +334,7 @@ class CostEstimator:
                 logger.debug(f"OpenRouter基准定价文件不存在: {model_pricing_file}")
                 return None
 
-            with open(model_pricing_file, "r", encoding="utf-8") as f:
+            with open(model_pricing_file, encoding="utf-8") as f:
                 pricing_data = json.load(f)
 
             # 寻找模型定价（可能有多个变体）
@@ -421,8 +420,8 @@ class CostEstimator:
             return None
 
     def _apply_currency_exchange_discount(
-        self, channel, base_pricing: Dict[str, float]
-    ) -> Dict[str, float]:
+        self, channel, base_pricing: dict[str, float]
+    ) -> dict[str, float]:
         """应用渠道的货币汇率折扣"""
         try:
             # 检查渠道是否有currency_exchange配置
@@ -439,7 +438,7 @@ class CostEstimator:
             exchange_rate = exchange_config.get("rate", 1.0)
             from_currency = exchange_config.get("from", "USD")
             to_currency = exchange_config.get("to", "CNY")
-            description = exchange_config.get("description", "")
+            exchange_config.get("description", "")
 
             # 应用汇率折扣 (如 0.7 汇率意味着打七折)
             discounted_pricing = {
@@ -467,7 +466,7 @@ class CostEstimator:
         self,
         channel,
         model_name: str,
-        messages: List[Dict[str, Any]],
+        messages: list[dict[str, Any]],
         max_output_tokens: int = 1000,
     ):
         """兼容性方法：估算请求成本（用于路由器调用）"""
@@ -492,7 +491,7 @@ class CostEstimator:
 
     def estimate_request_cost(
         self,
-        messages: List[Dict[str, Any]],
+        messages: list[dict[str, Any]],
         model_name: str,
         channel_id: str,
         max_tokens: Optional[int] = None,
@@ -551,10 +550,10 @@ class CostEstimator:
 
     def compare_channel_costs(
         self,
-        messages: List[Dict[str, Any]],
-        candidate_channels: List[Dict[str, Any]],
+        messages: list[dict[str, Any]],
+        candidate_channels: list[dict[str, Any]],
         max_tokens: Optional[int] = None,
-    ) -> List[CostEstimate]:
+    ) -> list[CostEstimate]:
         """比较多个渠道的成本估算"""
 
         estimates = []
@@ -585,8 +584,8 @@ class CostEstimator:
         return estimates
 
     def get_cost_optimization_recommendation(
-        self, estimates: List[CostEstimate], budget_limit: Optional[float] = None
-    ) -> Dict[str, Any]:
+        self, estimates: list[CostEstimate], budget_limit: Optional[float] = None
+    ) -> dict[str, Any]:
         """获取成本优化建议"""
 
         if not estimates:
@@ -658,8 +657,8 @@ class CostEstimator:
 
     def _get_preview_cache_key(
         self,
-        messages: List[Dict[str, Any]],
-        candidate_channels: List[Dict[str, Any]],
+        messages: list[dict[str, Any]],
+        candidate_channels: list[dict[str, Any]],
         max_tokens: Optional[int] = None,
     ) -> str:
         """生成成本预览缓存键"""
@@ -676,11 +675,11 @@ class CostEstimator:
 
     def create_cost_preview(
         self,
-        messages: List[Dict[str, Any]],
-        candidate_channels: List[Dict[str, Any]],
+        messages: list[dict[str, Any]],
+        candidate_channels: list[dict[str, Any]],
         max_tokens: Optional[int] = None,
         budget_limit: Optional[float] = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """创建完整的成本预览"""
 
         start_time = time.time()

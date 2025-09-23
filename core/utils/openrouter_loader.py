@@ -6,7 +6,7 @@ OpenRouter数据加载器
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from ..models.model_info import ModelInfo, create_model_info_from_openrouter
 
@@ -19,9 +19,9 @@ class OpenRouterDataLoader:
     def __init__(self, cache_dir: str = "cache"):
         self.cache_dir = Path(cache_dir)
         self.openrouter_file = self.cache_dir / "channels" / "openrouter_1.json"
-        self._models_cache: Optional[Dict[str, ModelInfo]] = None
+        self._models_cache: Optional[dict[str, ModelInfo]] = None
 
-    def load_models(self) -> Dict[str, ModelInfo]:
+    def load_models(self) -> dict[str, ModelInfo]:
         """加载所有模型数据"""
         if self._models_cache is not None:
             return self._models_cache
@@ -34,7 +34,7 @@ class OpenRouterDataLoader:
             return models
 
         try:
-            with open(self.openrouter_file, "r", encoding="utf-8") as f:
+            with open(self.openrouter_file, encoding="utf-8") as f:
                 data = json.load(f)
 
             openrouter_models = data.get("models", {})
@@ -56,7 +56,7 @@ class OpenRouterDataLoader:
         self._models_cache = models
         return models
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """获取数据统计信息"""
         models = self.load_models()
 
@@ -69,7 +69,7 @@ class OpenRouterDataLoader:
             [m for m in models.values() if m.capabilities.supports_function_calling]
         )
 
-        providers = set(m.provider for m in models.values() if m.provider)
+        providers = {m.provider for m in models.values() if m.provider}
 
         # 统计所有标签
         all_tags = set()

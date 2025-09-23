@@ -4,7 +4,6 @@
 用于快速验证Smart AI Router的基本状态
 """
 
-import json
 import subprocess
 import sys
 from pathlib import Path

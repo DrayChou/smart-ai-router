@@ -3,9 +3,8 @@ Channel management system
 渠道管理系统
 """
 
-import asyncio
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import Optional
 
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,10 +26,10 @@ class ChannelManager:
 
     async def get_channels_for_model_group(
         self, model_group_name: str, session: Optional[AsyncSession] = None
-    ) -> List[Channel]:
+    ) -> list[Channel]:
         """获取模型组的所有可用渠道"""
 
-        async def _get_channels(db_session: AsyncSession) -> List[Channel]:
+        async def _get_channels(db_session: AsyncSession) -> list[Channel]:
             # 查询模型组
             model_group_result = await db_session.execute(
                 select(VirtualModelGroup).where(
@@ -50,7 +49,7 @@ class ChannelManager:
                 .where(
                     and_(
                         ModelGroupChannel.model_group_id == model_group.id,
-                        ModelGroupChannel.enabled == True,
+                        ModelGroupChannel.enabled,
                         Channel.status == "active",
                     )
                 )

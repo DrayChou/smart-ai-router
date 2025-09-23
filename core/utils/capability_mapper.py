@@ -7,7 +7,7 @@ import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -16,17 +16,17 @@ logger = logging.getLogger(__name__)
 class ModelCapabilityMap:
     """模型能力映射"""
 
-    vision_models: Set[str]  # 支持视觉的模型名称模式
-    function_calling_models: Set[str]  # 支持函数调用的模型名称模式
-    code_generation_models: Set[str]  # 支持代码生成的模型名称模式
-    streaming_models: Set[str]  # 支持流式的模型名称模式
-    local_model_patterns: Set[str]  # 本地模型名称模式
+    vision_models: set[str]  # 支持视觉的模型名称模式
+    function_calling_models: set[str]  # 支持函数调用的模型名称模式
+    code_generation_models: set[str]  # 支持代码生成的模型名称模式
+    streaming_models: set[str]  # 支持流式的模型名称模式
+    local_model_patterns: set[str]  # 本地模型名称模式
 
     # 提供商默认能力
-    provider_capabilities: Dict[str, Dict[str, bool]]
+    provider_capabilities: dict[str, dict[str, bool]]
 
     # 具体模型的能力覆盖
-    model_overrides: Dict[str, Dict[str, bool]]
+    model_overrides: dict[str, dict[str, bool]]
 
 
 class CapabilityMapper:
@@ -193,7 +193,7 @@ class CapabilityMapper:
         except Exception as e:
             logger.error(f"保存能力映射配置失败: {e}")
 
-    def predict_capabilities(self, model_name: str, provider: str) -> Dict[str, bool]:
+    def predict_capabilities(self, model_name: str, provider: str) -> dict[str, bool]:
         """
         预测模型能力
 
@@ -244,7 +244,7 @@ class CapabilityMapper:
 
         return capabilities
 
-    def _model_matches_patterns(self, model_name: str, patterns: Set[str]) -> bool:
+    def _model_matches_patterns(self, model_name: str, patterns: set[str]) -> bool:
         """检查模型名称是否匹配模式"""
         for pattern in patterns:
             if pattern.lower() in model_name:
@@ -261,8 +261,8 @@ class CapabilityMapper:
         )
 
     def get_capability_requirements(
-        self, request_data: Dict[str, Any]
-    ) -> Dict[str, bool]:
+        self, request_data: dict[str, Any]
+    ) -> dict[str, bool]:
         """
         分析请求数据，确定需要的能力
 
@@ -327,8 +327,8 @@ class CapabilityMapper:
         return requirements
 
     def find_compatible_models(
-        self, models: List[str], requirements: Dict[str, bool], provider: str = ""
-    ) -> List[str]:
+        self, models: list[str], requirements: dict[str, bool], provider: str = ""
+    ) -> list[str]:
         """
         从模型列表中找出兼容的模型
 
@@ -358,20 +358,20 @@ class CapabilityMapper:
         return compatible_models
 
     def add_model_override(
-        self, model_name: str, capabilities: Dict[str, bool]
+        self, model_name: str, capabilities: dict[str, bool]
     ) -> None:
         """添加模型能力覆盖"""
         self.capability_map.model_overrides[model_name] = capabilities
         logger.info(f"已添加模型能力覆盖: {model_name} -> {capabilities}")
 
     def update_provider_capabilities(
-        self, provider: str, capabilities: Dict[str, bool]
+        self, provider: str, capabilities: dict[str, bool]
     ) -> None:
         """更新提供商默认能力"""
         self.capability_map.provider_capabilities[provider] = capabilities
         logger.info(f"已更新提供商能力: {provider} -> {capabilities}")
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """获取能力映射统计信息"""
         return {
             "vision_models_count": len(self.capability_map.vision_models),

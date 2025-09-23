@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import logging
 import random
-import time
-from typing import Any, Optional
+from typing import Any
 
 from core.config_models import Channel
 from core.router.types import ChannelCandidate, RoutingRequest, RoutingScore
@@ -393,7 +392,7 @@ class ScoringMixin:
         return 0.0
 
     def _calculate_quality_score(
-        self, channel: Channel, matched_model: Optional[str] = None
+        self, channel: Channel, matched_model: str | None = None
     ) -> float:
         """计算模型质量评分"""
         model_name = matched_model or channel.model_name
@@ -425,7 +424,7 @@ class ScoringMixin:
         return 0.6
 
     def _calculate_parameter_score(
-        self, channel: Channel, matched_model: Optional[str] = None
+        self, channel: Channel, matched_model: str | None = None
     ) -> float:
         """计算模型参数量评分"""
         model_name = matched_model or channel.model_name
@@ -454,7 +453,7 @@ class ScoringMixin:
         return 0.3
 
     def _calculate_context_score(
-        self, channel: Channel, matched_model: Optional[str] = None
+        self, channel: Channel, matched_model: str | None = None
     ) -> float:
         """计算上下文长度评分"""
         model_name = matched_model or channel.model_name
@@ -490,7 +489,7 @@ class ScoringMixin:
 
     def _get_model_specs(
         self, channel_id: str, model_name: str
-    ) -> Optional[dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         model_cache = self.config_loader.get_model_cache()
         if not model_cache:
             return None
@@ -573,7 +572,7 @@ class ScoringMixin:
         return 0.2
 
     def _calculate_free_score(
-        self, channel: Channel, model_name: Optional[str] = None
+        self, channel: Channel, model_name: str | None = None
     ) -> float:
         free_tags = {"free", "免费", "0cost", "nocost"}
 
@@ -690,7 +689,7 @@ class ScoringMixin:
         return 0.1
 
     def _calculate_local_score(
-        self, channel: Channel, model_name: Optional[str] = None
+        self, channel: Channel, model_name: str | None = None
     ) -> float:
         local_tags = {"local", "本地", "localhost", "127.0.0.1", "offline", "edge"}
 
@@ -1083,7 +1082,7 @@ class ScoringMixin:
         )
         return selected
 
-    def _is_free_channel(self, channel: Channel, model_name: Optional[str]) -> bool:
+    def _is_free_channel(self, channel: Channel, model_name: str | None) -> bool:
         if hasattr(channel, "cost") and channel.cost == 0:
             return True
         if model_name and "free" in model_name.lower():

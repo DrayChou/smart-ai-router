@@ -6,7 +6,7 @@ HTTP客户端连接池管理器
 
 import asyncio
 import logging
-from typing import Dict, Optional
+from typing import Optional
 from urllib.parse import urlparse
 
 import httpx
@@ -37,7 +37,7 @@ class HTTPClientPool:
     """HTTP客户端连接池"""
 
     def __init__(self):
-        self.clients: Dict[str, httpx.AsyncClient] = {}
+        self.clients: dict[str, httpx.AsyncClient] = {}
         self.lock = asyncio.Lock()
 
         # 连接池配置
@@ -120,7 +120,7 @@ class HTTPClientPool:
         # 因为连接数量通常不会很大
         pass
 
-    def get_stats(self) -> Dict[str, int]:
+    def get_stats(self) -> dict[str, int]:
         """获取连接池统计信息"""
         return {
             "active_clients": len(self.clients),

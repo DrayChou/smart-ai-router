@@ -7,7 +7,7 @@ Anthropic Claude API 兼容接口
 import json
 import time
 import uuid
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional, Union
 
 from fastapi import APIRouter, Body, Header, HTTPException
 from fastapi.responses import StreamingResponse
@@ -28,7 +28,7 @@ class AnthropicMessage(BaseModel):
     """Anthropic消息格式"""
 
     role: str = Field(..., description="消息角色: user or assistant")
-    content: Union[str, List[Dict[str, Any]]] = Field(..., description="消息内容")
+    content: Union[str, list[dict[str, Any]]] = Field(..., description="消息内容")
 
 
 class AnthropicTool(BaseModel):
@@ -36,7 +36,7 @@ class AnthropicTool(BaseModel):
 
     name: str = Field(..., description="工具名称")
     description: str = Field(..., description="工具描述")
-    input_schema: Dict[str, Any] = Field(..., description="输入参数schema")
+    input_schema: dict[str, Any] = Field(..., description="输入参数schema")
 
 
 class AnthropicSystemContent(BaseModel):
@@ -44,7 +44,7 @@ class AnthropicSystemContent(BaseModel):
 
     type: str = Field("text", description="内容类型")
     text: str = Field(..., description="文本内容")
-    cache_control: Optional[Dict[str, Any]] = Field(None, description="缓存控制")
+    cache_control: Optional[dict[str, Any]] = Field(None, description="缓存控制")
 
     @classmethod
     def validate_input(cls, data: Any) -> bool:
@@ -58,14 +58,14 @@ class AnthropicMessagesRequest(BaseModel):
     """Anthropic Messages API请求格式"""
 
     model: str = Field(..., description="模型ID")
-    messages: List[AnthropicMessage] = Field(..., description="消息列表")
+    messages: list[AnthropicMessage] = Field(..., description="消息列表")
     max_tokens: int = Field(..., description="最大生成token数", ge=1)
     temperature: Optional[float] = Field(0.7, description="温度参数", ge=0.0, le=1.0)
     top_p: Optional[float] = Field(1.0, description="Top-p参数", ge=0.0, le=1.0)
     top_k: Optional[int] = Field(None, description="Top-k参数", ge=0)
-    stop_sequences: Optional[List[str]] = Field(None, description="停止序列")
+    stop_sequences: Optional[list[str]] = Field(None, description="停止序列")
     stream: Optional[bool] = Field(False, description="是否流式输出")
-    system: Optional[Union[str, List[Dict[str, Any]]]] = Field(
+    system: Optional[Union[str, list[dict[str, Any]]]] = Field(
         None, description="系统提示"
     )
 
@@ -96,8 +96,8 @@ class AnthropicMessagesRequest(BaseModel):
 
         raise ValueError(f"System must be string or list, got {type(v)}")
 
-    tools: Optional[List[AnthropicTool]] = Field(None, description="工具列表")
-    tool_choice: Optional[Union[str, Dict[str, Any]]] = Field(
+    tools: Optional[list[AnthropicTool]] = Field(None, description="工具列表")
+    tool_choice: Optional[Union[str, dict[str, Any]]] = Field(
         None, description="工具选择"
     )
 
@@ -128,7 +128,7 @@ class AnthropicMessageResponse(BaseModel):
     id: str = Field(..., description="消息ID")
     type: str = Field("message", description="响应类型")
     role: str = Field("assistant", description="角色")
-    content: List[AnthropicContentBlock] = Field(..., description="内容块")
+    content: list[AnthropicContentBlock] = Field(..., description="内容块")
     model: str = Field(..., description="使用的模型")
     stop_reason: Optional[str] = Field(None, description="停止原因")
     usage: AnthropicUsage = Field(..., description="使用量统计")
@@ -148,7 +148,7 @@ def create_anthropic_router(
 
     @router.post("/messages")
     async def create_message(
-        request_data: Dict[str, Any] = Body(...),
+        request_data: dict[str, Any] = Body(...),
         authorization: Optional[str] = Header(None, alias="Authorization"),
         x_api_key: Optional[str] = Header(None, alias="x-api-key"),
         anthropic_version: str = Header("2023-06-01", alias="anthropic-version"),
@@ -168,7 +168,7 @@ def create_anthropic_router(
                         "message": f"Invalid request format: {e}",
                     },
                 },
-            )
+            ) from e
 
         logger.info(f"Anthropic request received: {request_obj}")
 
@@ -280,7 +280,7 @@ def create_anthropic_router(
                     "type": "api_error",
                     "error": {"type": "router_error", "message": e.message},
                 },
-            )
+            ) from e
         except Exception as e:
             logger.error(f"Unexpected error in Anthropic messages: {e}", exc_info=True)
             raise HTTPException(
@@ -292,7 +292,7 @@ def create_anthropic_router(
                         "message": "Internal server error",
                     },
                 },
-            )
+            ) from e
 
     return router
 
@@ -374,8 +374,8 @@ def convert_to_chat_request(request: AnthropicMessagesRequest) -> ChatCompletion
 
 
 def convert_to_anthropic_response(
-    response: Dict[str, Any], model: str
-) -> Dict[str, Any]:
+    response: dict[str, Any], model: str
+) -> dict[str, Any]:
     """将内部响应转换为Anthropic格式"""
 
     # 生成消息ID
@@ -473,7 +473,7 @@ async def stream_anthropic_response(
                         # 错误消息
                         yield f"data: {json.dumps(chunk_data)}\n\n"
                         return
-                except:
+                except (json.JSONDecodeError, ValueError):
                     # 如果不是JSON，当作文本内容处理
                     content = chunk
             else:
@@ -528,7 +528,7 @@ class AnthropicAPIError(Exception):
         self.status_code = status_code
         super().__init__(message)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为错误响应格式"""
         return {
             "type": "error",

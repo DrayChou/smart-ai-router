@@ -4,7 +4,7 @@
 
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -21,11 +21,11 @@ from core.utils.log_analyzer import LogAnalyzer
 class AuditEventFilter(BaseModel):
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
-    event_types: Optional[List[str]] = None
-    user_ids: Optional[List[str]] = None
-    ip_addresses: Optional[List[str]] = None
-    levels: Optional[List[str]] = None
-    outcomes: Optional[List[str]] = None
+    event_types: Optional[list[str]] = None
+    user_ids: Optional[list[str]] = None
+    ip_addresses: Optional[list[str]] = None
+    levels: Optional[list[str]] = None
+    outcomes: Optional[list[str]] = None
     limit: int = Field(default=100, ge=1, le=1000)
 
 
@@ -121,7 +121,7 @@ async def get_audit_events(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取审计事件失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取审计事件失败: {str(e)}") from e
 
 
 @router.get("/summary")
@@ -163,7 +163,7 @@ async def get_audit_summary(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取审计摘要失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取审计摘要失败: {str(e)}") from e
 
 
 @router.get("/security")
@@ -216,7 +216,7 @@ async def get_security_analysis(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取安全分析失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取安全分析失败: {str(e)}") from e
 
 
 @router.get("/user/{user_id}/activity")
@@ -267,7 +267,7 @@ async def get_user_activity(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取用户活动报告失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取用户活动报告失败: {str(e)}") from e
 
 
 @router.get("/anomalies")
@@ -317,7 +317,7 @@ async def detect_anomalies(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"异常检测失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"异常检测失败: {str(e)}") from e
 
 
 @router.post("/report/generate")
@@ -370,7 +370,7 @@ async def generate_audit_report(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"生成审计报告失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"生成审计报告失败: {str(e)}") from e
 
 
 @router.get("/compliance/summary")
@@ -446,7 +446,7 @@ async def get_compliance_summary(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取合规性摘要失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取合规性摘要失败: {str(e)}") from e
 
 
 @router.get("/health")
@@ -509,4 +509,4 @@ async def get_audit_health(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取审计健康状态失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取审计健康状态失败: {str(e)}") from e

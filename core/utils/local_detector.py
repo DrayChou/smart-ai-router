@@ -6,16 +6,14 @@
 
 import asyncio
 import logging
-from typing import Any, Dict, Optional
+from typing import Optional
 
 import httpx
 
 from ..models.model_info import (
     DataSource,
-    ModelCapabilities,
     ModelInfo,
     ModelPricing,
-    ModelSpecs,
 )
 
 logger = logging.getLogger(__name__)
@@ -176,7 +174,7 @@ class LocalModelDetector:
         except Exception:
             return False
 
-    def _get_auth_headers(self, api_key: str) -> Dict[str, str]:
+    def _get_auth_headers(self, api_key: str) -> dict[str, str]:
         """获取认证头"""
         headers = {"Content-Type": "application/json"}
         if api_key:

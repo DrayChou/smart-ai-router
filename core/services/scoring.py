@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import TYPE_CHECKING, Any, List
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from core.json_router import RoutingScore
+    pass
 
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ class ScoringService:
         # Router must provide calculator methods, strategy getter, and sorter.
         self._router = router
 
-    async def score(self, channels: List[Any], request: Any) -> List[Any]:
+    async def score(self, channels: list[Any], request: Any) -> list[Any]:
         """Batch-optimized scoring with fallback to individual for small sets."""
         start_time = time.time()
         channel_count = len(channels)
@@ -125,7 +125,7 @@ class ScoringService:
 
         return scored_channels
 
-    async def score_individual(self, channels: List[Any], request: Any) -> List[Any]:
+    async def score_individual(self, channels: list[Any], request: Any) -> list[Any]:
         """Individual scoring for small sets."""
         logger.info(
             f"📊 SCORING: Using individual scoring for {len(channels)} channels"

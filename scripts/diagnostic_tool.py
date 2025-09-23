@@ -12,7 +12,6 @@ import sys
 import time
 import traceback
 from pathlib import Path
-from typing import Any, Dict, List, Optional
 
 import yaml
 
@@ -24,7 +23,6 @@ sys.path.insert(0, str(project_root))
 import os
 
 if os.name == "nt":  # Windows
-    import locale
 
     try:
         # 尝试设置UTF-8编码
@@ -179,7 +177,7 @@ class DiagnosticTool:
 
         # 验证YAML语法
         try:
-            with open(self.project_root / config_file, "r", encoding="utf-8") as f:
+            with open(self.project_root / config_file, encoding="utf-8") as f:
                 config_data = yaml.safe_load(f)
             self.add_info("configuration", "YAML语法", "配置文件语法正确")
         except yaml.YAMLError as e:
@@ -294,7 +292,7 @@ class DiagnosticTool:
                     "dependencies",
                     f"缺少依赖 {module}",
                     f"{description} 未安装",
-                    f"运行 'uv sync' 安装依赖",
+                    "运行 'uv sync' 安装依赖",
                 )
 
     def check_network_connectivity(self):
@@ -404,7 +402,7 @@ class DiagnosticTool:
                 if self.check_file_exists(cache_file):
                     try:
                         with open(
-                            self.project_root / cache_file, "r", encoding="utf-8"
+                            self.project_root / cache_file, encoding="utf-8"
                         ) as f:
                             data = json.load(f)
                         self.add_info(
@@ -487,7 +485,7 @@ class DiagnosticTool:
         total_warnings = len(self.warnings)
         total_info = len(self.info)
 
-        print(f"\n📈 统计信息:")
+        print("\n📈 统计信息:")
         print(f"  ❌ 严重问题: {total_issues}")
         print(f"  ⚠️  警告: {total_warnings}")
         print(f"  ℹ️  信息: {total_info}")
@@ -526,7 +524,7 @@ class DiagnosticTool:
                     print(f"    • {item['title']}: {item['description']}")
 
         # 总结
-        print(f"\n🎯 诊断总结:")
+        print("\n🎯 诊断总结:")
         if total_issues == 0:
             if total_warnings == 0:
                 print("  ✅ 系统状态良好，没有发现问题！")
@@ -536,7 +534,7 @@ class DiagnosticTool:
             print(f"  ❌ 发现 {total_issues} 个问题需要解决。")
             print("  📋 请按照上面的解决方案逐一处理问题。")
 
-        print(f"\n📚 更多帮助:")
+        print("\n📚 更多帮助:")
         print("  • 查看故障排除文档: docs/TROUBLESHOOTING.md")
         print("  • 查看开发指南: CLAUDE.md")
         print("  • 提交问题: https://github.com/your-repo/issues")

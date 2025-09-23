@@ -2,13 +2,13 @@
 
 import os
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import yaml
 from dotenv import load_dotenv
 
 
-def load_config(config_path: str = None) -> Dict[str, Any]:
+def load_config(config_path: str = None) -> dict[str, Any]:
     """
     加载配置文件
 
@@ -38,9 +38,9 @@ def load_config(config_path: str = None) -> Dict[str, Any]:
         with open(config_path, encoding="utf-8") as f:
             config = yaml.safe_load(f)
     except FileNotFoundError:
-        raise FileNotFoundError(f"配置文件未找到: {config_path}")
+        raise FileNotFoundError(f"配置文件未找到: {config_path}") from None
     except yaml.YAMLError as e:
-        raise ValueError(f"配置文件格式错误: {e}")
+        raise ValueError(f"配置文件格式错误: {e}") from e
 
     # 环境变量替换
     config = _replace_env_vars(config)
@@ -80,7 +80,7 @@ def _replace_env_vars(obj: Any) -> Any:
         return obj
 
 
-def get_config_value(config: Dict[str, Any], key_path: str, default: Any = None) -> Any:
+def get_config_value(config: dict[str, Any], key_path: str, default: Any = None) -> Any:
     """
     获取嵌套配置值
 

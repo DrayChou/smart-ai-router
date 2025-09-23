@@ -1,10 +1,9 @@
-# -*- coding: utf-8 -*-
 """
 OpenRouter API适配器 - 支持价格优先排序和OpenRouter特有功能
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 
@@ -25,7 +24,7 @@ class OpenRouterAdapter(OpenAIAdapter):
     - OpenRouter特定的模型路由选项
     """
 
-    def __init__(self, provider_name: str, config: Dict[str, Any]):
+    def __init__(self, provider_name: str, config: dict[str, Any]):
         config = dict(config or {})
         base_url = config.get("base_url") or "https://openrouter.ai/api"
         config["base_url"] = base_url.rstrip("/")
@@ -38,7 +37,7 @@ class OpenRouterAdapter(OpenAIAdapter):
         base = base_url.lower() if base_url else ""
         return "openrouter" in provider_lower or "openrouter.ai" in base
 
-    def transform_request(self, request: ChatRequest) -> Dict[str, Any]:
+    def transform_request(self, request: ChatRequest) -> dict[str, Any]:
         """转换为OpenRouter格式请求，添加价格优先排序支持"""
         # 先获取基础OpenAI格式
         payload = super().transform_request(request)
@@ -91,7 +90,7 @@ class OpenRouterAdapter(OpenAIAdapter):
 
     def get_request_headers(
         self, channel: Channel, request: ChatRequest
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         """获取OpenRouter特有的请求头"""
         headers = super().get_request_headers(channel, request)
 
@@ -126,7 +125,7 @@ class OpenRouterAdapter(OpenAIAdapter):
         # 默认使用Smart AI Router的标识
         return "Smart AI Router - Personal AI Gateway"
 
-    async def get_models(self, base_url: str, api_key: str) -> List[Dict[str, Any]]:
+    async def get_models(self, base_url: str, api_key: str) -> list[dict[str, Any]]:
         """
         获取OpenRouter模型列表
         OpenRouter返回更详细的模型信息，包括定价和能力
@@ -188,9 +187,9 @@ class OpenRouterAdapter(OpenAIAdapter):
 
         except httpx.HTTPError as e:
             logger.error(f"获取OpenRouter模型列表失败: {e}")
-            raise ProviderError(f"获取模型列表失败: {e}")
+            raise ProviderError(f"获取模型列表失败: {e}") from e
 
-    def _is_openrouter_chat_model(self, model_data: Dict[str, Any]) -> bool:
+    def _is_openrouter_chat_model(self, model_data: dict[str, Any]) -> bool:
         """判断是否是OpenRouter聊天模型"""
         model_id = model_data.get("id", "").lower()
 
@@ -215,8 +214,8 @@ class OpenRouterAdapter(OpenAIAdapter):
         return True
 
     def _get_openrouter_model_capabilities(
-        self, model_data: Dict[str, Any]
-    ) -> List[str]:
+        self, model_data: dict[str, Any]
+    ) -> list[str]:
         """从OpenRouter模型数据提取能力信息"""
         capabilities = ["text"]
 
@@ -245,7 +244,7 @@ class OpenRouterAdapter(OpenAIAdapter):
 
         return capabilities
 
-    def _get_openrouter_speed_score(self, model_data: Dict[str, Any]) -> float:
+    def _get_openrouter_speed_score(self, model_data: dict[str, Any]) -> float:
         """根据OpenRouter模型数据计算速度评分"""
         # OpenRouter没有直接的速度指标，根据模型类型和大小推断
         model_id = model_data.get("id", "").lower()
@@ -262,7 +261,7 @@ class OpenRouterAdapter(OpenAIAdapter):
         else:
             return 0.6
 
-    def _get_openrouter_quality_score(self, model_data: Dict[str, Any]) -> float:
+    def _get_openrouter_quality_score(self, model_data: dict[str, Any]) -> float:
         """根据OpenRouter模型数据计算质量评分"""
         model_id = model_data.get("id", "").lower()
 

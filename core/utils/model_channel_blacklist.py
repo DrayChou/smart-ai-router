@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Model-Channel级别黑名单管理器
 支持细粒度的模型-渠道组合黑名单，而不是整个渠道黑名单
@@ -9,7 +8,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -76,12 +75,12 @@ class ErrorClassifier:
     @classmethod
     def classify_error(
         cls, status_code: int, error_message: str
-    ) -> Tuple[ErrorType, int, bool]:
+    ) -> tuple[ErrorType, int, bool]:
         """
         分类错误并返回错误类型、退避时间、是否永久
 
         Returns:
-            Tuple[ErrorType, int, bool]: (错误类型, 退避时间秒, 是否永久)
+            tuple[ErrorType, int, bool]: (错误类型, 退避时间秒, 是否永久)
         """
         error_msg_lower = error_message.lower()
 
@@ -157,9 +156,9 @@ class ModelChannelBlacklistManager:
     """模型-渠道级别黑名单管理器"""
 
     def __init__(self):
-        self._blacklist: Dict[str, ModelChannelBlacklistEntry] = {}
+        self._blacklist: dict[str, ModelChannelBlacklistEntry] = {}
         self._lock = asyncio.Lock()
-        self._channel_failure_counts: Dict[str, int] = {}  # 渠道级别失败计数
+        self._channel_failure_counts: dict[str, int] = {}  # 渠道级别失败计数
 
     def _generate_key(self, channel_id: str, model_name: str) -> str:
         """生成模型-渠道组合键"""
@@ -257,12 +256,12 @@ class ModelChannelBlacklistManager:
 
     def is_model_blacklisted(
         self, channel_id: str, model_name: str
-    ) -> Tuple[bool, Optional[ModelChannelBlacklistEntry]]:
+    ) -> tuple[bool, Optional[ModelChannelBlacklistEntry]]:
         """
         检查特定模型在特定渠道是否被拉黑
 
         Returns:
-            Tuple[bool, Optional[ModelChannelBlacklistEntry]]: (是否被拉黑, 黑名单条目)
+            tuple[bool, Optional[ModelChannelBlacklistEntry]]: (是否被拉黑, 黑名单条目)
         """
         key = self._generate_key(channel_id, model_name)
 
@@ -281,7 +280,7 @@ class ModelChannelBlacklistManager:
 
         return True, entry
 
-    def get_blacklisted_models_for_channel(self, channel_id: str) -> List[str]:
+    def get_blacklisted_models_for_channel(self, channel_id: str) -> list[str]:
         """获取指定渠道上所有被拉黑的模型"""
         blacklisted_models = []
 
@@ -301,8 +300,8 @@ class ModelChannelBlacklistManager:
         return blacklisted_models
 
     def get_available_channels_for_model(
-        self, model_name: str, all_channel_ids: List[str]
-    ) -> List[str]:
+        self, model_name: str, all_channel_ids: list[str]
+    ) -> list[str]:
         """获取指定模型的可用渠道列表"""
         available_channels = []
 
@@ -332,7 +331,7 @@ class ModelChannelBlacklistManager:
 
             return False
 
-    def get_blacklist_stats(self) -> Dict[str, Any]:
+    def get_blacklist_stats(self) -> dict[str, Any]:
         """获取黑名单统计信息"""
         total_entries = len(self._blacklist)
         permanent_count = sum(

@@ -1,10 +1,9 @@
-# -*- coding: utf-8 -*-
 """
 适配器管理器 - 动态选择和使用正确的Provider适配器
 """
 
 import logging
-from typing import Any, Dict, Optional, Tuple, Type
+from typing import Any, Optional
 
 from ..config_models import Channel
 from ..models.chat_request import ChatRequest
@@ -21,13 +20,13 @@ class AdapterManager:
     """适配器管理器 - 智能选择和使用合适的Provider适配器"""
 
     def __init__(self):
-        self._adapter_registry: Dict[str, Type[BaseAdapter]] = {}
-        self._adapter_cache: Dict[Tuple[str, str, str], BaseAdapter] = {}
+        self._adapter_registry: dict[str, type[BaseAdapter]] = {}
+        self._adapter_cache: dict[tuple[str, str, str], BaseAdapter] = {}
         self._register_adapters()
 
     def _register_adapters(self):
         """注册所有可用的适配器 (按名称映射到类)."""
-        registry: Dict[str, Type[BaseAdapter]] = {
+        registry: dict[str, type[BaseAdapter]] = {
             "openrouter": OpenRouterAdapter,
             "anthropic": AnthropicAdapter,
             "groq": GroqAdapter,
@@ -48,7 +47,7 @@ class AdapterManager:
 
     def _select_adapter_class(
         self, channel: Channel, provider: Any
-    ) -> Type[BaseAdapter]:
+    ) -> type[BaseAdapter]:
         provider_name = getattr(provider, "name", channel.provider).lower()
         base_url = (channel.base_url or getattr(provider, "base_url", "") or "").lower()
         adapter_name = getattr(provider, "adapter_class", None)
@@ -67,8 +66,8 @@ class AdapterManager:
 
         return self._adapter_registry["openai"]
 
-    def _build_adapter_config(self, channel: Channel, provider: Any) -> Dict[str, Any]:
-        config: Dict[str, Any]
+    def _build_adapter_config(self, channel: Channel, provider: Any) -> dict[str, Any]:
+        config: dict[str, Any]
         if hasattr(provider, "dict"):
             config = provider.dict()  # type: ignore[assignment]
         else:
@@ -85,7 +84,7 @@ class AdapterManager:
         return config
 
     def _get_adapter_instance(
-        self, adapter_cls: Type[BaseAdapter], channel: Channel, provider: Any
+        self, adapter_cls: type[BaseAdapter], channel: Channel, provider: Any
     ) -> BaseAdapter:
         base_url = channel.base_url or getattr(provider, "base_url", "") or ""
         cache_key = (
@@ -106,7 +105,7 @@ class AdapterManager:
         provider: Any,
         request: ChatRequest,
         matched_model: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """使用适配器准备请求"""
         adapter_cls = self._select_adapter_class(channel, provider)
         adapter = self._get_adapter_instance(adapter_cls, channel, provider)
@@ -158,7 +157,7 @@ class AdapterManager:
         provider: Any,
         request: ChatRequest,
         matched_model: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """回退的请求准备方式（兼容原有逻辑）"""
         base_url = (channel.base_url or getattr(provider, "base_url", "")).rstrip("/")
         if not base_url.endswith("/v1"):
@@ -190,10 +189,10 @@ class AdapterManager:
 
     def enhance_request_for_cost_optimization(
         self,
-        request_data: Dict[str, Any],
+        request_data: dict[str, Any],
         adapter: BaseAdapter,
         routing_strategy: str = "balanced",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """为成本优化增强请求（特别是OpenRouter）"""
         if not isinstance(adapter, OpenRouterAdapter):
             return request_data

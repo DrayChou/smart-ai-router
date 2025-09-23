@@ -98,7 +98,7 @@ class RealisticBenchmark:
                 results[model_query] = {"error": str(e)}
 
         # 性能总结
-        print(f"\n=== PERFORMANCE SUMMARY ===")
+        print("\n=== PERFORMANCE SUMMARY ===")
 
         successful_tests = [r for r in results.values() if "error" not in r]
         if successful_tests:
@@ -130,7 +130,7 @@ class RealisticBenchmark:
 
     async def stress_test_concurrent_queries(self):
         """压力测试：并发查询"""
-        print(f"\n=== CONCURRENT STRESS TEST ===")
+        print("\n=== CONCURRENT STRESS TEST ===")
 
         # 模拟多个并发用户查询
         concurrent_queries = [
@@ -145,7 +145,7 @@ class RealisticBenchmark:
 
         # 创建并发任务
         tasks = []
-        for i, model in enumerate(concurrent_queries):
+        for _i, model in enumerate(concurrent_queries):
             request = await self.create_request(model)
             task = self.router.route_request(request)
             tasks.append(task)
@@ -182,7 +182,7 @@ class RealisticBenchmark:
         # 并发测试
         await self.stress_test_concurrent_queries()
 
-        print(f"\n=== BENCHMARK COMPLETE ===")
+        print("\n=== BENCHMARK COMPLETE ===")
 
 
 async def main():

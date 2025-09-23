@@ -3,10 +3,9 @@
 任务管理器 - 统一管理所有后台任务
 """
 
-import asyncio
 import logging
 import time
-from typing import Any, Dict, Optional
+from typing import Any
 
 from ..utils.api_key_validator import run_api_key_validation_task
 from .scheduler import (
@@ -19,7 +18,7 @@ from .scheduler import (
 from .tasks.model_discovery import get_model_discovery_task, run_model_discovery
 
 # 🗑️ Removed pricing_discovery - was generating unused cache files
-from .tasks.service_health_check import ServiceHealthChecker, run_health_check_task
+from .tasks.service_health_check import run_health_check_task
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +31,7 @@ class TaskManager:
         self.scheduler = get_scheduler()
         self.is_initialized = False
 
-    def initialize_tasks(self, config: Dict[str, Any]):
+    def initialize_tasks(self, config: dict[str, Any]):
         """初始化所有定时任务"""
         if self.is_initialized:
             logger.warning("任务已初始化，跳过")
@@ -309,7 +308,7 @@ class TaskManager:
         logger.info("停止任务管理器")
         await stop_scheduler()
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """获取任务管理器状态"""
         return {
             "initialized": self.is_initialized,
@@ -336,7 +335,7 @@ def get_task_manager() -> TaskManager:
 
 
 # 便捷函数
-async def initialize_background_tasks(config: Dict[str, Any], config_loader=None):
+async def initialize_background_tasks(config: dict[str, Any], config_loader=None):
     """初始化后台任务的便捷函数"""
     manager = get_task_manager()
     if config_loader:
@@ -352,7 +351,7 @@ async def stop_background_tasks():
     await manager.stop()
 
 
-def get_task_manager_status() -> Dict[str, Any]:
+def get_task_manager_status() -> dict[str, Any]:
     """获取任务管理器状态的便捷函数"""
     manager = get_task_manager()
     return manager.get_status()

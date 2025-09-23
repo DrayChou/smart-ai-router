@@ -1,10 +1,9 @@
-# -*- coding: utf-8 -*-
 """
 统一工厂函数
 减少重复的单例模式代码
 """
 import threading
-from typing import Callable, Optional, Type, TypeVar
+from typing import Callable, Optional, TypeVar
 
 T = TypeVar("T")
 
@@ -18,7 +17,7 @@ class SingletonFactory:
         self._main_lock = threading.Lock()
 
     def get_instance(
-        self, cls: Type[T], factory_func: Optional[Callable[[], T]] = None
+        self, cls: type[T], factory_func: Optional[Callable[[], T]] = None
     ) -> T:
         """获取单例实例（线程安全）"""
         cls_name = cls.__name__
@@ -44,7 +43,7 @@ class SingletonFactory:
 
             return self._instances[cls_name]
 
-    def clear_instance(self, cls: Type[T]) -> None:
+    def clear_instance(self, cls: type[T]) -> None:
         """清除指定类的实例"""
         cls_name = cls.__name__
         if cls_name in self._instances:
@@ -62,12 +61,12 @@ class SingletonFactory:
 _global_factory = SingletonFactory()
 
 
-def get_singleton(cls: Type[T], factory_func: Optional[Callable[[], T]] = None) -> T:
+def get_singleton(cls: type[T], factory_func: Optional[Callable[[], T]] = None) -> T:
     """获取单例实例的便捷函数"""
     return _global_factory.get_instance(cls, factory_func)
 
 
-def clear_singleton(cls: Type[T]) -> None:
+def clear_singleton(cls: type[T]) -> None:
     """清除单例实例的便捷函数"""
     _global_factory.clear_instance(cls)
 

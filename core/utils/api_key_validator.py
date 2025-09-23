@@ -10,7 +10,7 @@ import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 import httpx
 
@@ -32,7 +32,7 @@ class APIKeyValidationResult:
     status_code: Optional[int]
     latency_ms: Optional[float]
     timestamp: datetime
-    models_discovered: Optional[List[Dict]] = None
+    models_discovered: Optional[list[dict]] = None
     model_count: int = 0
 
 
@@ -48,7 +48,7 @@ class APIKeyStatus:
     consecutive_failures: int
     next_validation: datetime
     health_score: float  # 0.0 - 1.0
-    usage_stats: Dict[str, Any]
+    usage_stats: dict[str, Any]
 
 
 class APIKeyValidator:
@@ -63,8 +63,8 @@ class APIKeyValidator:
         self.key_status_file = self.cache_dir / "api_key_status.json"
 
         # 验证结果和状态
-        self.validation_results: Dict[str, APIKeyValidationResult] = {}
-        self.key_status: Dict[str, APIKeyStatus] = {}
+        self.validation_results: dict[str, APIKeyValidationResult] = {}
+        self.key_status: dict[str, APIKeyStatus] = {}
 
         # 验证配置
         self.validation_timeout = httpx.Timeout(15.0, connect=5.0)
@@ -80,7 +80,7 @@ class APIKeyValidator:
         """加载缓存的验证数据"""
         try:
             if self.validation_cache_file.exists():
-                with open(self.validation_cache_file, "r", encoding="utf-8") as f:
+                with open(self.validation_cache_file, encoding="utf-8") as f:
                     data = json.load(f)
                     self.validation_results = {
                         k: APIKeyValidationResult(**v)
@@ -91,7 +91,7 @@ class APIKeyValidator:
                 )
 
             if self.key_status_file.exists():
-                with open(self.key_status_file, "r", encoding="utf-8") as f:
+                with open(self.key_status_file, encoding="utf-8") as f:
                     data = json.load(f)
                     self.key_status = {
                         k: APIKeyStatus(**v)
@@ -146,7 +146,7 @@ class APIKeyValidator:
         return min(base_interval * backoff_factor, self.max_backoff)
 
     async def _validate_openai_key(
-        self, channel: Dict[str, Any]
+        self, channel: dict[str, Any]
     ) -> APIKeyValidationResult:
         """验证OpenAI格式的API密钥"""
         channel_id = channel.get("id", "unknown")
@@ -242,7 +242,7 @@ class APIKeyValidator:
             )
 
     async def _validate_anthropic_key(
-        self, channel: Dict[str, Any]
+        self, channel: dict[str, Any]
     ) -> APIKeyValidationResult:
         """验证Anthropic格式的API密钥"""
         channel_id = channel.get("id", "unknown")
@@ -326,7 +326,7 @@ class APIKeyValidator:
                 timestamp=datetime.now(),
             )
 
-    async def validate_api_key(self, channel: Dict[str, Any]) -> APIKeyValidationResult:
+    async def validate_api_key(self, channel: dict[str, Any]) -> APIKeyValidationResult:
         """验证单个API密钥"""
         channel_id = channel.get("id", "unknown")
         provider = channel.get("provider", "unknown")
@@ -354,8 +354,8 @@ class APIKeyValidator:
             return await self._validate_openai_key(channel)
 
     async def validate_all_keys(
-        self, channels: List[Dict[str, Any]]
-    ) -> Dict[str, APIKeyValidationResult]:
+        self, channels: list[dict[str, Any]]
+    ) -> dict[str, APIKeyValidationResult]:
         """验证所有API密钥"""
         if not channels:
             logger.warning("没有可验证的API密钥")
@@ -461,7 +461,7 @@ class APIKeyValidator:
         total_keys = len(self.validation_results)
         valid_keys = sum(1 for r in self.validation_results.values() if r.is_valid)
 
-        logger.info(f"=== API密钥验证完成 ===")
+        logger.info("=== API密钥验证完成 ===")
         logger.info(f"总密钥数: {total_keys}")
         logger.info(f"有效密钥: {valid_keys}")
         logger.info(f"无效密钥: {total_keys - valid_keys}")
@@ -478,7 +478,7 @@ class APIKeyValidator:
         for error_type, count in error_types.items():
             logger.info(f"{error_type}: {count} 个")
 
-    def get_valid_channels(self) -> List[str]:
+    def get_valid_channels(self) -> list[str]:
         """获取有效的渠道ID列表"""
         return [
             channel_id
@@ -486,7 +486,7 @@ class APIKeyValidator:
             if status.is_valid and status.health_score > 0.5
         ]
 
-    def get_invalid_channels(self) -> List[str]:
+    def get_invalid_channels(self) -> list[str]:
         """获取无效的渠道ID列表"""
         return [
             channel_id
@@ -512,7 +512,7 @@ class APIKeyValidator:
 
         return datetime.now() >= status.next_validation
 
-    def get_validation_stats(self) -> Dict[str, Any]:
+    def get_validation_stats(self) -> dict[str, Any]:
         """获取验证统计信息"""
         total = len(self.key_status)
         valid = len([s for s in self.key_status.values() if s.is_valid])
@@ -555,7 +555,7 @@ class APIKeyValidator:
 
 
 # 主要的任务执行函数
-async def run_api_key_validation_task(channels: List[Dict[str, Any]]) -> Dict[str, Any]:
+async def run_api_key_validation_task(channels: list[dict[str, Any]]) -> dict[str, Any]:
     """运行API密钥验证任务"""
     validator = APIKeyValidator()
     results = await validator.validate_all_keys(channels)

@@ -7,7 +7,7 @@ import hashlib
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +20,8 @@ class CacheEntry:
     channel_id: str
     api_key_hash: str
     user_level: str  # free/pro/premium/unknown
-    models: List[str]
-    models_pricing: Dict[str, Any]
+    models: list[str]
+    models_pricing: dict[str, Any]
     status: str  # success/failed/partial
     discovered_at: datetime
     error_message: Optional[str] = None
@@ -62,7 +62,7 @@ class ApiKeyCacheManager:
         ]
         return f"{channel_id}_{api_key_hash}"
 
-    def parse_cache_key(self, cache_key: str) -> Tuple[str, str]:
+    def parse_cache_key(self, cache_key: str) -> tuple[str, str]:
         """
         解析缓存键，提取渠道ID和API Key哈希
 
@@ -97,8 +97,8 @@ class ApiKeyCacheManager:
         return len(api_key_hash) == self.hash_length
 
     def find_cache_entries_by_channel(
-        self, cache: Dict[str, Any], channel_id: str
-    ) -> List[str]:
+        self, cache: dict[str, Any], channel_id: str
+    ) -> list[str]:
         """
         查找特定渠道的所有缓存条目
 
@@ -118,7 +118,7 @@ class ApiKeyCacheManager:
         return channel_keys
 
     def find_cache_entry_by_channel_and_key(
-        self, cache: Dict[str, Any], channel_id: str, api_key: str
+        self, cache: dict[str, Any], channel_id: str, api_key: str
     ) -> Optional[str]:
         """
         查找特定渠道和API Key对应的缓存条目
@@ -134,7 +134,7 @@ class ApiKeyCacheManager:
         target_cache_key = self.generate_cache_key(channel_id, api_key)
         return target_cache_key if target_cache_key in cache else None
 
-    def get_cache_statistics(self, cache: Dict[str, Any]) -> Dict[str, Any]:
+    def get_cache_statistics(self, cache: dict[str, Any]) -> dict[str, Any]:
         """
         获取缓存统计信息
 
@@ -147,8 +147,8 @@ class ApiKeyCacheManager:
         total_entries = len(cache)
         api_key_entries = 0
         legacy_entries = 0
-        channel_groups: Dict[str, int] = {}
-        user_levels: Dict[str, int] = {}
+        channel_groups: dict[str, int] = {}
+        user_levels: dict[str, int] = {}
 
         for cache_key, cache_data in cache.items():
             if self.is_api_key_cache(cache_key):
@@ -179,8 +179,8 @@ class ApiKeyCacheManager:
         }
 
     def migrate_legacy_cache(
-        self, old_cache: Dict[str, Any], channels_map: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, old_cache: dict[str, Any], channels_map: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         迁移旧缓存格式到新的API Key级别格式
 
@@ -240,7 +240,7 @@ class ApiKeyCacheManager:
         return new_cache
 
     def _detect_user_level(
-        self, cache_data: Dict[str, Any], channel_config: Dict[str, Any]
+        self, cache_data: dict[str, Any], channel_config: dict[str, Any]
     ) -> str:
         """
         检测用户等级（基于已有的缓存数据和渠道配置）
@@ -284,8 +284,8 @@ class ApiKeyCacheManager:
         return "unknown"
 
     def cleanup_invalid_entries(
-        self, cache: Dict[str, Any], channels_map: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, cache: dict[str, Any], channels_map: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         清理无效的缓存条目
 

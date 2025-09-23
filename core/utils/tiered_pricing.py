@@ -8,7 +8,7 @@ import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -36,14 +36,14 @@ class TieredPricingCalculator:
         self.config_path = Path(pricing_config_path)
         self.pricing_data = self._load_pricing_config()
 
-    def _load_pricing_config(self) -> Dict[str, Any]:
+    def _load_pricing_config(self) -> dict[str, Any]:
         """加载定价配置"""
         try:
             if not self.config_path.exists():
                 logger.error(f"定价配置文件不存在: {self.config_path}")
                 return {"models": {}}
 
-            with open(self.config_path, "r", encoding="utf-8") as f:
+            with open(self.config_path, encoding="utf-8") as f:
                 return json.load(f)
         except Exception as e:
             logger.error(f"加载定价配置失败: {e}")
@@ -88,7 +88,7 @@ class TieredPricingCalculator:
             return None
 
     def _calculate_fixed_pricing(
-        self, model_config: Dict[str, Any], use_batch: bool
+        self, model_config: dict[str, Any], use_batch: bool
     ) -> PricingResult:
         """计算固定定价"""
         pricing_key = "batch_pricing" if use_batch else "online_pricing"
@@ -104,7 +104,7 @@ class TieredPricingCalculator:
         )
 
     def _calculate_tiered_pricing(
-        self, model_config: Dict[str, Any], input_tokens: int, use_batch: bool
+        self, model_config: dict[str, Any], input_tokens: int, use_batch: bool
     ) -> Optional[PricingResult]:
         """计算阶梯定价（基于输入长度）"""
         tiered_config = model_config.get("tiered_pricing", {})
@@ -127,7 +127,7 @@ class TieredPricingCalculator:
 
     def _calculate_complex_tiered_pricing(
         self,
-        model_config: Dict[str, Any],
+        model_config: dict[str, Any],
         input_tokens: int,
         output_tokens: int,
         use_batch: bool,
@@ -147,7 +147,7 @@ class TieredPricingCalculator:
         return None
 
     def _matches_complex_condition(
-        self, tier: Dict[str, Any], input_tokens: int, output_tokens: int
+        self, tier: dict[str, Any], input_tokens: int, output_tokens: int
     ) -> bool:
         """检查是否匹配复杂条件"""
         # 检查输入长度条件
@@ -180,7 +180,7 @@ class TieredPricingCalculator:
         return True
 
     def _create_pricing_result_from_tier(
-        self, tier: Dict[str, Any], use_batch: bool
+        self, tier: dict[str, Any], use_batch: bool
     ) -> PricingResult:
         """从价格档位创建定价结果"""
         pricing_key = "batch_pricing" if use_batch else "online_pricing"
@@ -199,7 +199,7 @@ class TieredPricingCalculator:
         input_tokens: int,
         output_tokens: int,
         use_batch: bool = False,
-    ) -> Optional[Tuple[float, str]]:
+    ) -> Optional[tuple[float, str]]:
         """
         计算总成本
 
@@ -221,15 +221,15 @@ class TieredPricingCalculator:
 
         return total_cost, cost_info
 
-    def get_model_info(self, model_name: str) -> Optional[Dict[str, Any]]:
+    def get_model_info(self, model_name: str) -> Optional[dict[str, Any]]:
         """获取模型基本信息"""
         return self.pricing_data.get("models", {}).get(model_name)
 
-    def list_supported_models(self) -> List[str]:
+    def list_supported_models(self) -> list[str]:
         """获取支持的模型列表"""
         return list(self.pricing_data.get("models", {}).keys())
 
-    def get_pricing_summary(self, model_name: str) -> Optional[Dict[str, Any]]:
+    def get_pricing_summary(self, model_name: str) -> Optional[dict[str, Any]]:
         """获取模型定价摘要"""
         model_config = self.pricing_data.get("models", {}).get(model_name)
         if not model_config:
@@ -269,7 +269,7 @@ def get_pricing_calculator() -> TieredPricingCalculator:
 
 def calculate_doubao_cost(
     model_name: str, input_tokens: int, output_tokens: int = 0, use_batch: bool = False
-) -> Optional[Tuple[float, str]]:
+) -> Optional[tuple[float, str]]:
     """便捷函数：计算豆包模型成本"""
     calculator = get_pricing_calculator()
     return calculator.calculate_cost(model_name, input_tokens, output_tokens, use_batch)

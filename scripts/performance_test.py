@@ -9,7 +9,6 @@ import json
 import sys
 import time
 from pathlib import Path
-from typing import List
 
 # 添加项目根目录到Python路径
 project_root = Path(__file__).parent.parent
@@ -124,12 +123,12 @@ class PerformanceTest:
         # 第二次请求（热缓存）
         print("  Second request (warm cache)...")
         start_time = time.time()
-        results2 = await self.router.route_request(request)
+        await self.router.route_request(request)
         warm_time = (time.time() - start_time) * 1000
 
         speedup = cold_time / warm_time if warm_time > 0 else 0
 
-        print(f"\nCACHE PERFORMANCE:")
+        print("\nCACHE PERFORMANCE:")
         print(f"  Cold cache: {cold_time:.1f}ms")
         print(f"  Warm cache: {warm_time:.1f}ms")
         print(f"  Speedup: {speedup:.1f}x")

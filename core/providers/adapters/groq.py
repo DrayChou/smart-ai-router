@@ -3,7 +3,7 @@ Groq Provider适配器
 Groq是高性能AI推理服务，提供快速的开源模型访问
 """
 
-from typing import Any, Dict, List
+from typing import Any
 
 from core.utils.logger import get_logger
 
@@ -16,7 +16,7 @@ logger = get_logger(__name__)
 class GroqAdapter(OpenAIAdapter):
     """Groq适配器 - 继承OpenAI适配器因为API兼容"""
 
-    def __init__(self, provider_name: str, config: Dict[str, Any]):
+    def __init__(self, provider_name: str, config: dict[str, Any]):
         super().__init__(provider_name, config)
 
         # Groq特定配置
@@ -38,7 +38,7 @@ class GroqAdapter(OpenAIAdapter):
         # Groq API只返回它支持的模型，所以不需要客户端过滤
         return True
 
-    def _get_model_capabilities(self, model_id: str) -> List[str]:
+    def _get_model_capabilities(self, model_id: str) -> list[str]:
         """Groq模型能力映射"""
         capabilities = ["text"]
 
@@ -112,7 +112,7 @@ class GroqAdapter(OpenAIAdapter):
 
         return 0.8  # 默认质量评分
 
-    async def list_models(self, api_key: str) -> List[ModelInfo]:
+    async def list_models(self, api_key: str) -> list[ModelInfo]:
         """获取Groq模型列表，重写以应用免费定价"""
         models = await super().list_models(api_key)
 
@@ -123,7 +123,7 @@ class GroqAdapter(OpenAIAdapter):
 
         return models
 
-    def get_rate_limits(self) -> Dict[str, int]:
+    def get_rate_limits(self) -> dict[str, int]:
         """获取Groq速率限制信息"""
         return {
             "requests_per_minute": self.rate_limit_rpm,

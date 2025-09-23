@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import List, Optional
 
 from core.json_router import JSONRouter, RoutingRequest, RoutingScore, get_router
 from core.yaml_config import YAMLConfigLoader, get_yaml_config_loader
@@ -16,23 +15,23 @@ class RouterService:
 
     def __init__(
         self,
-        config_loader: Optional[YAMLConfigLoader] = None,
-        router: Optional[JSONRouter] = None,
+        config_loader: YAMLConfigLoader | None = None,
+        router: JSONRouter | None = None,
     ) -> None:
         self.config_loader = config_loader or get_yaml_config_loader()
         self.router = router or get_router()
         logger.debug("RouterService initialised with YAML configuration loader")
 
-    async def route_request(self, request: RoutingRequest) -> List[RoutingScore]:
+    async def route_request(self, request: RoutingRequest) -> list[RoutingScore]:
         """Route a request using the consolidated JSONRouter."""
         logger.debug("Routing request via RouterService: model=%s", request.model)
         return await self.router.route_request(request)
 
-    def get_available_models(self) -> List[str]:
+    def get_available_models(self) -> list[str]:
         """Expose JSONRouter's available model list (including tag:* entries)."""
         return self.router.get_available_models()
 
-    def get_channel_info(self, channel_id: str) -> Optional[dict]:
+    def get_channel_info(self, channel_id: str) -> dict | None:
         """Return basic channel information from the loaded configuration."""
         channel = self.config_loader.get_channel_by_id(channel_id)
         if not channel:
@@ -48,7 +47,7 @@ class RouterService:
         }
 
 
-_global_router_service: Optional[RouterService] = None
+_global_router_service: RouterService | None = None
 
 
 def get_router_service() -> RouterService:

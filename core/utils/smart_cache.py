@@ -10,9 +10,8 @@ import json
 import logging
 import time
 from collections import defaultdict
-from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, TypeVar, Union
+from typing import Any, Callable, Optional, TypeVar, Union
 
 from .async_file_ops import get_async_file_manager
 
@@ -53,7 +52,7 @@ class SmartCache:
         self.cache_dir.mkdir(exist_ok=True)
 
         # 内存缓存
-        self.memory_cache: Dict[str, CacheEntry] = {}
+        self.memory_cache: dict[str, CacheEntry] = {}
         self.cache_lock = asyncio.Lock()
 
         # 分层缓存策略配置
@@ -143,7 +142,7 @@ class SmartCache:
         self._load_persistent_cache()
 
         # 缓存大小管理
-        self.cache_size_by_type: Dict[str, int] = defaultdict(int)
+        self.cache_size_by_type: dict[str, int] = defaultdict(int)
 
         # 启动清理任务
         self._start_cleanup_task()
@@ -154,7 +153,7 @@ class SmartCache:
         key_hash = hashlib.sha256(f"{cache_type}:{key}".encode()).hexdigest()
         return f"{cache_type}:{key_hash}"
 
-    def _get_cache_config(self, cache_type: str) -> Dict[str, Any]:
+    def _get_cache_config(self, cache_type: str) -> dict[str, Any]:
         """获取缓存配置"""
         return self.cache_configs.get(cache_type, {"ttl": 300, "persistent": False})
 
@@ -266,10 +265,10 @@ class SmartCache:
             if not self.persistent_cache_file.exists():
                 return
 
-            with open(self.persistent_cache_file, "r", encoding="utf-8") as f:
+            with open(self.persistent_cache_file, encoding="utf-8") as f:
                 data = json.load(f)
 
-            current_time = time.time()
+            time.time()
             loaded_count = 0
 
             for cache_key, entry_data in data.items():
@@ -304,7 +303,7 @@ class SmartCache:
 
             data = await file_manager.read_json(self.persistent_cache_file, {})
 
-            current_time = time.time()
+            time.time()
             loaded_count = 0
 
             for cache_key, entry_data in data.items():
@@ -352,7 +351,7 @@ class SmartCache:
             )
 
             if not success:
-                logger.warning(f"异步保存持久化缓存失败: 文件写入返回失败")
+                logger.warning("异步保存持久化缓存失败: 文件写入返回失败")
 
         except Exception as e:
             logger.warning(f"异步保存持久化缓存失败: {e}")
@@ -423,7 +422,7 @@ class SmartCache:
 
         asyncio.create_task(cleanup_loop())
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """获取缓存统计信息"""
         stats = {
             "total_entries": len(self.memory_cache),
@@ -466,7 +465,7 @@ class SmartCache:
 
         return stats
 
-    async def _enforce_size_limit(self, cache_type: str, config: Dict[str, Any]):
+    async def _enforce_size_limit(self, cache_type: str, config: dict[str, Any]):
         """强制执行缓存大小限制"""
         max_size = config.get("max_size")
         if not max_size:
@@ -501,7 +500,7 @@ class SmartCache:
         if evicted_count > 0:
             logger.debug(f"缓存LRU清理: {cache_type} 驱逐了 {evicted_count} 个条目")
 
-    async def preload_hot_queries(self, hot_patterns: List[str]):
+    async def preload_hot_queries(self, hot_patterns: list[str]):
         """预加载热点查询模式"""
         for pattern in hot_patterns:
             # 这里可以根据pattern预生成一些常用查询的缓存
@@ -512,7 +511,7 @@ class SmartCache:
 
         logger.info(f"预加载热点查询: {len(hot_patterns)} 个模式")
 
-    def get_cache_layer_stats(self) -> Dict[str, Any]:
+    def get_cache_layer_stats(self) -> dict[str, Any]:
         """获取分层缓存统计信息"""
         layer_stats = {
             "L1_long_term": {"types": [], "total_entries": 0, "total_size_mb": 0},

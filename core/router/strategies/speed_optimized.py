@@ -3,8 +3,6 @@ Speed-optimized routing strategy
 速度优化路由策略
 """
 
-from decimal import Decimal
-from typing import List
 
 from core.models.channel import Channel
 from core.router.base import BaseRoutingStrategy, RoutingRequest, RoutingScore
@@ -19,8 +17,8 @@ class SpeedOptimizedStrategy(BaseRoutingStrategy):
         )
 
     async def calculate_scores(
-        self, channels: List[Channel], request: RoutingRequest
-    ) -> List[RoutingScore]:
+        self, channels: list[Channel], request: RoutingRequest
+    ) -> list[RoutingScore]:
         """按速度排序计算评分"""
         scores = []
 

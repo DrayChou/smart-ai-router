@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -*-
 """
 Pydantic models for configuration validation.
 """
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -14,7 +13,7 @@ class Provider(BaseModel):
     base_url: str
     auth_type: str = "bearer"
     rate_limit: int = 60
-    capabilities: List[str] = []
+    capabilities: list[str] = []
 
 
 class Channel(BaseModel):
@@ -30,28 +29,28 @@ class Channel(BaseModel):
     priority: int = 1
     weight: float = 1.0
     daily_limit: int = 1000
-    capabilities: List[str] = []
+    capabilities: list[str] = []
 
     # Channel-level tags that apply to all models in this channel
-    tags: List[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
 
     # Configured models list for fallback when /models API fails
-    configured_models: Optional[List[str]] = Field(default=None)
+    configured_models: Optional[list[str]] = Field(default=None)
 
     # Cost per token
-    cost_per_token: Optional[Dict[str, float]] = Field(default_factory=dict)
+    cost_per_token: Optional[dict[str, float]] = Field(default_factory=dict)
 
     # Model name aliases mapping: standard_name -> channel_specific_name
     # Example: {"deepseek-v3.1": "deepseek-chat", "doubao-1.5-pro-256k": "ep-20250203083646-2szv9"}
-    model_aliases: Optional[Dict[str, str]] = Field(default=None)
+    model_aliases: Optional[dict[str, str]] = Field(default=None)
 
     # performance and pricing are optional dictionaries
-    performance: Dict[str, float] = Field(default_factory=dict)
-    pricing: Dict[str, Any] = Field(default_factory=dict)
+    performance: dict[str, float] = Field(default_factory=dict)
+    pricing: dict[str, Any] = Field(default_factory=dict)
 
     # Currency exchange configuration for special pricing providers
     # Example: {"currency_exchange": {"from": "USD", "to": "CNY", "rate": 0.7, "description": "充值0.7人民币获得1美元"}}
-    currency_exchange: Optional[Dict[str, Any]] = Field(default=None)
+    currency_exchange: Optional[dict[str, Any]] = Field(default=None)
 
     # Rate limiting configuration
     min_request_interval: int = Field(
@@ -89,7 +88,7 @@ class Server(BaseModel):
     host: str = "0.0.0.0"
     port: int = 7601
     debug: bool = False
-    cors_origins: List[str] = ["*"]
+    cors_origins: list[str] = ["*"]
     request_timeout: int = 300
     max_request_size: int = 10485760
 
@@ -117,8 +116,8 @@ class Config(BaseModel):
     system: System = Field(default_factory=System)
     server: Server = Field(default_factory=Server)
     auth: Auth = Field(default_factory=Auth)
-    providers: Dict[str, Provider]
-    channels: List[Channel]
+    providers: dict[str, Provider]
+    channels: list[Channel]
     routing: Routing = Field(default_factory=Routing)
     tasks: Tasks = Field(default_factory=Tasks)
 

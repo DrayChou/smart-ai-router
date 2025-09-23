@@ -5,7 +5,7 @@
 import logging
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +107,7 @@ class ModelAnalyzer:
     }
 
     def analyze_model(
-        self, model_name: str, model_data: Dict[str, Any] = None
+        self, model_name: str, model_data: dict[str, Any] = None
     ) -> ModelSpecs:
         """分析单个模型，提取参数和上下文信息"""
 
@@ -203,7 +203,7 @@ class ModelAnalyzer:
 
         return name
 
-    def _extract_parameter_size(self, model_name: str) -> Optional[Tuple[int, str]]:
+    def _extract_parameter_size(self, model_name: str) -> Optional[tuple[int, str]]:
         """从模型名称提取参数大小"""
         name_lower = model_name.lower()
 
@@ -226,7 +226,7 @@ class ModelAnalyzer:
 
         return None
 
-    def _extract_context_length(self, model_name: str) -> Optional[Tuple[int, str]]:
+    def _extract_context_length(self, model_name: str) -> Optional[tuple[int, str]]:
         """从模型名称提取上下文长度"""
         name_lower = model_name.lower()
 
@@ -250,8 +250,8 @@ class ModelAnalyzer:
         return None
 
     def batch_analyze_models(
-        self, models_data: Dict[str, Any]
-    ) -> Dict[str, ModelSpecs]:
+        self, models_data: dict[str, Any]
+    ) -> dict[str, ModelSpecs]:
         """批量分析模型"""
         results = {}
 
@@ -261,7 +261,7 @@ class ModelAnalyzer:
 
         return results
 
-    def extract_tags_from_model_name(self, model_name: str) -> List[str]:
+    def extract_tags_from_model_name(self, model_name: str) -> list[str]:
         """从模型名称中提取标签"""
         import re
 

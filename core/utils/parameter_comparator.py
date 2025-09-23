@@ -6,7 +6,7 @@
 import logging
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -254,12 +254,12 @@ class ParameterComparator:
             return None
 
     def filter_models_by_comparison(
-        self, comparison: ParameterComparison, models_cache: Dict[str, Any]
-    ) -> List[Tuple[str, str, float]]:
+        self, comparison: ParameterComparison, models_cache: dict[str, Any]
+    ) -> list[tuple[str, str, float]]:
         """根据参数量比较筛选模型
 
         Returns:
-            List[Tuple[channel_id, model_name, params]]: 匹配的渠道ID、模型名和参数量
+            list[tuple[channel_id, model_name, params]]: 匹配的渠道ID、模型名和参数量
         """
         try:
             matching_models = []

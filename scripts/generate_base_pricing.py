@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 基础定价文件生成器
 
@@ -138,12 +137,12 @@ def generate_base_pricing(openrouter_unified):
 def print_base_pricing_stats(stats):
     """打印基础定价统计信息"""
     total = stats["total_models"]
-    print(f"\n" + "=" * 60)
+    print("\n" + "=" * 60)
     print("基础定价文件统计")
     print("=" * 60)
     print(f"总模型数量: {total}")
 
-    print(f"\n能力分布:")
+    print("\n能力分布:")
     print(
         f"  免费模型: {stats['free_models']:>3} 个 ({stats['free_models']/total*100:>4.1f}%)"
     )
@@ -160,12 +159,12 @@ def print_base_pricing_stats(stats):
         f"函数调用: {stats['function_calling_models']:>3} 个 ({stats['function_calling_models']/total*100:>4.1f}%)"
     )
 
-    print(f"\n价格分布 (每百万tokens):")
+    print("\n价格分布 (每百万tokens):")
     for range_name, count in stats["price_ranges"].items():
         if count > 0:
             print(f"  {range_name:>10}: {count:>3} 个 ({count/total*100:>4.1f}%)")
 
-    print(f"\n上下文长度分布:")
+    print("\n上下文长度分布:")
     for range_name, count in stats["context_ranges"].items():
         if count > 0:
             print(f"  {range_name:>10}: {count:>3} 个 ({count/total*100:>4.1f}%)")
@@ -282,19 +281,19 @@ def main():
     index_data = create_lookup_index(base_pricing)
 
     # 打印索引统计
-    print(f"\n索引统计:")
+    print("\n索引统计:")
     print(f"  能力类型: {len(index_data['capabilities'])} 种")
     print(f"  参数范围: {len(index_data['parameter_ranges'])} 种")
     print(f"  提供商数: {len(index_data['providers'])} 个")
     print(f"  最便宜模型: {len(index_data['cheapest_models'])} 个")
 
-    print(f"\n主要能力分布:")
+    print("\n主要能力分布:")
     for capability, count in sorted(
         index_data["capabilities"].items(), key=lambda x: x[1], reverse=True
     )[:10]:
         print(f"  {capability}: {count} 个模型")
 
-    print(f"\n主要提供商:")
+    print("\n主要提供商:")
     for provider, count in sorted(
         index_data["providers"].items(), key=lambda x: x[1], reverse=True
     )[:10]:

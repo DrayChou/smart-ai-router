@@ -7,11 +7,10 @@
 import asyncio
 import logging
 import time
-from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable
 
-from .smart_cache import cache_get, cache_set, get_smart_cache
+from .smart_cache import get_smart_cache
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +26,8 @@ class HotQuery:
 
 
 # 热点查询统计 - 使用简单的全局字典而非类
-_query_stats: Dict[str, HotQuery] = {}
-_preload_tasks: Dict[str, asyncio.Task] = {}
+_query_stats: dict[str, HotQuery] = {}
+_preload_tasks: dict[str, asyncio.Task] = {}
 
 
 def record_query_access(query_pattern: str, response_time_ms: float):
@@ -52,7 +51,7 @@ def record_query_access(query_pattern: str, response_time_ms: float):
 
 def get_hot_queries(
     min_frequency: int = 3, max_age_hours: float = 24
-) -> List[HotQuery]:
+) -> list[HotQuery]:
     """获取热点查询列表"""
     current_time = time.time()
     max_age_seconds = max_age_hours * 3600
@@ -157,7 +156,7 @@ async def batch_preload_hot_queries(router_instance, max_concurrent: int = 3):
     )
 
 
-async def _preload_tag_query(router_instance, tags: List[str]):
+async def _preload_tag_query(router_instance, tags: list[str]):
     """预加载标签查询（辅助函数）"""
     from ..json_router import RoutingRequest
 
@@ -173,7 +172,7 @@ async def _preload_tag_query(router_instance, tags: List[str]):
     return {"candidates_count": len(candidates), "tags": tags}
 
 
-def get_preload_stats() -> Dict[str, Any]:
+def get_preload_stats() -> dict[str, Any]:
     """获取预加载统计信息"""
     hot_queries = get_hot_queries()
 
@@ -236,7 +235,7 @@ def track_query_performance(query_pattern: str):
                 elapsed_ms = (time.time() - start_time) * 1000
                 record_query_access(query_pattern, elapsed_ms)
                 return result
-            except Exception as e:
+            except Exception:
                 elapsed_ms = (time.time() - start_time) * 1000
                 record_query_access(query_pattern, elapsed_ms)
                 raise

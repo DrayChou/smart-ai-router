@@ -5,7 +5,7 @@ Anthropic Provider适配器
 
 import json
 from collections.abc import AsyncGenerator
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import httpx
 
@@ -25,7 +25,7 @@ logger = get_logger(__name__)
 class AnthropicAdapter(BaseAdapter):
     """Anthropic适配器"""
 
-    def __init__(self, provider_name: str, config: Dict[str, Any]):
+    def __init__(self, provider_name: str, config: dict[str, Any]):
         super().__init__(provider_name, config)
 
         # Anthropic API版本
@@ -40,7 +40,7 @@ class AnthropicAdapter(BaseAdapter):
             "default_output_cost", 0.075
         )
 
-    def get_auth_headers(self, api_key: str) -> Dict[str, str]:
+    def get_auth_headers(self, api_key: str) -> dict[str, str]:
         """获取Anthropic认证头"""
         return {
             "x-api-key": api_key,
@@ -82,10 +82,10 @@ class AnthropicAdapter(BaseAdapter):
 
         except httpx.HTTPError as e:
             logger.error(f"Anthropic API网络请求失败: {e}")
-            raise ProviderError(f"网络请求失败: {e}")
+            raise ProviderError(f"网络请求失败: {e}") from e
         except Exception as e:
             logger.error(f"Anthropic API未知错误: {e}")
-            raise ProviderError(f"请求失败: {e}")
+            raise ProviderError(f"请求失败: {e}") from e
 
     async def chat_completions_stream(
         self, request: ChatRequest, api_key: str, **kwargs
@@ -131,12 +131,12 @@ class AnthropicAdapter(BaseAdapter):
 
         except httpx.HTTPError as e:
             logger.error(f"Anthropic流式API网络请求失败: {e}")
-            raise ProviderError(f"流式网络请求失败: {e}")
+            raise ProviderError(f"流式网络请求失败: {e}") from e
         except Exception as e:
             logger.error(f"Anthropic流式API未知错误: {e}")
-            raise ProviderError(f"流式请求失败: {e}")
+            raise ProviderError(f"流式请求失败: {e}") from e
 
-    async def list_models(self, api_key: str) -> List[ModelInfo]:
+    async def list_models(self, api_key: str) -> list[ModelInfo]:
         """获取Anthropic模型列表"""
         # Anthropic不提供模型列表API，返回预定义模型
         models = [
@@ -199,7 +199,7 @@ class AnthropicAdapter(BaseAdapter):
         logger.info(f"返回{len(models)}个Anthropic模型")
         return models
 
-    def transform_request(self, request: ChatRequest) -> Dict[str, Any]:
+    def transform_request(self, request: ChatRequest) -> dict[str, Any]:
         """转换为Anthropic格式请求"""
         # Anthropic使用不同的API格式
         messages = self._process_messages(request)
@@ -229,7 +229,7 @@ class AnthropicAdapter(BaseAdapter):
 
         return payload
 
-    def transform_response(self, provider_response: Dict[str, Any]) -> ChatResponse:
+    def transform_response(self, provider_response: dict[str, Any]) -> ChatResponse:
         """转换Anthropic响应为标准格式"""
         content_blocks = provider_response.get("content", [])
 
@@ -261,7 +261,7 @@ class AnthropicAdapter(BaseAdapter):
             tools_called=tool_calls if tool_calls else None,
         )
 
-    def _process_messages(self, request: ChatRequest) -> List[Dict[str, Any]]:
+    def _process_messages(self, request: ChatRequest) -> list[dict[str, Any]]:
         """处理消息格式，移除system消息"""
         messages = []
 
@@ -290,7 +290,7 @@ class AnthropicAdapter(BaseAdapter):
 
         return None
 
-    def _convert_tools(self, tools: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _convert_tools(self, tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """转换工具格式为Anthropic格式"""
         converted_tools = []
 

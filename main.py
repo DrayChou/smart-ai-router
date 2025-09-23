@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 """
 Smart AI Router - 精简版 (仅保留8个核心接口)
@@ -6,7 +5,7 @@ Smart AI Router - 精简版 (仅保留8个核心接口)
 
 import os
 import sys
-from typing import Any, Dict
+from typing import Any
 
 # Fix Unicode encoding for Windows
 if sys.platform == "win32":
@@ -45,11 +44,11 @@ from core.scheduler.task_manager import (
     initialize_background_tasks,
     stop_background_tasks,
 )
-from core.utils.audit_logger import get_audit_logger, initialize_audit_logger
+from core.utils.audit_logger import get_audit_logger
 from core.utils.blacklist_recovery import start_recovery_service, stop_recovery_service
 from core.utils.http_client_pool import close_global_pool
 from core.utils.logger import setup_logging, shutdown_logging
-from core.utils.logging_integration import enable_smart_logging, get_enhanced_logger
+from core.utils.logging_integration import enable_smart_logging
 from core.utils.smart_cache import close_global_cache
 from core.yaml_config import YAMLConfigLoader, get_yaml_config_loader
 
@@ -86,7 +85,7 @@ async def _startup_refresh_minimal(config_loader):
                 channel_configs = merged_config.get("channels", [])
 
                 # 预构建内存索引
-                memory_index = get_memory_index()
+                get_memory_index()
                 stats = rebuild_index_if_needed(
                     config_loader.model_cache,
                     force_rebuild=True,
@@ -176,7 +175,7 @@ def create_minimal_app() -> FastAPI:
     # 初始化配置和路由器
     config_loader: YAMLConfigLoader = get_yaml_config_loader()
     router: JSONRouter = JSONRouter(config_loader)
-    server_config: Dict[str, Any] = config_loader.get_server_config()
+    server_config: dict[str, Any] = config_loader.get_server_config()
 
     # 注册异步配置加载器（如果支持）
     try:
@@ -195,7 +194,7 @@ def create_minimal_app() -> FastAPI:
         "batch_size": 100,
         "flush_interval": 5.0,
     }
-    smart_logger = setup_logging(log_config, "logs/smart-ai-router-minimal.log")
+    setup_logging(log_config, "logs/smart-ai-router-minimal.log")
 
     # 启用智能日志系统
     try:
@@ -304,7 +303,7 @@ async def create_minimal_app_async() -> FastAPI:
 
     # 初始化路由器
     router: JSONRouter = JSONRouter(config_loader)
-    server_config: Dict[str, Any] = config_loader.get_server_config()
+    server_config: dict[str, Any] = config_loader.get_server_config()
 
     # 设置日志系统
     log_config = {
@@ -315,7 +314,7 @@ async def create_minimal_app_async() -> FastAPI:
         "batch_size": 100,
         "flush_interval": 5.0,
     }
-    smart_logger = setup_logging(log_config, "logs/smart-ai-router-minimal.log")
+    setup_logging(log_config, "logs/smart-ai-router-minimal.log")
 
     # 🚀 启用智能日志系统 (AIRouter功能集成)
     try:
@@ -435,7 +434,7 @@ def main():
         f"""
 Smart AI Router - Minimal Mode Starting...
 Mode: Minimal (8 core endpoints only)
-Security: Enhanced (72% fewer attack surfaces) 
+Security: Enhanced (72% fewer attack surfaces)
 Server: http://{args.host}:{args.port}
 Docs: http://{args.host}:{args.port}/docs
     """

@@ -6,9 +6,9 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
-from .model_analyzer import ModelSpecs, get_model_analyzer
+from .model_analyzer import get_model_analyzer
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class ChannelCacheManager:
 
         self.model_analyzer = get_model_analyzer()
 
-    def save_channel_models(self, channel_id: str, models_data: Dict[str, Any]) -> None:
+    def save_channel_models(self, channel_id: str, models_data: dict[str, Any]) -> None:
         """保存单个渠道的模型发现数据"""
 
         channel_cache_file = self.channels_cache_dir / f"{channel_id}.json"
@@ -102,7 +102,7 @@ class ChannelCacheManager:
         except Exception as e:
             logger.error(f"❌ Failed to save channel cache for {channel_id}: {e}")
 
-    def load_channel_models(self, channel_id: str) -> Optional[Dict[str, Any]]:
+    def load_channel_models(self, channel_id: str) -> Optional[dict[str, Any]]:
         """加载单个渠道的模型数据"""
         channel_cache_file = self.channels_cache_dir / f"{channel_id}.json"
 
@@ -110,18 +110,18 @@ class ChannelCacheManager:
             return None
 
         try:
-            with open(channel_cache_file, "r", encoding="utf-8") as f:
+            with open(channel_cache_file, encoding="utf-8") as f:
                 return json.load(f)
         except Exception as e:
             logger.error(f"❌ Failed to load channel cache for {channel_id}: {e}")
             return None
 
-    def get_all_channel_ids(self) -> List[str]:
+    def get_all_channel_ids(self) -> list[str]:
         """获取所有已缓存的渠道ID"""
         channel_files = list(self.channels_cache_dir.glob("*.json"))
         return [f.stem for f in channel_files]
 
-    def get_channel_summary(self) -> Dict[str, Any]:
+    def get_channel_summary(self) -> dict[str, Any]:
         """获取所有渠道的摘要信息"""
         summary = {
             "total_channels": 0,
@@ -166,7 +166,7 @@ class ChannelCacheManager:
         logger.info("🔄 Migrating from old cache format to channel-separated format")
 
         try:
-            with open(old_cache_path, "r", encoding="utf-8") as f:
+            with open(old_cache_path, encoding="utf-8") as f:
                 old_data = json.load(f)
 
             migrated_count = 0
@@ -189,8 +189,8 @@ class ChannelCacheManager:
         self,
         min_params: Optional[int] = None,
         min_context: Optional[int] = None,
-        channel_ids: Optional[List[str]] = None,
-    ) -> List[Dict[str, Any]]:
+        channel_ids: Optional[list[str]] = None,
+    ) -> list[dict[str, Any]]:
         """根据规格搜索模型"""
         results = []
 

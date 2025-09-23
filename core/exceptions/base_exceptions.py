@@ -1,11 +1,10 @@
-# -*- coding: utf-8 -*-
 """
 统一异常基类
 定义所有系统异常的基础结构
 """
 import traceback
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from .error_codes import ErrorCode, get_error_message
 
@@ -17,9 +16,9 @@ class BaseRouterException(Exception):
         self,
         error_code: ErrorCode,
         message: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None,
+        details: Optional[dict[str, Any]] = None,
         cause: Optional[Exception] = None,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ):
         self.error_code = error_code
         self.message = message or get_error_message(error_code)
@@ -31,7 +30,7 @@ class BaseRouterException(Exception):
 
         super().__init__(self.message)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
         return {
             "error_code": self.error_code.value,
@@ -75,7 +74,7 @@ class RoutingException(BaseRouterException):
         error_code: ErrorCode,
         message: Optional[str] = None,
         model: Optional[str] = None,
-        tags: Optional[List[str]] = None,
+        tags: Optional[list[str]] = None,
         **kwargs,
     ):
         details = kwargs.get("details", {})
@@ -169,7 +168,7 @@ class AuthenticationException(BaseRouterException):
 class TagNotFoundError(RoutingException):
     """标签未找到错误 - 向后兼容"""
 
-    def __init__(self, tags: List[str], message: Optional[str] = None):
+    def __init__(self, tags: list[str], message: Optional[str] = None):
         super().__init__(error_code=ErrorCode.TAG_NOT_FOUND, message=message, tags=tags)
         # 保持原有属性以兼容现有代码
         self.tags = tags

@@ -5,7 +5,7 @@
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from .routing_models import RoutingRequest, RoutingScore
 from .services import get_router_service
@@ -22,7 +22,7 @@ class JSONRouter:
         self._router_service = get_router_service()
         logger.info("JSONRouter (兼容版) 初始化完成")
 
-    async def route_request(self, request_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def route_request(self, request_data: dict[str, Any]) -> list[dict[str, Any]]:
         """路由请求 - 兼容原有接口"""
         try:
             # 转换请求格式
@@ -49,8 +49,8 @@ class JSONRouter:
             return []
 
     def _convert_results_to_legacy_format(
-        self, results: List[RoutingScore]
-    ) -> List[Dict[str, Any]]:
+        self, results: list[RoutingScore]
+    ) -> list[dict[str, Any]]:
         """将新格式结果转换为遗留格式"""
         legacy_results = []
 

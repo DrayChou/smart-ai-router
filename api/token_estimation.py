@@ -4,19 +4,15 @@ Token预估和模型优化API接口
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from core.utils.token_estimator import (
-    ModelRecommendation,
-    TaskComplexity,
-    TokenEstimate,
     get_model_optimizer,
     get_token_estimator,
 )
-from core.yaml_config import get_yaml_config_loader
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +27,7 @@ class ChatMessage(BaseModel):
 class TokenEstimationRequest(BaseModel):
     model_config = {"protected_namespaces": ()}
 
-    messages: List[ChatMessage]
+    messages: list[ChatMessage]
     model_family: str = "gpt"
     optimization_strategy: str = (
         "balanced"  # cost_first, quality_first, speed_first, balanced
@@ -45,7 +41,7 @@ class TokenEstimationResponse(BaseModel):
     total_tokens: int
     confidence: float
     task_complexity: str
-    recommendations: List[Dict[str, Any]]
+    recommendations: list[dict[str, Any]]
     optimization_strategy: str
 
 
@@ -147,13 +143,13 @@ def create_token_estimation_router(config_loader) -> APIRouter:
 
         except Exception as e:
             logger.error(f"Token预估失败: {e}")
-            raise HTTPException(status_code=500, detail=f"Token预估失败: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Token预估失败: {str(e)}") from e
 
     @router.post("/pricing", response_model=ModelPricingResponse)
     async def calculate_model_pricing(request: ModelPricingRequest):
         """计算特定模型的精确定价"""
         try:
-            model_optimizer = get_model_optimizer()
+            get_model_optimizer()
 
             # 查找匹配的渠道
             all_channels = config_loader.get_enabled_channels()
@@ -196,7 +192,7 @@ def create_token_estimation_router(config_loader) -> APIRouter:
             raise
         except Exception as e:
             logger.error(f"定价计算失败: {e}")
-            raise HTTPException(status_code=500, detail=f"定价计算失败: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"定价计算失败: {str(e)}") from e
 
     @router.get("/complexity/{text}")
     async def detect_task_complexity(text: str):
@@ -221,7 +217,7 @@ def create_token_estimation_router(config_loader) -> APIRouter:
 
         except Exception as e:
             logger.error(f"复杂度检测失败: {e}")
-            raise HTTPException(status_code=500, detail=f"复杂度检测失败: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"复杂度检测失败: {str(e)}") from e
 
     @router.get("/models/quality")
     async def get_model_quality_scores():
@@ -271,7 +267,7 @@ def create_token_estimation_router(config_loader) -> APIRouter:
             logger.error(f"获取模型质量评分失败: {e}")
             raise HTTPException(
                 status_code=500, detail=f"获取模型质量评分失败: {str(e)}"
-            )
+            ) from e
 
     @router.get("/strategies")
     async def get_optimization_strategies():

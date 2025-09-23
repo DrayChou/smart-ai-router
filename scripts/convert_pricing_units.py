@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 定价单位转换脚本
 将现有的科学计数法定价转换为更直观的百万token单位
@@ -24,7 +23,7 @@ def convert_pricing_file(file_path: Path) -> bool:
     try:
         print(f"[转换] 正在转换文件: {file_path.name}")
 
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             data = json.load(f)
 
         # 检查当前单位
@@ -42,7 +41,7 @@ def convert_pricing_file(file_path: Path) -> bool:
         converted_count = 0
 
         # 转换所有模型的定价
-        for model_id, model_data in data.get("models", {}).items():
+        for _model_id, model_data in data.get("models", {}).items():
             if "pricing" in model_data and model_data["pricing"]:
                 pricing = model_data["pricing"]
 

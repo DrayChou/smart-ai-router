@@ -1,9 +1,8 @@
-# -*- coding: utf-8 -*-
 """
 Unified token counting and cost calculation utilities
 """
 import logging
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +47,7 @@ class TokenCounter:
             return len(text.split())
 
     @classmethod
-    def count_tokens_in_messages(cls, messages: List[Dict[str, Any]]) -> int:
+    def count_tokens_in_messages(cls, messages: list[dict[str, Any]]) -> int:
         """计算消息列表中的token数量（OpenAI格式）"""
         encoder = cls.get_tiktoken_encoder()
 
@@ -101,9 +100,9 @@ class TokenCounter:
         cls,
         prompt_tokens: int,
         completion_tokens: int,
-        pricing: Dict[str, float],
-        currency_exchange: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        pricing: dict[str, float],
+        currency_exchange: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
         """计算请求成本，支持货币转换
 
         Args:
@@ -167,7 +166,7 @@ class TokenCounter:
 
     @classmethod
     def calculate_cost_legacy(
-        cls, prompt_tokens: int, completion_tokens: int, pricing: Dict[str, float]
+        cls, prompt_tokens: int, completion_tokens: int, pricing: dict[str, float]
     ) -> float:
         """传统成本计算方法（保持向后兼容）"""
         result = cls.calculate_cost(prompt_tokens, completion_tokens, pricing)
@@ -175,7 +174,7 @@ class TokenCounter:
 
     @classmethod
     def get_cost_per_1k_tokens(
-        cls, pricing: Dict[str, float], token_type: str = "input"
+        cls, pricing: dict[str, float], token_type: str = "input"
     ) -> float:
         """获取每1K token的成本"""
         if token_type in pricing:
@@ -200,7 +199,7 @@ class TokenCounter:
             return f"{symbol}{cost:.4f} {currency}"
 
     @classmethod
-    def format_cost_comparison(cls, cost_info: Dict[str, Any]) -> str:
+    def format_cost_comparison(cls, cost_info: dict[str, Any]) -> str:
         """格式化成本对比显示"""
         base_cost = cost_info.get("base_cost", 0)
         actual_cost = cost_info.get("actual_cost", 0)
@@ -218,8 +217,8 @@ class TokenCounter:
 
     @classmethod
     def get_token_stats(
-        cls, messages: List[Dict[str, Any]], max_tokens: Optional[int] = None
-    ) -> Dict[str, Any]:
+        cls, messages: list[dict[str, Any]], max_tokens: Optional[int] = None
+    ) -> dict[str, Any]:
         """获取完整的token统计信息"""
         prompt_tokens = cls.count_tokens_in_messages(messages)
         estimated_completion_tokens = cls.estimate_completion_tokens(
@@ -246,7 +245,7 @@ class CostTracker:
         self.total_cost = 0.0
 
     def add_request_cost(
-        self, cost: float, model: str, channel_id: str, tokens: Dict[str, int]
+        self, cost: float, model: str, channel_id: str, tokens: dict[str, int]
     ) -> None:
         """添加请求成本记录"""
         record = {
@@ -264,7 +263,7 @@ class CostTracker:
             f"💰 COST TRACKING: ${cost:.6f} for {tokens.get('total_tokens', 0)} tokens via {channel_id}"
         )
 
-    def get_session_summary(self) -> Dict[str, Any]:
+    def get_session_summary(self) -> dict[str, Any]:
         """获取会话成本摘要"""
         if not self.session_costs:
             return {"total_cost": 0.0, "total_requests": 0, "average_cost": 0.0}
@@ -285,7 +284,7 @@ class CostTracker:
             "formatted_total_cost": TokenCounter.format_cost(self.total_cost),
         }
 
-    def get_cost_by_channel(self) -> Dict[str, float]:
+    def get_cost_by_channel(self) -> dict[str, float]:
         """按渠道统计成本"""
         channel_costs = {}
         for record in self.session_costs:

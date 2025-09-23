@@ -4,7 +4,7 @@ Multi-layer routing strategy
 """
 
 from decimal import Decimal
-from typing import Any, Dict, List
+from typing import Any
 
 from core.models.channel import Channel
 from core.router.base import BaseRoutingStrategy, RoutingRequest, RoutingScore
@@ -19,8 +19,8 @@ class MultiLayerRoutingStrategy(BaseRoutingStrategy):
         )
 
     async def calculate_scores(
-        self, channels: List[Channel], request: RoutingRequest
-    ) -> List[RoutingScore]:
+        self, channels: list[Channel], request: RoutingRequest
+    ) -> list[RoutingScore]:
         """计算多层评分"""
         scores = []
 
@@ -174,8 +174,8 @@ class MultiLayerRoutingStrategy(BaseRoutingStrategy):
         return min(1.0, max(0.0, final_score))
 
     def _adjust_weights_by_priority(
-        self, strategy: List[Dict[str, Any]], priority: str
-    ) -> List[Dict[str, Any]]:
+        self, strategy: list[dict[str, Any]], priority: str
+    ) -> list[dict[str, Any]]:
         """根据用户优先级调整权重"""
 
         if priority == "cost":

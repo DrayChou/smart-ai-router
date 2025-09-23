@@ -9,9 +9,9 @@ import json
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
-from .model_analyzer import ModelSpecs, get_model_analyzer
+from .model_analyzer import get_model_analyzer
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +34,8 @@ class ApiKeyCacheManager:
         self.model_analyzer = get_model_analyzer()
 
         # 内存缓存，避免频繁文件读取
-        self._memory_cache: Dict[str, Dict[str, Any]] = {}
-        self._cache_ttl: Dict[str, datetime] = {}
+        self._memory_cache: dict[str, dict[str, Any]] = {}
+        self._cache_ttl: dict[str, datetime] = {}
         self._ttl_duration = timedelta(hours=1)  # 1小时TTL
 
     def _get_api_key_hash(self, api_key: str) -> str:
@@ -62,7 +62,7 @@ class ApiKeyCacheManager:
         self,
         channel_id: str,
         api_key: str,
-        models_data: Dict[str, Any],
+        models_data: dict[str, Any],
         provider: str = None,
     ) -> None:
         """保存特定API Key的模型发现数据"""
@@ -162,8 +162,8 @@ class ApiKeyCacheManager:
             logger.error(f"❌ Failed to save API key cache for {channel_id}: {e}")
 
     def _extract_pricing_info(
-        self, model_detail: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+        self, model_detail: dict[str, Any]
+    ) -> Optional[dict[str, Any]]:
         """从模型详情中提取定价信息"""
         if not model_detail:
             return None
@@ -201,7 +201,7 @@ class ApiKeyCacheManager:
         mapping = {}
         if mapping_file.exists():
             try:
-                with open(mapping_file, "r", encoding="utf-8") as f:
+                with open(mapping_file, encoding="utf-8") as f:
                     mapping = json.load(f)
             except Exception as e:
                 logger.warning(f"无法读取映射文件 {mapping_file}: {e}")
@@ -221,7 +221,7 @@ class ApiKeyCacheManager:
 
     def load_api_key_models(
         self, channel_id: str, api_key: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[dict[str, Any]]:
         """加载特定API Key的模型数据"""
         cache_key = self._get_cache_key(channel_id, api_key)
 
@@ -236,7 +236,7 @@ class ApiKeyCacheManager:
             return None
 
         try:
-            with open(cache_file, "r", encoding="utf-8") as f:
+            with open(cache_file, encoding="utf-8") as f:
                 cache_data = json.load(f)
 
             # 更新内存缓存
@@ -249,7 +249,7 @@ class ApiKeyCacheManager:
             logger.error(f"❌ Failed to load API key cache for {channel_id}: {e}")
             return None
 
-    def get_channel_api_keys(self, channel_id: str) -> List[str]:
+    def get_channel_api_keys(self, channel_id: str) -> list[str]:
         """获取渠道下的所有API Key哈希"""
         mapping_file = self.mappings_dir / f"{channel_id}_mapping.json"
 
@@ -257,14 +257,14 @@ class ApiKeyCacheManager:
             return []
 
         try:
-            with open(mapping_file, "r", encoding="utf-8") as f:
+            with open(mapping_file, encoding="utf-8") as f:
                 mapping = json.load(f)
             return list(mapping.keys())
         except Exception as e:
             logger.error(f"无法读取渠道映射 {channel_id}: {e}")
             return []
 
-    def load_channel_models_fallback(self, channel_id: str) -> Optional[Dict[str, Any]]:
+    def load_channel_models_fallback(self, channel_id: str) -> Optional[dict[str, Any]]:
         """回退到任意可用的API Key数据（用于兼容性）"""
         api_keys = self.get_channel_api_keys(channel_id)
 
@@ -278,7 +278,7 @@ class ApiKeyCacheManager:
 
             if cache_file.exists():
                 try:
-                    with open(cache_file, "r", encoding="utf-8") as f:
+                    with open(cache_file, encoding="utf-8") as f:
                         return json.load(f)
                 except Exception as e:
                     logger.warning(f"无法加载缓存 {cache_key}: {e}")
@@ -307,7 +307,7 @@ class ApiKeyCacheManager:
 
         return True
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """获取缓存统计信息"""
         total_files = len(list(self.api_keys_cache_dir.glob("*.json")))
         memory_entries = len(self._memory_cache)

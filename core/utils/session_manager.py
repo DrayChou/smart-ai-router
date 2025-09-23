@@ -6,7 +6,7 @@ import hashlib
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +21,8 @@ class UserSession:
     last_active_at: float
     total_requests: int = 0
     total_cost: float = 0.0
-    models_used: Dict[str, int] = field(default_factory=dict)
-    channels_used: Dict[str, int] = field(default_factory=dict)
+    models_used: dict[str, int] = field(default_factory=dict)
+    channels_used: dict[str, int] = field(default_factory=dict)
 
     def add_request(self, cost: float, model: str, channel: str):
         """添加请求记录"""
@@ -49,7 +49,7 @@ class SessionManager:
     """会话管理器"""
 
     def __init__(self, session_timeout: int = 3600, cleanup_interval: int = 300):
-        self.sessions: Dict[str, UserSession] = {}
+        self.sessions: dict[str, UserSession] = {}
         self.session_timeout = session_timeout  # 1小时
         self.cleanup_interval = cleanup_interval  # 5分钟
         self._last_cleanup = time.time()
@@ -133,7 +133,7 @@ class SessionManager:
 
         return session
 
-    def get_session_stats(self, user_identifier: str) -> Dict[str, Any]:
+    def get_session_stats(self, user_identifier: str) -> dict[str, Any]:
         """获取会话统计信息"""
         if user_identifier not in self.sessions:
             return {
@@ -182,7 +182,7 @@ class SessionManager:
 
             self._last_cleanup = now
 
-    def get_global_stats(self) -> Dict[str, Any]:
+    def get_global_stats(self) -> dict[str, Any]:
         """获取全局统计信息"""
         total_sessions = len(self.sessions)
         total_requests = sum(

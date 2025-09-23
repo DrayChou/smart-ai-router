@@ -1,11 +1,10 @@
-# -*- coding: utf-8 -*-
 """
 黑名单管理和监控API端点
 提供模型黑名单的查看、管理和监控功能
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -43,9 +42,9 @@ class BlacklistStatsResponse(BaseModel):
     total_blacklisted: int
     permanent_blacklisted: int
     temporary_blacklisted: int
-    by_channel: Dict[str, List[Dict[str, Any]]]
-    by_error_type: Dict[str, int]
-    channel_failure_counts: Dict[str, int]
+    by_channel: dict[str, list[dict[str, Any]]]
+    by_error_type: dict[str, int]
+    channel_failure_counts: dict[str, int]
 
 
 class RecoveryStatsResponse(BaseModel):
@@ -82,8 +81,8 @@ class HealthReportResponse(BaseModel):
     total_models: int
     available_models: int
     blacklisted_models: int
-    channels: Dict[str, Dict[str, Any]]
-    model_blacklists: Dict[str, Any]
+    channels: dict[str, dict[str, Any]]
+    model_blacklists: dict[str, Any]
 
 
 # --- API Endpoints ---
@@ -98,7 +97,7 @@ async def get_blacklist_stats(admin_token: str = Depends(verify_admin_token)):
     return BlacklistStatsResponse(**stats)
 
 
-@router.get("/entries", response_model=List[BlacklistEntryResponse])
+@router.get("/entries", response_model=list[BlacklistEntryResponse])
 async def get_blacklist_entries(
     channel_id: Optional[str] = None,
     model_name: Optional[str] = None,
@@ -233,7 +232,7 @@ async def trigger_recovery_check(admin_token: str = Depends(verify_admin_token))
         await recovery_manager._perform_recovery_check()
         return {"message": "Recovery check completed successfully"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Recovery check failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Recovery check failed: {str(e)}") from e
 
 
 @router.post("/recovery/service/{action}")

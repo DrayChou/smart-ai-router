@@ -9,10 +9,8 @@ import json
 import logging
 import subprocess
 import sys
-import time
 import traceback
 from pathlib import Path
-from typing import Any, Dict, List, Optional
 
 import yaml
 
@@ -132,7 +130,7 @@ class DiagnosticTool:
         config_file = Path("config/router_config.yaml")
         if self.check_file_exists(config_file):
             try:
-                with open(self.project_root / config_file, "r", encoding="utf-8") as f:
+                with open(self.project_root / config_file, encoding="utf-8") as f:
                     config = yaml.safe_load(f)
                 self.add_info("configuration", "YAML语法", "配置文件语法正确")
 
@@ -244,11 +242,11 @@ class DiagnosticTool:
                         f"OpenAI API返回: {response.status_code}",
                         "检查API服务状态",
                     )
-        except Exception as e:
+        except Exception:
             self.add_warning(
                 "network",
                 "HTTPS连接问题",
-                f"无法建立HTTPS连接到OpenAI",
+                "无法建立HTTPS连接到OpenAI",
                 "检查网络配置或代理设置",
             )
 
@@ -322,7 +320,7 @@ class DiagnosticTool:
                 if self.check_file_exists(cache_file):
                     try:
                         with open(
-                            self.project_root / cache_file, "r", encoding="utf-8"
+                            self.project_root / cache_file, encoding="utf-8"
                         ) as f:
                             data = json.load(f)
                         self.add_info(
@@ -383,7 +381,7 @@ class DiagnosticTool:
         print("Smart AI Router 诊断报告")
         print("=" * 60)
 
-        print(f"\n统计信息:")
+        print("\n统计信息:")
         print(f"  ERROR 严重问题: {total_issues}")
         print(f"  WARN  警告: {total_warnings}")
         print(f"  INFO  信息: {total_info}")
@@ -414,14 +412,14 @@ class DiagnosticTool:
                 print(f"  {current_category.upper()}:")
             print(f"    - {info['title']}: {info['info']}")
 
-        print(f"\n诊断总结:")
+        print("\n诊断总结:")
         if total_issues == 0:
             print("  OK 系统状态良好，未发现问题。")
         else:
             print(f"  ERROR 发现 {total_issues} 个问题需要解决。")
             print("  请按照上面的解决方案逐一处理问题。")
 
-        print(f"\n更多帮助:")
+        print("\n更多帮助:")
         print("  - 查看故障排除文档: docs/TROUBLESHOOTING.md")
         print("  - 查看开发指南: CLAUDE.md")
         print("  - 提交问题: https://github.com/your-repo/issues")

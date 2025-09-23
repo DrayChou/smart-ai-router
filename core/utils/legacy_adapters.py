@@ -5,11 +5,11 @@
 """
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from .local_model_capabilities import ModelCapabilities as LegacyModelCapabilities
 from .model_analyzer import ModelSpecs  # 保持原有类型
-from .unified_model_registry import ModelMetadata, get_unified_model_registry
+from .unified_model_registry import get_unified_model_registry
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ class CapabilityMapperAdapter:
     def __init__(self):
         self.registry = get_unified_model_registry()
 
-    def predict_capabilities(self, model_name: str, provider: str) -> Dict[str, bool]:
+    def predict_capabilities(self, model_name: str, provider: str) -> dict[str, bool]:
         """兼容原capability_mapper.predict_capabilities接口"""
         metadata = self.registry.get_model_metadata(model_name, provider)
 
@@ -32,7 +32,7 @@ class CapabilityMapperAdapter:
 
     def _fallback_capability_prediction(
         self, model_name: str, provider: str
-    ) -> Dict[str, bool]:
+    ) -> dict[str, bool]:
         """回退能力预测"""
         model_lower = model_name.lower()
         provider_lower = provider.lower()
@@ -56,8 +56,8 @@ class CapabilityMapperAdapter:
         return capabilities
 
     def get_capability_requirements(
-        self, request_data: Dict[str, Any]
-    ) -> Dict[str, bool]:
+        self, request_data: dict[str, Any]
+    ) -> dict[str, bool]:
         """兼容原get_capability_requirements接口"""
         requirements = {
             "vision": False,
@@ -90,8 +90,8 @@ class CapabilityMapperAdapter:
         return requirements
 
     def find_compatible_models(
-        self, models: List[str], requirements: Dict[str, bool], provider: str = ""
-    ) -> List[str]:
+        self, models: list[str], requirements: dict[str, bool], provider: str = ""
+    ) -> list[str]:
         """兼容原find_compatible_models接口"""
         compatible_models = []
 
@@ -118,7 +118,7 @@ class ModelAnalyzerAdapter:
         self.registry = get_unified_model_registry()
 
     def analyze_model(
-        self, model_name: str, model_data: Dict[str, Any] = None
+        self, model_name: str, model_data: dict[str, Any] = None
     ) -> ModelSpecs:
         """兼容原analyze_model接口"""
         metadata = self.registry.get_model_metadata(model_name)
@@ -138,7 +138,7 @@ class ModelAnalyzerAdapter:
         return self._fallback_model_analysis(model_name, model_data)
 
     def _fallback_model_analysis(
-        self, model_name: str, model_data: Dict[str, Any] = None
+        self, model_name: str, model_data: dict[str, Any] = None
     ) -> ModelSpecs:
         """回退模型分析"""
         specs = ModelSpecs(model_name=model_name)
@@ -212,8 +212,8 @@ class ModelAnalyzerAdapter:
             return str(context_length)
 
     def batch_analyze_models(
-        self, models_data: Dict[str, Any]
-    ) -> Dict[str, ModelSpecs]:
+        self, models_data: dict[str, Any]
+    ) -> dict[str, ModelSpecs]:
         """兼容原batch_analyze_models接口"""
         results = {}
 
@@ -223,7 +223,7 @@ class ModelAnalyzerAdapter:
 
         return results
 
-    def extract_tags_from_model_name(self, model_name: str) -> List[str]:
+    def extract_tags_from_model_name(self, model_name: str) -> list[str]:
         """兼容原extract_tags_from_model_name接口"""
         metadata = self.registry.get_model_metadata(model_name)
 

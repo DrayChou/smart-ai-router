@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 批量评分器 - 优化模型筛选性能
 用于大幅减少单个模型评分时间，从70-80ms降低到10ms以下
@@ -10,9 +9,8 @@ import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
-from core.config_models import Channel
 from core.json_router import ChannelCandidate
 
 logger = logging.getLogger(__name__)
@@ -22,14 +20,14 @@ logger = logging.getLogger(__name__)
 class BatchedScoreComponents:
     """批量评分结果"""
 
-    cost_scores: Dict[str, float]
-    speed_scores: Dict[str, float]
-    quality_scores: Dict[str, float]
-    reliability_scores: Dict[str, float]
-    parameter_scores: Dict[str, float]
-    context_scores: Dict[str, float]
-    free_scores: Dict[str, float]
-    local_scores: Dict[str, float]
+    cost_scores: dict[str, float]
+    speed_scores: dict[str, float]
+    quality_scores: dict[str, float]
+    reliability_scores: dict[str, float]
+    parameter_scores: dict[str, float]
+    context_scores: dict[str, float]
+    free_scores: dict[str, float]
+    local_scores: dict[str, float]
     computation_time_ms: float
 
 
@@ -71,7 +69,7 @@ class BatchScorer:
         self.max_cache_timeout = 600  # 10分钟最大缓存
         self.adaptive_cache_timeout = self.cache_timeout  # 初始值
 
-    def _get_cache_key(self, channels: List[ChannelCandidate], request) -> str:
+    def _get_cache_key(self, channels: list[ChannelCandidate], request) -> str:
         """生成缓存键（优化版：包含更多请求上下文）"""
         channel_ids = sorted([c.channel.id for c in channels])
         model_name = getattr(request, "model", "unknown")
@@ -143,8 +141,8 @@ class BatchScorer:
             )
 
     def _batch_get_model_specs(
-        self, channels: List[ChannelCandidate]
-    ) -> Dict[str, Dict[str, Any]]:
+        self, channels: list[ChannelCandidate]
+    ) -> dict[str, dict[str, Any]]:
         """批量获取模型规格信息（内存索引优化版）"""
         model_specs = {}
 
@@ -247,8 +245,8 @@ class BatchScorer:
         return model_specs
 
     def _batch_calculate_parameter_scores(
-        self, channels: List[ChannelCandidate], model_specs: Dict[str, Dict[str, Any]]
-    ) -> Dict[str, float]:
+        self, channels: list[ChannelCandidate], model_specs: dict[str, dict[str, Any]]
+    ) -> dict[str, float]:
         """批量计算参数数量评分"""
         parameter_scores = {}
 
@@ -291,8 +289,8 @@ class BatchScorer:
         return parameter_scores
 
     def _batch_calculate_context_scores(
-        self, channels: List[ChannelCandidate], model_specs: Dict[str, Dict[str, Any]]
-    ) -> Dict[str, float]:
+        self, channels: list[ChannelCandidate], model_specs: dict[str, dict[str, Any]]
+    ) -> dict[str, float]:
         """批量计算上下文长度评分"""
         context_scores = {}
 
@@ -333,8 +331,8 @@ class BatchScorer:
         return context_scores
 
     def _batch_calculate_free_scores(
-        self, channels: List[ChannelCandidate], model_specs: Dict[str, Dict[str, Any]]
-    ) -> Dict[str, float]:
+        self, channels: list[ChannelCandidate], model_specs: dict[str, dict[str, Any]]
+    ) -> dict[str, float]:
         """批量计算免费优先评分"""
         free_scores = {}
         free_tags = {"free", "免费", "0cost", "nocost", "trial"}
@@ -407,13 +405,13 @@ class BatchScorer:
         return free_scores
 
     def _batch_calculate_basic_scores(
-        self, channels: List[ChannelCandidate], request
-    ) -> Tuple[
-        Dict[str, float],
-        Dict[str, float],
-        Dict[str, float],
-        Dict[str, float],
-        Dict[str, float],
+        self, channels: list[ChannelCandidate], request
+    ) -> tuple[
+        dict[str, float],
+        dict[str, float],
+        dict[str, float],
+        dict[str, float],
+        dict[str, float],
     ]:
         """批量计算基础评分（成本、速度、质量、可靠性、本地）"""
         cost_scores = {}
@@ -525,8 +523,8 @@ class BatchScorer:
         )
 
     async def batch_score_channels(
-        self, channels: List[ChannelCandidate], request
-    ) -> Tuple[BatchedScoreComponents, PerformanceMetrics]:
+        self, channels: list[ChannelCandidate], request
+    ) -> tuple[BatchedScoreComponents, PerformanceMetrics]:
         """批量评分渠道列表，返回评分结果和性能指标"""
         start_time = time.time()
         channel_count = len(channels)
@@ -655,7 +653,7 @@ class BatchScorer:
 
     def get_score_for_channel(
         self, batch_result: BatchedScoreComponents, candidate: ChannelCandidate
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """从批量结果中获取特定渠道的评分"""
         channel_id = candidate.channel.id
         model_name = candidate.matched_model
@@ -682,7 +680,7 @@ class BatchScorer:
             return "medium_batch_optimization"
         return "none"
 
-    def get_performance_stats(self) -> Dict[str, Any]:
+    def get_performance_stats(self) -> dict[str, Any]:
         """获取性能统计信息"""
         total_requests = self.performance_stats["total_requests"]
         if total_requests == 0:
@@ -704,7 +702,7 @@ class BatchScorer:
             "recommendations": self._generate_performance_recommendations(),
         }
 
-    def _generate_performance_recommendations(self) -> List[str]:
+    def _generate_performance_recommendations(self) -> list[str]:
         """生成性能优化建议"""
         recommendations = []
         stats = self.performance_stats

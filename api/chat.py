@@ -3,13 +3,10 @@ Chat completion API endpoints
 聊天完成API接口
 """
 
-import time
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
-from core.exceptions import RoutingException
 from core.handlers.chat_handler import ChatCompletionHandler, ChatCompletionRequest
-from core.utils.exception_handler import ExternalAPIError, ValidationError
 from core.utils.logger import get_logger
 
 # Removed duplicate log_request import - logging handled by chat_handler

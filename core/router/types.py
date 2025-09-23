@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 from core.config_models import Channel
 
@@ -19,7 +19,7 @@ class RoutingScore:
     quality_score: float
     reliability_score: float
     reason: str
-    matched_model: Optional[str] = None
+    matched_model: str | None = None
     parameter_score: float = 0.0
     context_score: float = 0.0
     free_score: float = 0.0
@@ -30,7 +30,7 @@ class ChannelCandidate:
     """Wrapped channel candidate along with the matched model name."""
 
     channel: Channel
-    matched_model: Optional[str] = None
+    matched_model: str | None = None
 
 
 @dataclass
@@ -39,10 +39,10 @@ class RoutingRequest:
 
     model: str
     messages: list[dict[str, Any]]
-    temperature: Optional[float] = None
-    max_tokens: Optional[int] = None
+    temperature: float | None = None
+    max_tokens: int | None = None
     stream: bool = False
-    functions: Optional[list[dict[str, Any]]] = None
+    functions: list[dict[str, Any]] | None = None
     required_capabilities: list[str] = None
-    data: Optional[dict[str, Any]] = None
-    strategy: Optional[str] = None
+    data: dict[str, Any] | None = None
+    strategy: str | None = None

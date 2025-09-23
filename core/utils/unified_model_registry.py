@@ -9,7 +9,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -40,11 +40,11 @@ class ModelMetadata:
 
     # 多模态能力 (OpenRouter标准)
     modality: Optional[str] = None  # "text+image->text"
-    input_modalities: List[str] = None  # ["text", "image"]
-    output_modalities: List[str] = None  # ["text"]
+    input_modalities: list[str] = None  # ["text", "image"]
+    output_modalities: list[str] = None  # ["text"]
 
     # API能力支持
-    supported_parameters: List[str] = None  # ["tools", "function_calling"]
+    supported_parameters: list[str] = None  # ["tools", "function_calling"]
     supports_streaming: bool = True
     supports_function_calling: bool = False
     supports_vision: bool = False
@@ -65,7 +65,7 @@ class ModelMetadata:
     # 元数据
     created_timestamp: Optional[int] = None
     is_deprecated: bool = False
-    tags: Set[str] = None  # 自动从model_id提取的标签
+    tags: set[str] = None  # 自动从model_id提取的标签
 
     # 数据来源追踪
     data_source: DataSource = DataSource.OPENROUTER
@@ -137,13 +137,13 @@ class ModelMetadata:
         if self.is_free:
             self.tags.add("free")
 
-    def matches_tags(self, required_tags: List[str]) -> bool:
+    def matches_tags(self, required_tags: list[str]) -> bool:
         """检查是否匹配所有必需标签"""
         if not required_tags:
             return True
         return all(tag.lower() in self.tags for tag in required_tags)
 
-    def to_legacy_capability_format(self) -> Dict[str, bool]:
+    def to_legacy_capability_format(self) -> dict[str, bool]:
         """转换为旧版capability_mapper格式"""
         return {
             "vision": self.supports_vision,
@@ -166,10 +166,10 @@ class UnifiedModelRegistry:
         self.channel_overrides_file = self.cache_dir / "channel_overrides.json"
 
         # 内存缓存
-        self._models: Dict[str, ModelMetadata] = {}
-        self._provider_overrides: Dict[str, Dict[str, Any]] = {}
-        self._channel_overrides: Dict[str, Dict[str, Any]] = {}
-        self._tags_index: Dict[str, Set[str]] = {}  # tag -> model_ids
+        self._models: dict[str, ModelMetadata] = {}
+        self._provider_overrides: dict[str, dict[str, Any]] = {}
+        self._channel_overrides: dict[str, dict[str, Any]] = {}
+        self._tags_index: dict[str, set[str]] = {}  # tag -> model_ids
 
         # 加载数据
         self._load_all_data()
@@ -203,7 +203,7 @@ class UnifiedModelRegistry:
             return 0
 
         try:
-            with open(self.openrouter_file, "r", encoding="utf-8") as f:
+            with open(self.openrouter_file, encoding="utf-8") as f:
                 data = json.load(f)
 
             models_data = data.get("models", {})
@@ -225,7 +225,7 @@ class UnifiedModelRegistry:
             return 0
 
     def _parse_openrouter_model(
-        self, model_id: str, model_info: Dict[str, Any]
+        self, model_id: str, model_info: dict[str, Any]
     ) -> ModelMetadata:
         """解析OpenRouter模型数据"""
         raw_data = model_info.get("raw_data", {})
@@ -384,7 +384,7 @@ class UnifiedModelRegistry:
                 json.dump(default_overrides, f, indent=2, ensure_ascii=False)
 
         try:
-            with open(self.provider_overrides_file, "r", encoding="utf-8") as f:
+            with open(self.provider_overrides_file, encoding="utf-8") as f:
                 self._provider_overrides = json.load(f)
 
             logger.info(
@@ -401,7 +401,7 @@ class UnifiedModelRegistry:
             return 0
 
         try:
-            with open(self.channel_overrides_file, "r", encoding="utf-8") as f:
+            with open(self.channel_overrides_file, encoding="utf-8") as f:
                 self._channel_overrides = json.load(f)
 
             logger.info(f"成功加载渠道覆盖配置: {len(self._channel_overrides)}个渠道")
@@ -490,8 +490,8 @@ class UnifiedModelRegistry:
                 setattr(metadata, field, value)
 
     def find_models_by_tags(
-        self, tags: List[str], provider: str = ""
-    ) -> List[ModelMetadata]:
+        self, tags: list[str], provider: str = ""
+    ) -> list[ModelMetadata]:
         """根据标签查找模型"""
         if not tags:
             return list(self._models.values())
@@ -519,11 +519,11 @@ class UnifiedModelRegistry:
 
         return results
 
-    def get_free_models(self, provider: str = "") -> List[ModelMetadata]:
+    def get_free_models(self, provider: str = "") -> list[ModelMetadata]:
         """获取免费模型列表"""
         return self.find_models_by_tags(["free"], provider)
 
-    def get_vision_models(self, provider: str = "") -> List[ModelMetadata]:
+    def get_vision_models(self, provider: str = "") -> list[ModelMetadata]:
         """获取支持视觉的模型"""
         return [m for m in self._models.values() if m.supports_vision]
 
@@ -536,7 +536,7 @@ class UnifiedModelRegistry:
         self._tags_index.clear()
         self._load_all_data()
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """获取统计信息"""
         free_count = len([m for m in self._models.values() if m.is_free])
         vision_count = len([m for m in self._models.values() if m.supports_vision])
@@ -549,7 +549,7 @@ class UnifiedModelRegistry:
             "free_models": free_count,
             "vision_models": vision_count,
             "function_calling_models": function_count,
-            "providers": len(set(m.provider for m in self._models.values())),
+            "providers": len({m.provider for m in self._models.values()}),
             "tags": len(self._tags_index),
             "provider_overrides": len(self._provider_overrides),
             "channel_overrides": len(self._channel_overrides),

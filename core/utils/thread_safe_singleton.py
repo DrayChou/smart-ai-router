@@ -5,7 +5,7 @@
 
 import threading
 from functools import wraps
-from typing import Any, Callable, Dict, Optional, Type, TypeVar
+from typing import Any, Callable, Optional, TypeVar
 
 T = TypeVar("T")
 
@@ -13,7 +13,7 @@ T = TypeVar("T")
 class ThreadSafeSingleton:
     """线程安全的单例基类"""
 
-    _instances: Dict[Type, Any] = {}
+    _instances: dict[type, Any] = {}
     _lock = threading.RLock()
 
     def __new__(cls, *args, **kwargs):
@@ -26,7 +26,7 @@ class ThreadSafeSingleton:
         return cls._instances[cls]
 
     @classmethod
-    def get_instance(cls: Type[T]) -> T:
+    def get_instance(cls: type[T]) -> T:
         """获取单例实例"""
         if cls not in cls._instances:
             with cls._lock:
@@ -45,8 +45,8 @@ class ThreadSafeSingleton:
 class SingletonFactory:
     """单例工厂，管理所有单例实例"""
 
-    _instances: Dict[str, Any] = {}
-    _factories: Dict[str, Callable] = {}
+    _instances: dict[str, Any] = {}
+    _factories: dict[str, Callable] = {}
     _lock = threading.RLock()
 
     @classmethod
@@ -128,7 +128,7 @@ class ThreadSafeContainer:
     """线程安全的容器，用于替代全局变量"""
 
     def __init__(self):
-        self._data: Dict[str, Any] = {}
+        self._data: dict[str, Any] = {}
         self._lock = threading.RLock()
 
     def set(self, key: str, value: Any) -> None:

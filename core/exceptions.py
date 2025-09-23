@@ -1,10 +1,8 @@
-# -*- coding: utf-8 -*-
 """
 Unified exception hierarchy for Smart AI Router
 """
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
-from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 
 
@@ -15,7 +13,7 @@ class RouterException(Exception):
         self,
         message: str,
         status_code: int = 500,
-        details: Optional[Dict[str, Any]] = None,
+        details: Optional[dict[str, Any]] = None,
     ):
         self.message = message
         self.status_code = status_code
@@ -31,7 +29,7 @@ class ChannelException(RouterException):
         channel_id: str,
         message: str,
         status_code: int = 503,
-        details: Optional[Dict[str, Any]] = None,
+        details: Optional[dict[str, Any]] = None,
     ):
         self.channel_id = channel_id
         super().__init__(message, status_code, details)

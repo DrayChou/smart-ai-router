@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 异步配置加载器 - Phase 1 Python 性能优化
 专注解决配置加载的 2-4 秒延迟问题
 """
 
 import asyncio
-import json
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional, Union
 
 import aiofiles
 import yaml
@@ -31,7 +29,7 @@ class AsyncConfigLoadingMonitor:
         self._start_time = None
         self._total_tasks = 0
 
-    async def track_config_loading(self, loader_tasks: List[asyncio.Task]) -> List[Any]:
+    async def track_config_loading(self, loader_tasks: list[asyncio.Task]) -> list[Any]:
         """实时跟踪配置加载进度"""
         self._start_time = time.time()
         self._total_tasks = len(loader_tasks)
@@ -67,8 +65,8 @@ class AsyncConfigFailoverManager:
         self._timeout_seconds = timeout_seconds
 
     async def load_with_timeout_and_fallback(
-        self, primary_loader_coro, fallback_config: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        self, primary_loader_coro, fallback_config: Optional[dict[str, Any]] = None
+    ) -> dict[str, Any]:
         """带超时和回退的配置加载"""
         try:
             # 主要加载路径，带超时
@@ -87,8 +85,8 @@ class AsyncConfigFailoverManager:
             return self._get_fallback_config(fallback_config)
 
     def _get_fallback_config(
-        self, fallback_config: Optional[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        self, fallback_config: Optional[dict[str, Any]]
+    ) -> dict[str, Any]:
         """获取回退配置"""
         if fallback_config:
             return fallback_config
@@ -160,7 +158,7 @@ class AsyncYAMLConfigLoader:
 
     def _identify_config_files(
         self, primary_config_path: Union[str, Path]
-    ) -> List[tuple]:
+    ) -> list[tuple]:
         """识别需要加载的配置文件"""
         config_files = []
 
@@ -186,7 +184,7 @@ class AsyncYAMLConfigLoader:
 
     async def _load_yaml_async(
         self, file_path: Union[str, Path], file_type: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """异步 YAML 文件加载"""
         try:
             start_time = time.time()
@@ -198,7 +196,7 @@ class AsyncYAMLConfigLoader:
                 return self._config_cache[file_key]
 
             # 异步读取文件内容
-            async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
+            async with aiofiles.open(file_path, encoding="utf-8") as f:
                 content = await f.read()
 
             # 使用线程池进行 YAML 解析 (CPU 密集型)
@@ -229,8 +227,8 @@ class AsyncYAMLConfigLoader:
             }
 
     async def _merge_configs(
-        self, config_results: List[Dict[str, Any]], config_files: List[tuple]
-    ) -> Dict[str, Any]:
+        self, config_results: list[dict[str, Any]], config_files: list[tuple]
+    ) -> dict[str, Any]:
         """合并配置结果"""
         merged_config = {
             "providers": {},  # 修复：providers 应该是字典，不是列表
@@ -264,7 +262,7 @@ class AsyncYAMLConfigLoader:
         logger.debug(f"配置合并完成: {len(merged_config)} 个顶级配置项")
         return merged_config
 
-    async def _validate_config_async(self, config_data: Dict[str, Any]) -> Config:
+    async def _validate_config_async(self, config_data: dict[str, Any]) -> Config:
         """异步验证配置"""
         try:
             # 使用线程池进行 Pydantic 验证 (CPU 密集型)
@@ -283,7 +281,7 @@ class AsyncYAMLConfigLoader:
             logger.error(f"配置验证过程出错: {e}")
             raise
 
-    def _validate_with_pydantic(self, config_data: Dict[str, Any]) -> Config:
+    def _validate_with_pydantic(self, config_data: dict[str, Any]) -> Config:
         """使用 Pydantic 验证配置"""
         return Config.parse_obj(config_data)
 
@@ -292,7 +290,7 @@ class AsyncYAMLConfigLoader:
         logger.warning("使用同步回退加载配置")
 
         try:
-            with open(config_path, "r", encoding="utf-8") as f:
+            with open(config_path, encoding="utf-8") as f:
                 config_data = yaml.safe_load(f)
 
             return Config.parse_obj(config_data)
@@ -345,7 +343,7 @@ class AsyncConfigPerformanceProfiler:
             logger.error(f"性能分析期间配置加载失败: {e}")
             raise
 
-    def get_performance_stats(self) -> Dict[str, Any]:
+    def get_performance_stats(self) -> dict[str, Any]:
         """获取性能统计"""
         if not self._metrics["total_load_time"]:
             return {"message": "无性能数据"}

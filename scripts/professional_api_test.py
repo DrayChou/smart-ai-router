@@ -10,11 +10,9 @@ Smart AI Router 专业统一API测试脚本
 - Gemini兼容接口 (文本/流式/多模态/Tools)
 """
 
-import base64
 import json
 import time
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import requests
 
@@ -53,10 +51,10 @@ class ProfessionalAPITester:
         self,
         method: str,
         url: str,
-        headers: Dict[str, str],
-        data: Optional[Dict] = None,
+        headers: dict[str, str],
+        data: Optional[dict] = None,
         stream: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """统一请求方法"""
         try:
             if method.upper() == "GET":
@@ -295,7 +293,7 @@ class ProfessionalAPITester:
             status_code = result.get("status_code", 0)
             response_text = result.get("response_text", "")
 
-            print(f"[调试] OpenAI Vision错误详情:")
+            print("[调试] OpenAI Vision错误详情:")
             print(f"  状态码: {status_code}")
             print(f"  错误信息: {error_msg}")
             print(f"  响应内容: {response_text[:200]}...")
@@ -556,7 +554,7 @@ class ProfessionalAPITester:
             status_code = result.get("status_code", 0)
             response_text = result.get("response_text", "")
 
-            print(f"[调试] Anthropic Tools错误详情:")
+            print("[调试] Anthropic Tools错误详情:")
             print(f"  状态码: {status_code}")
             print(f"  错误信息: {error_msg}")
             print(f"  响应内容: {response_text[:200]}...")
@@ -719,7 +717,7 @@ class ProfessionalAPITester:
             status_code = result.get("status_code", 0)
             response_text = result.get("response_text", "")
 
-            print(f"[调试] Gemini Vision错误详情:")
+            print("[调试] Gemini Vision错误详情:")
             print(f"  状态码: {status_code}")
             print(f"  错误信息: {error_msg}")
             print(f"  响应内容: {response_text[:200]}...")
@@ -966,7 +964,7 @@ class ProfessionalAPITester:
 
         with open("professional_api_test_results.json", "w", encoding="utf-8") as f:
             json.dump(self.results, f, ensure_ascii=False, indent=2)
-        print(f"\n详细结果已保存到: professional_api_test_results.json")
+        print("\n详细结果已保存到: professional_api_test_results.json")
 
 
 def main():

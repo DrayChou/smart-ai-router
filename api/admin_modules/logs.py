@@ -4,7 +4,7 @@
 
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -33,17 +33,17 @@ class LogExportRequest(BaseModel):
 
 
 class AlertCheckResponse(BaseModel):
-    alerts: List[Dict[str, Any]]
+    alerts: list[dict[str, Any]]
     checked_at: datetime
 
 
 class LogStatsResponse(BaseModel):
     total_entries: int
-    level_counts: Dict[str, int]
-    logger_counts: Dict[str, int]
-    error_patterns: List[Dict[str, Any]]
-    request_stats: Dict[str, Any]
-    time_range: Dict[str, Optional[datetime]]
+    level_counts: dict[str, int]
+    logger_counts: dict[str, int]
+    error_patterns: list[dict[str, Any]]
+    request_stats: dict[str, Any]
+    time_range: dict[str, Optional[datetime]]
 
 
 # --- Router Setup ---
@@ -96,7 +96,7 @@ async def get_log_statistics(
             time_range=stats.time_range,
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取日志统计失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取日志统计失败: {str(e)}") from e
 
 
 @router.post("/search")
@@ -137,7 +137,7 @@ async def search_logs(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"搜索日志失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"搜索日志失败: {str(e)}") from e
 
 
 @router.get("/errors")
@@ -163,7 +163,7 @@ async def get_recent_errors(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取错误日志失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取错误日志失败: {str(e)}") from e
 
 
 @router.get("/slow-requests")
@@ -196,7 +196,7 @@ async def get_slow_requests(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取慢请求日志失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取慢请求日志失败: {str(e)}") from e
 
 
 @router.get("/request/{request_id}/timeline")
@@ -229,7 +229,7 @@ async def get_request_timeline(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取请求时间线失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取请求时间线失败: {str(e)}") from e
 
 
 @router.post("/export")
@@ -271,7 +271,7 @@ async def export_logs(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"导出日志失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"导出日志失败: {str(e)}") from e
 
 
 @router.get("/alerts", response_model=AlertCheckResponse)
@@ -290,7 +290,7 @@ async def check_log_alerts(
         return AlertCheckResponse(alerts=alerts, checked_at=datetime.now())
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"检查日志警报失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"检查日志警报失败: {str(e)}") from e
 
 
 @router.get("/report")
@@ -323,7 +323,7 @@ async def generate_log_report(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"生成日志报告失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"生成日志报告失败: {str(e)}") from e
 
 
 @router.delete("/cleanup")
@@ -362,7 +362,7 @@ async def cleanup_old_logs(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"清理日志失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"清理日志失败: {str(e)}") from e
 
 
 @router.get("/health")
@@ -412,4 +412,4 @@ async def get_logging_health(
         return health_info
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取日志健康状态失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取日志健康状态失败: {str(e)}") from e

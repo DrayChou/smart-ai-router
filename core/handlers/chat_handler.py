@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Chat completion request handler with improved architecture
 """
@@ -8,7 +7,7 @@ import logging
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Optional, Union
 
 import httpx
 from fastapi import HTTPException
@@ -17,13 +16,11 @@ from pydantic import BaseModel
 
 from ..json_router import JSONRouter, RoutingRequest, RoutingScore, TagNotFoundError
 from ..utils.adapter_manager import get_adapter_manager
-from ..utils.channel_monitor import check_api_error_and_alert, get_channel_monitor
-from ..utils.cost_estimator import get_cost_estimator
+from ..utils.channel_monitor import check_api_error_and_alert
 from ..utils.http_client_pool import get_http_pool
 from ..utils.logging_integration import (
     get_enhanced_logger,
     log_api_request,
-    log_api_response,
     log_channel_operation,
 )
 from ..utils.model_channel_blacklist import get_model_blacklist_manager
@@ -35,7 +32,6 @@ from ..utils.smart_cache import cache_get, cache_set
 from ..utils.text_processor import clean_model_response
 from ..utils.token_counter import get_cost_tracker
 from ..utils.token_estimator import (
-    TaskComplexity,
     get_model_optimizer,
     get_token_estimator,
 )
@@ -56,31 +52,31 @@ def status_log_request(*args, **kwargs):
 
 class ChatMessage(BaseModel):
     role: str
-    content: Union[str, List[Dict[str, Any]]]
+    content: Union[str, list[dict[str, Any]]]
 
 
 class ChatCompletionRequest(BaseModel):
     model: str
-    messages: List[ChatMessage]
+    messages: list[ChatMessage]
     temperature: Optional[float] = 0.7
     max_tokens: Optional[int] = None
     stream: bool = False
     top_p: Optional[float] = 1.0
     frequency_penalty: Optional[float] = 0.0
     presence_penalty: Optional[float] = 0.0
-    functions: Optional[List[Dict[str, Any]]] = None
-    function_call: Optional[Union[str, Dict[str, str]]] = None
-    tools: Optional[List[Dict[str, Any]]] = None
-    tool_choice: Optional[Union[str, Dict[str, Any]]] = None
+    functions: Optional[list[dict[str, Any]]] = None
+    function_call: Optional[Union[str, dict[str, str]]] = None
+    tools: Optional[list[dict[str, Any]]] = None
+    tool_choice: Optional[Union[str, dict[str, Any]]] = None
     system: Optional[str] = None
-    extra_params: Optional[Dict[str, Any]] = None
+    extra_params: Optional[dict[str, Any]] = None
 
 
 @dataclass
 class RoutingResult:
     """路由结果包装"""
 
-    candidates: List[RoutingScore]
+    candidates: list[RoutingScore]
     execution_time: float
     total_candidates: int
 
@@ -90,8 +86,8 @@ class ChannelRequestInfo:
     """渠道请求信息"""
 
     url: str
-    headers: Dict[str, str]
-    request_data: Dict[str, Any]
+    headers: dict[str, str]
+    request_data: dict[str, Any]
     channel: Any
     provider: Any
     matched_model: Optional[str]
@@ -345,8 +341,8 @@ class ChatCompletionHandler:
         )
 
     async def _perform_cost_estimation(
-        self, request: ChatCompletionRequest, candidate_channels: List, request_id: str
-    ) -> Optional[Dict[str, Any]]:
+        self, request: ChatCompletionRequest, candidate_channels: list, request_id: str
+    ) -> Optional[dict[str, Any]]:
         """执行Token预估和智能模型推荐"""
         try:
             # 获取Token预估器和模型优化器
@@ -478,7 +474,7 @@ class ChatCompletionHandler:
 
     def _get_model_pricing(
         self, model_name: str, provider: str
-    ) -> Optional[Dict[str, float]]:
+    ) -> Optional[dict[str, float]]:
         """获取模型定价信息"""
         try:
             # 尝试从静态定价加载器获取
@@ -507,7 +503,7 @@ class ChatCompletionHandler:
             return None
 
     async def _perform_concurrent_channel_check(
-        self, candidate_channels: List[RoutingScore]
+        self, candidate_channels: list[RoutingScore]
     ) -> None:
         """执行并发渠道可用性检查"""
         logger.info(
@@ -539,7 +535,7 @@ class ChatCompletionHandler:
 
             # 找出第一个可用且符合间隔要求的渠道并移到首位
             interval_manager = get_request_interval_manager()
-            for i, (original_index, channel, result) in enumerate(check_tasks):
+            for i, (original_index, channel, _result) in enumerate(check_tasks):
                 if i < len(check_results) and not isinstance(
                     check_results[i], Exception
                 ):
@@ -580,7 +576,7 @@ class ChatCompletionHandler:
         routing_result: RoutingResult,
         start_time: float,
         request_id: str,
-        cost_preview: Optional[Dict[str, Any]] = None,
+        cost_preview: Optional[dict[str, Any]] = None,
     ) -> Union[JSONResponse, StreamingResponse]:
         """执行请求并处理重试逻辑"""
         last_error = None
@@ -669,7 +665,7 @@ class ChatCompletionHandler:
                 )
 
                 # 存储元数据到请求中，供后续使用
-                setattr(request, "_metadata", metadata)
+                request._metadata = metadata
 
                 if request.stream:
                     return self._handle_streaming_request(
@@ -1016,7 +1012,7 @@ class ChatCompletionHandler:
         attempt_num: int,
         request_type: str,
         latency: Optional[float] = None,
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         """创建调试头信息"""
         headers = {
             "X-Router-Channel": f"{channel_info.channel.name} (ID: {channel_info.channel.id})",
@@ -1079,7 +1075,7 @@ class ChatCompletionHandler:
         routing_score,
         attempt_num: int,
         failed_channels: set,
-        total_candidates: List,
+        total_candidates: list,
     ) -> None:
         """增强的HTTP错误处理，支持模型级别黑名单"""
         error_text = (
@@ -1283,7 +1279,7 @@ class ChatCompletionHandler:
         error: httpx.RequestError,
         channel,
         attempt_num: int,
-        total_candidates: List,
+        total_candidates: list,
     ) -> None:
         """处理请求错误"""
         logger.warning(
@@ -1297,7 +1293,7 @@ class ChatCompletionHandler:
         if attempt_num < len(total_candidates):
             logger.info(f"FAILOVER: Trying next channel (#{attempt_num + 1})")
 
-    def _infer_capabilities(self, request: ChatCompletionRequest) -> List[str]:
+    def _infer_capabilities(self, request: ChatCompletionRequest) -> list[str]:
         """推断请求所需的能力"""
         capabilities = ["text"]
         if request.functions or request.tools:
@@ -1364,7 +1360,7 @@ class ChatCompletionHandler:
     def _create_all_channels_failed_error(
         self,
         model: str,
-        candidates: List,
+        candidates: list,
         last_error: Optional[Exception],
         execution_time: float,
     ) -> JSONResponse:
@@ -1394,7 +1390,7 @@ class ChatCompletionHandler:
 
     async def _fast_channel_check(
         self, url: str, headers: dict
-    ) -> Tuple[bool, int, str]:
+    ) -> tuple[bool, int, str]:
         """快速检查渠道是否可用"""
         cache_key = f"{url}:{hash(str(headers))}"
 
@@ -1461,7 +1457,7 @@ class ChatCompletionHandler:
                 response._content = error_content
                 response.raise_for_status()
 
-            content = await response.aread()
+            await response.aread()
             result = response.json()
 
             # 返回响应和TTFB时间 (不修改原始响应)

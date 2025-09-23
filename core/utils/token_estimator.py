@@ -8,7 +8,7 @@ import logging
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 try:
     import tiktoken
@@ -143,7 +143,7 @@ class TokenEstimator:
         }
 
     def estimate_input_tokens(
-        self, messages: List[Dict[str, str]], model_family: str = "gpt"
+        self, messages: list[dict[str, str]], model_family: str = "gpt"
     ) -> int:
         """估算输入tokens数量"""
 
@@ -181,7 +181,7 @@ class TokenEstimator:
         # 添加格式开销和最小值
         return max(estimated_tokens + 50, 10)
 
-    def detect_task_complexity(self, messages: List[Dict[str, str]]) -> TaskComplexity:
+    def detect_task_complexity(self, messages: list[dict[str, str]]) -> TaskComplexity:
         """检测任务复杂度"""
 
         # 拼接所有消息内容用于分析
@@ -210,7 +210,7 @@ class TokenEstimator:
 
     def estimate_output_tokens(
         self, input_tokens: int, complexity: TaskComplexity
-    ) -> Tuple[int, float]:
+    ) -> tuple[int, float]:
         """估算输出tokens数量"""
 
         multiplier = self.output_multipliers[complexity]
@@ -234,7 +234,7 @@ class TokenEstimator:
         return estimated_tokens, confidence
 
     def estimate_tokens(
-        self, messages: List[Dict[str, str]], model_family: str = "gpt"
+        self, messages: list[dict[str, str]], model_family: str = "gpt"
     ) -> TokenEstimate:
         """完整的token估算"""
 
@@ -384,9 +384,9 @@ class ModelOptimizer:
     def recommend_models(
         self,
         tokens_estimate: TokenEstimate,
-        available_channels: List[Dict[str, Any]],
+        available_channels: list[dict[str, Any]],
         optimization_strategy: str = "balanced",
-    ) -> List[ModelRecommendation]:
+    ) -> list[ModelRecommendation]:
         """推荐最佳模型"""
 
         recommendations = []

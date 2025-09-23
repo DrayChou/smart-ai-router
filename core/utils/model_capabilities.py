@@ -7,16 +7,16 @@ import json
 import logging
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 # 文件内容缓存
-_cache_content: Optional[Dict] = None
+_cache_content: Optional[dict] = None
 _cache_file_path = Path("cache/channels/openrouter_1.json")
 
 
-def _load_openrouter_cache() -> Dict:
+def _load_openrouter_cache() -> dict:
     """加载OpenRouter缓存数据（带内存缓存）"""
     global _cache_content
 
@@ -29,7 +29,7 @@ def _load_openrouter_cache() -> Dict:
             _cache_content = {}
             return _cache_content
 
-        with open(_cache_file_path, "r", encoding="utf-8") as f:
+        with open(_cache_file_path, encoding="utf-8") as f:
             _cache_content = json.load(f)
 
         logger.debug(
@@ -43,7 +43,7 @@ def _load_openrouter_cache() -> Dict:
         return _cache_content
 
 
-def _extract_capabilities_from_data(raw_data: Dict) -> List[str]:
+def _extract_capabilities_from_data(raw_data: dict) -> list[str]:
     """从OpenRouter原始数据中提取能力信息"""
     capabilities = ["text"]  # 默认支持文本
 
@@ -68,7 +68,7 @@ def _extract_capabilities_from_data(raw_data: Dict) -> List[str]:
     return capabilities
 
 
-def _extract_context_length(raw_data: Dict) -> int:
+def _extract_context_length(raw_data: dict) -> int:
     """从OpenRouter原始数据中提取上下文长度"""
     return raw_data.get("context_length", 0)
 
@@ -98,7 +98,7 @@ def _models_match(model_name_1: str, model_name_2: str) -> bool:
 
 
 @lru_cache(maxsize=1000)
-def get_model_capabilities_from_openrouter(model_name: str) -> Tuple[List[str], int]:
+def get_model_capabilities_from_openrouter(model_name: str) -> tuple[list[str], int]:
     """
     使用OpenRouter数据库作为通用模型能力参考
     所有渠道（OpenRouter、OpenAI、Anthropic等）的模型能力都参考OpenRouter的模型列表
@@ -155,7 +155,7 @@ def clear_cache() -> None:
     logger.debug("模型能力缓存已清除")
 
 
-def get_cache_stats() -> Dict:
+def get_cache_stats() -> dict:
     """获取缓存统计信息"""
     cache_info = get_model_capabilities_from_openrouter.cache_info()
     return {

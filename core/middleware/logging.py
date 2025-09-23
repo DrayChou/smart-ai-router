@@ -1,11 +1,10 @@
-# -*- coding: utf-8 -*-
 """
 日志中间件 - 自动记录API请求和响应
 """
 import json
 import time
 import uuid
-from typing import Any, Callable, Dict, Optional
+from typing import Callable, Optional
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -204,7 +203,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         except Exception:
             return "<Failed to read response body>"
 
-    def _filter_headers(self, headers: Dict[str, str]) -> Dict[str, str]:
+    def _filter_headers(self, headers: dict[str, str]) -> dict[str, str]:
         """过滤敏感的请求头"""
         sensitive_headers = {
             "authorization",

@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from typing import List, Optional
 
 from core.router.types import ChannelCandidate
 from core.utils.model_analyzer import get_model_analyzer
@@ -43,7 +42,7 @@ _PARAM_PATTERN = re.compile(r"^([><=]+)(\d+\.?\d*)([bmk])$", re.IGNORECASE)
 _CONTEXT_PATTERN = re.compile(r"^([><=]+)(\d+\.?\d*)([kK]?[iI]|[mM]?[oO])$")
 
 
-def parse_size_filter(tag: str) -> Optional[SizeFilter]:
+def parse_size_filter(tag: str) -> SizeFilter | None:
     """Parse expressions like ">20b" or "<8ko" into SizeFilter objects."""
     param_match = _PARAM_PATTERN.match(tag)
     if param_match:
@@ -73,8 +72,8 @@ def parse_size_filter(tag: str) -> Optional[SizeFilter]:
 
 
 def apply_size_filters(
-    candidates: List[ChannelCandidate], size_filters: List[SizeFilter]
-) -> List[ChannelCandidate]:
+    candidates: list[ChannelCandidate], size_filters: list[SizeFilter]
+) -> list[ChannelCandidate]:
     """Apply size filters to channel candidates."""
     if not size_filters:
         return candidates
@@ -82,7 +81,7 @@ def apply_size_filters(
     analyzer = get_model_analyzer()
     config_loader = get_yaml_config_loader()
 
-    filtered: List[ChannelCandidate] = []
+    filtered: list[ChannelCandidate] = []
 
     for candidate in candidates:
         channel = candidate.channel
@@ -108,7 +107,7 @@ def apply_size_filters(
     return filtered
 
 
-def _matches_all_filters(model_data: dict, size_filters: List[SizeFilter]) -> bool:
+def _matches_all_filters(model_data: dict, size_filters: list[SizeFilter]) -> bool:
     for filter_obj in size_filters:
         if filter_obj.filter_type == "params":
             param_count = model_data.get("parameter_count")

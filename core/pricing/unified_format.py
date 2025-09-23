@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 统一定价数据格式定义
 以OpenRouter格式为标准，支持所有平台的数据转换
@@ -10,7 +9,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional
 
 
 class ModelCategory(Enum):
@@ -44,8 +43,8 @@ class Architecture:
     """模型架构信息"""
 
     modality: str = "text->text"
-    input_modalities: List[str] = field(default_factory=lambda: ["text"])
-    output_modalities: List[str] = field(default_factory=lambda: ["text"])
+    input_modalities: list[str] = field(default_factory=lambda: ["text"])
+    output_modalities: list[str] = field(default_factory=lambda: ["text"])
     tokenizer: Optional[str] = None
     instruct_type: Optional[str] = None
 
@@ -94,7 +93,7 @@ class UnifiedModelData:
 
     # 架构和能力
     architecture: Optional[Architecture] = None
-    capabilities: List[str] = field(default_factory=list)
+    capabilities: list[str] = field(default_factory=list)
 
     # 定价信息
     pricing: Optional[Pricing] = None
@@ -109,9 +108,9 @@ class UnifiedModelData:
     # 元数据
     data_source: DataSource = DataSource.OPENROUTER
     last_updated: Optional[datetime] = None
-    aliases: List[str] = field(default_factory=list)
+    aliases: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
         result = {}
         for field_name, field_value in self.__dict__.items():
@@ -128,7 +127,7 @@ class UnifiedModelData:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "UnifiedModelData":
+    def from_dict(cls, data: dict[str, Any]) -> "UnifiedModelData":
         """从字典创建实例"""
         # 处理嵌套对象
         if "architecture" in data and isinstance(data["architecture"], dict):
@@ -162,9 +161,9 @@ class UnifiedPricingFile:
     format_version: str = "2.0"
     last_updated: datetime = field(default_factory=datetime.now)
     description: str = ""
-    models: Dict[str, UnifiedModelData] = field(default_factory=dict)
+    models: dict[str, UnifiedModelData] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
         return {
             "provider": self.provider,
@@ -185,7 +184,7 @@ class UnifiedPricingFile:
     @classmethod
     def load_from_file(cls, file_path: Path) -> "UnifiedPricingFile":
         """从JSON文件加载"""
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             data = json.load(f)
 
         # 转换模型数据
@@ -213,7 +212,7 @@ class ModelCapabilityInference:
     """模型能力推理工具"""
 
     @staticmethod
-    def infer_capabilities_from_name(model_name: str) -> List[str]:
+    def infer_capabilities_from_name(model_name: str) -> list[str]:
         """从模型名称推断能力"""
         capabilities = []
         name_lower = model_name.lower()

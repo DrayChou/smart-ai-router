@@ -4,10 +4,9 @@
 """
 
 import logging
-import traceback
 from enum import Enum
 from functools import wraps
-from typing import Any, Callable, Optional, Type, Union
+from typing import Any, Callable, Optional, Union
 
 logger = logging.getLogger(__name__)
 
@@ -251,19 +250,19 @@ def handle_http_errors(func: Callable):
         except Exception as e:
             # 根据异常类型分类处理
             if "timeout" in str(e).lower():
-                raise NetworkError(f"Network timeout: {e}", cause=e)
+                raise NetworkError(f"Network timeout: {e}", cause=e) from e
             elif "connection" in str(e).lower():
-                raise NetworkError(f"Connection error: {e}", cause=e)
+                raise NetworkError(f"Connection error: {e}", cause=e) from e
             elif "401" in str(e) or "unauthorized" in str(e).lower():
-                raise AuthenticationError(f"Authentication failed: {e}", cause=e)
+                raise AuthenticationError(f"Authentication failed: {e}", cause=e) from e
             elif "403" in str(e) or "forbidden" in str(e).lower():
-                raise AuthenticationError(f"Access forbidden: {e}", cause=e)
+                raise AuthenticationError(f"Access forbidden: {e}", cause=e) from e
             elif "404" in str(e) or "not found" in str(e).lower():
-                raise ExternalAPIError(f"Resource not found: {e}", cause=e)
+                raise ExternalAPIError(f"Resource not found: {e}", cause=e) from e
             elif "429" in str(e) or "rate limit" in str(e).lower():
-                raise ExternalAPIError(f"Rate limit exceeded: {e}", cause=e)
+                raise ExternalAPIError(f"Rate limit exceeded: {e}", cause=e) from e
             else:
-                raise ExternalAPIError(f"HTTP error: {e}", cause=e)
+                raise ExternalAPIError(f"HTTP error: {e}", cause=e) from e
 
     @wraps(func)
     async def async_wrapper(*args, **kwargs):
@@ -272,19 +271,19 @@ def handle_http_errors(func: Callable):
         except Exception as e:
             # 根据异常类型分类处理
             if "timeout" in str(e).lower():
-                raise NetworkError(f"Network timeout: {e}", cause=e)
+                raise NetworkError(f"Network timeout: {e}", cause=e) from e
             elif "connection" in str(e).lower():
-                raise NetworkError(f"Connection error: {e}", cause=e)
+                raise NetworkError(f"Connection error: {e}", cause=e) from e
             elif "401" in str(e) or "unauthorized" in str(e).lower():
-                raise AuthenticationError(f"Authentication failed: {e}", cause=e)
+                raise AuthenticationError(f"Authentication failed: {e}", cause=e) from e
             elif "403" in str(e) or "forbidden" in str(e).lower():
-                raise AuthenticationError(f"Access forbidden: {e}", cause=e)
+                raise AuthenticationError(f"Access forbidden: {e}", cause=e) from e
             elif "404" in str(e) or "not found" in str(e).lower():
-                raise ExternalAPIError(f"Resource not found: {e}", cause=e)
+                raise ExternalAPIError(f"Resource not found: {e}", cause=e) from e
             elif "429" in str(e) or "rate limit" in str(e).lower():
-                raise ExternalAPIError(f"Rate limit exceeded: {e}", cause=e)
+                raise ExternalAPIError(f"Rate limit exceeded: {e}", cause=e) from e
             else:
-                raise ExternalAPIError(f"HTTP error: {e}", cause=e)
+                raise ExternalAPIError(f"HTTP error: {e}", cause=e) from e
 
     # 根据原函数是否是协程返回相应的包装器
     import asyncio

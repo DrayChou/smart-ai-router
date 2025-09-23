@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 异步文件操作工具 - 使用aiofiles优化IO性能
 """
@@ -10,7 +9,7 @@ import logging
 import time
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional, Union
 
 import aiofiles
 import aiofiles.os
@@ -53,7 +52,7 @@ class AsyncFileManager:
                 return default
 
             start_time = time.time()
-            async with aiofiles.open(path, "r", encoding="utf-8") as f:
+            async with aiofiles.open(path, encoding="utf-8") as f:
                 content = await f.read()
 
             if not content.strip():
@@ -123,7 +122,7 @@ class AsyncFileManager:
                 return default
 
             start_time = time.time()
-            async with aiofiles.open(path, "r", encoding="utf-8") as f:
+            async with aiofiles.open(path, encoding="utf-8") as f:
                 content = await f.read()
 
             if not content.strip():
@@ -191,7 +190,7 @@ class AsyncFileManager:
                 return None
 
             start_time = time.time()
-            async with aiofiles.open(path, "r", encoding=encoding) as f:
+            async with aiofiles.open(path, encoding=encoding) as f:
                 content = await f.read()
 
             read_time = (time.time() - start_time) * 1000
@@ -334,8 +333,8 @@ class AsyncFileManager:
             return None
 
     async def batch_read_json(
-        self, file_paths: List[Union[str, Path]], default: Any = None
-    ) -> Dict[str, Any]:
+        self, file_paths: list[Union[str, Path]], default: Any = None
+    ) -> dict[str, Any]:
         """批量异步读取JSON文件"""
 
         async def read_single(path):
@@ -345,8 +344,8 @@ class AsyncFileManager:
         return dict(results)
 
     async def batch_write_json(
-        self, file_data: Dict[Union[str, Path], Any], **kwargs
-    ) -> Dict[str, bool]:
+        self, file_data: dict[Union[str, Path], Any], **kwargs
+    ) -> dict[str, bool]:
         """批量异步写入JSON文件"""
 
         async def write_single(path, data):

@@ -4,7 +4,7 @@ Models API endpoints
 """
 
 import time
-from typing import Dict, List, Optional, Set
+from typing import Optional
 
 from fastapi import APIRouter
 from pydantic import BaseModel
@@ -35,15 +35,15 @@ class ChannelInfo(BaseModel):
     id: str
     name: str
     provider: Optional[str] = None
-    tags: Optional[List[str]] = None
+    tags: Optional[list[str]] = None
     priority: Optional[int] = None
-    capabilities: Optional[List[str]] = None
+    capabilities: Optional[list[str]] = None
     cost_per_token: Optional[ChannelCost] = None
     # 渠道特定的模型信息覆盖
     channel_context_length: Optional[int] = None
     channel_capabilities: Optional[ModelCapabilities] = None
     # 渠道特定的tags（从渠道配置或模型分析得出）
-    channel_tags: Optional[List[str]] = None
+    channel_tags: Optional[list[str]] = None
 
 
 class ModelInfo(BaseModel):
@@ -72,13 +72,13 @@ class ModelInfo(BaseModel):
 
     # 渠道和标签信息
     channel_count: Optional[int] = None
-    tags: Optional[List[str]] = None
-    channels: Optional[List[ChannelInfo]] = None
+    tags: Optional[list[str]] = None
+    channels: Optional[list[ChannelInfo]] = None
 
 
 class ModelsResponse(BaseModel):
     object: str = "list"
-    data: List[ModelInfo]
+    data: list[ModelInfo]
     total_models: int = 0
 
 
@@ -123,8 +123,8 @@ def create_models_router(config_loader: YAMLConfigLoader) -> APIRouter:
         memory_index = get_memory_index()
 
         for model_id in sorted(all_models):
-            aggregated_tags: Set[str] = set()
-            channel_list: List[ChannelInfo] = []
+            aggregated_tags: set[str] = set()
+            channel_list: list[ChannelInfo] = []
             channel_ids = model_channels_map.get(model_id, [])
             parameter_count: Optional[int] = None
             context_length: Optional[int] = None

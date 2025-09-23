@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from core.exceptions import ParameterComparisonError
 from core.router.types import ChannelCandidate, RoutingRequest
@@ -16,7 +15,7 @@ class ParameterComparisonMixin:
 
     def _get_parameter_comparison_candidates(
         self, request: RoutingRequest
-    ) -> Optional[list[ChannelCandidate]]:
+    ) -> list[ChannelCandidate] | None:
         if not self.parameter_comparator.is_parameter_comparison(request.model):
             return None
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Authentication Module - API Token和Admin Token验证
 """

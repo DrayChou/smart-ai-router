@@ -8,7 +8,7 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +25,10 @@ class ChannelConfig:
     enabled: bool = True
     priority: int = 1
     weight: float = 1.0
-    capabilities: List[str] = field(default_factory=list)
-    pricing: Dict[str, Any] = field(default_factory=dict)
-    limits: Dict[str, Any] = field(default_factory=dict)
-    performance: Dict[str, float] = field(default_factory=dict)
+    capabilities: list[str] = field(default_factory=list)
+    pricing: dict[str, Any] = field(default_factory=dict)
+    limits: dict[str, Any] = field(default_factory=dict)
+    performance: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -42,7 +42,7 @@ class ProviderConfig:
     base_url: str
     auth_type: str = "bearer"
     enabled: bool = True
-    capabilities: List[str] = field(default_factory=list)
+    capabilities: list[str] = field(default_factory=list)
     pricing_multiplier: float = 1.0
 
 
@@ -54,19 +54,19 @@ class ModelGroupConfig:
     display_name: str
     description: str
     enabled: bool = True
-    routing_strategy: List[Dict[str, Any]] = field(default_factory=list)
-    filters: Dict[str, Any] = field(default_factory=dict)
-    channels: List[str] = field(default_factory=list)
+    routing_strategy: list[dict[str, Any]] = field(default_factory=list)
+    filters: dict[str, Any] = field(default_factory=dict)
+    channels: list[str] = field(default_factory=list)
 
 
 @dataclass
 class RuntimeState:
     """运行时状态"""
 
-    channel_stats: Dict[str, Any] = field(default_factory=dict)
-    request_history: List[Dict[str, Any]] = field(default_factory=list)
-    health_scores: Dict[str, float] = field(default_factory=dict)
-    cost_tracking: Dict[str, Any] = field(default_factory=dict)
+    channel_stats: dict[str, Any] = field(default_factory=dict)
+    request_history: list[dict[str, Any]] = field(default_factory=list)
+    health_scores: dict[str, float] = field(default_factory=dict)
+    cost_tracking: dict[str, Any] = field(default_factory=dict)
 
 
 class ConfigLoader:
@@ -74,10 +74,10 @@ class ConfigLoader:
 
     def __init__(self, config_path: Optional[str] = None):
         self.config_path = config_path or self._get_default_config_path()
-        self.config_data: Dict[str, Any] = {}
-        self.providers: Dict[str, ProviderConfig] = {}
-        self.channels: Dict[str, ChannelConfig] = {}
-        self.model_groups: Dict[str, ModelGroupConfig] = {}
+        self.config_data: dict[str, Any] = {}
+        self.providers: dict[str, ProviderConfig] = {}
+        self.channels: dict[str, ChannelConfig] = {}
+        self.model_groups: dict[str, ModelGroupConfig] = {}
         self.runtime_state: RuntimeState = RuntimeState()
 
         self.load_config()
@@ -97,7 +97,7 @@ class ConfigLoader:
     def load_config(self) -> None:
         """加载配置文件"""
         try:
-            with open(self.config_path, "r", encoding="utf-8") as f:
+            with open(self.config_path, encoding="utf-8") as f:
                 self.config_data = json.load(f)
 
             self._load_providers()
@@ -171,7 +171,7 @@ class ConfigLoader:
         """获取Model Group配置"""
         return self.model_groups.get(name)
 
-    def get_channels_for_group(self, group_name: str) -> List[ChannelConfig]:
+    def get_channels_for_group(self, group_name: str) -> list[ChannelConfig]:
         """获取模型组的所有可用渠道"""
         group = self.get_model_group(group_name)
         if not group or not group.enabled:
@@ -187,11 +187,11 @@ class ConfigLoader:
 
         return channels
 
-    def get_enabled_channels(self) -> List[ChannelConfig]:
+    def get_enabled_channels(self) -> list[ChannelConfig]:
         """获取所有启用的渠道"""
         return [ch for ch in self.channels.values() if ch.enabled and ch.api_key]
 
-    def get_channels_by_model(self, model_name: str) -> List[ChannelConfig]:
+    def get_channels_by_model(self, model_name: str) -> list[ChannelConfig]:
         """按模型名称获取渠道"""
         return [
             ch
@@ -199,7 +199,7 @@ class ConfigLoader:
             if ch.enabled and ch.model_name == model_name and ch.api_key
         ]
 
-    def get_channels_by_capability(self, capability: str) -> List[ChannelConfig]:
+    def get_channels_by_capability(self, capability: str) -> list[ChannelConfig]:
         """按能力获取渠道"""
         return [
             ch
@@ -235,7 +235,7 @@ class ConfigLoader:
         """更新渠道健康分数"""
         self.runtime_state.health_scores[channel_id] = health_score
 
-    def add_request_log(self, log_entry: Dict[str, Any]) -> None:
+    def add_request_log(self, log_entry: dict[str, Any]) -> None:
         """添加请求日志"""
         log_entry["timestamp"] = datetime.now().isoformat()
         self.runtime_state.request_history.append(log_entry)
@@ -261,13 +261,13 @@ class ConfigLoader:
                 self.runtime_state.cost_tracking["total_tokens"] = 0
             self.runtime_state.cost_tracking["total_tokens"] += tokens
 
-    def get_server_config(self) -> Dict[str, Any]:
+    def get_server_config(self) -> dict[str, Any]:
         """获取服务器配置"""
         return self.config_data.get(
             "server", {"host": "0.0.0.0", "port": 7601, "debug": False}
         )
 
-    def get_routing_config(self) -> Dict[str, Any]:
+    def get_routing_config(self) -> dict[str, Any]:
         """获取路由配置"""
         return self.config_data.get(
             "routing",
@@ -278,7 +278,7 @@ class ConfigLoader:
             },
         )
 
-    def get_monitoring_config(self) -> Dict[str, Any]:
+    def get_monitoring_config(self) -> dict[str, Any]:
         """获取监控配置"""
         return self.config_data.get(
             "monitoring",

@@ -7,7 +7,7 @@ OpenAI ChatGPT API 兼容接口
 import json
 import time
 import uuid
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional, Union
 
 from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import StreamingResponse
@@ -29,14 +29,14 @@ class ChatGPTContentPart(BaseModel):
 
     type: str = Field(..., description="内容类型")
     text: Optional[str] = Field(None, description="文本内容")
-    image_url: Optional[Dict[str, Any]] = Field(None, description="图片URL")
+    image_url: Optional[dict[str, Any]] = Field(None, description="图片URL")
 
 
 class ChatGPTMessage(BaseModel):
     """OpenAI消息格式"""
 
     role: str = Field(..., description="消息角色: system, user, assistant, or tool")
-    content: Union[str, List[Union[ChatGPTContentPart, Dict[str, Any]]]] = Field(
+    content: Union[str, list[Union[ChatGPTContentPart, dict[str, Any]]]] = Field(
         ..., description="消息内容"
     )
     name: Optional[str] = Field(None, description="工具名称")
@@ -47,26 +47,26 @@ class ChatGPTTool(BaseModel):
     """OpenAI工具定义"""
 
     type: str = Field("function", description="工具类型")
-    function: Dict[str, Any] = Field(..., description="函数定义")
+    function: dict[str, Any] = Field(..., description="函数定义")
 
 
 class ChatGPTResponseFormat(BaseModel):
     """OpenAI响应格式"""
 
     type: str = Field("json_object", description="响应类型")
-    json_schema: Optional[Dict[str, Any]] = Field(None, description="JSON schema")
+    json_schema: Optional[dict[str, Any]] = Field(None, description="JSON schema")
 
 
 class ChatGPTCompletionRequest(BaseModel):
     """OpenAI Chat Completions API请求格式"""
 
     model: str = Field(..., description="模型ID")
-    messages: List[ChatGPTMessage] = Field(..., description="消息列表")
+    messages: list[ChatGPTMessage] = Field(..., description="消息列表")
     temperature: Optional[float] = Field(0.7, description="温度参数", ge=0.0, le=2.0)
     top_p: Optional[float] = Field(1.0, description="Top-p参数", ge=0.0, le=1.0)
     n: Optional[int] = Field(1, description="生成数量", ge=1, le=10)
     stream: Optional[bool] = Field(False, description="是否流式输出")
-    stop: Optional[Union[str, List[str]]] = Field(None, description="停止条件")
+    stop: Optional[Union[str, list[str]]] = Field(None, description="停止条件")
     max_tokens: Optional[int] = Field(None, description="最大token数", ge=1)
     presence_penalty: Optional[float] = Field(
         0.0, description="存在惩罚", ge=-2.0, le=2.0
@@ -74,10 +74,10 @@ class ChatGPTCompletionRequest(BaseModel):
     frequency_penalty: Optional[float] = Field(
         0.0, description="频率惩罚", ge=-2.0, le=2.0
     )
-    logit_bias: Optional[Dict[str, int]] = Field(None, description="Logit偏差")
+    logit_bias: Optional[dict[str, int]] = Field(None, description="Logit偏差")
     user: Optional[str] = Field(None, description="用户标识")
-    tools: Optional[List[ChatGPTTool]] = Field(None, description="工具列表")
-    tool_choice: Optional[Union[str, Dict[str, Any]]] = Field(
+    tools: Optional[list[ChatGPTTool]] = Field(None, description="工具列表")
+    tool_choice: Optional[Union[str, dict[str, Any]]] = Field(
         None, description="工具选择"
     )
     response_format: Optional[ChatGPTResponseFormat] = Field(
@@ -103,7 +103,7 @@ class ChatGPTLogProb(BaseModel):
 
     token: str = Field(..., description="token")
     logprob: float = Field(..., description="log概率")
-    bytes: Optional[List[int]] = Field(None, description="token字节")
+    bytes: Optional[list[int]] = Field(None, description="token字节")
 
 
 class ChatGPTTopLogProb(BaseModel):
@@ -111,8 +111,8 @@ class ChatGPTTopLogProb(BaseModel):
 
     token: str = Field(..., description="token")
     logprob: float = Field(..., description="log概率")
-    bytes: Optional[List[int]] = Field(None, description="token字节")
-    top_logprobs: Optional[List[ChatGPTLogProb]] = Field(
+    bytes: Optional[list[int]] = Field(None, description="token字节")
+    top_logprobs: Optional[list[ChatGPTLogProb]] = Field(
         None, description="top log概率"
     )
 
@@ -120,7 +120,7 @@ class ChatGPTTopLogProb(BaseModel):
 class ChatGPTChoiceLogProbs(BaseModel):
     """OpenAI选择Log概率"""
 
-    content: Optional[List[ChatGPTTopLogProb]] = Field(None, description="内容log概率")
+    content: Optional[list[ChatGPTTopLogProb]] = Field(None, description="内容log概率")
 
 
 class ChatGPTToolCall(BaseModel):
@@ -128,7 +128,7 @@ class ChatGPTToolCall(BaseModel):
 
     id: str = Field(..., description="工具调用ID")
     type: str = Field("function", description="工具类型")
-    function: Dict[str, Any] = Field(..., description="函数调用")
+    function: dict[str, Any] = Field(..., description="函数调用")
 
 
 class ChatGPTMessageResponse(BaseModel):
@@ -136,7 +136,7 @@ class ChatGPTMessageResponse(BaseModel):
 
     role: str = Field("assistant", description="角色")
     content: Optional[Union[str, None]] = Field(None, description="内容")
-    tool_calls: Optional[List[ChatGPTToolCall]] = Field(None, description="工具调用")
+    tool_calls: Optional[list[ChatGPTToolCall]] = Field(None, description="工具调用")
 
 
 class ChatGPTChoice(BaseModel):
@@ -156,7 +156,7 @@ class ChatGPTCompletionResponse(BaseModel):
     created: int = Field(..., description="创建时间")
     model: str = Field(..., description="使用的模型")
     system_fingerprint: Optional[str] = Field(None, description="系统指纹")
-    choices: List[ChatGPTChoice] = Field(..., description="选择列表")
+    choices: list[ChatGPTChoice] = Field(..., description="选择列表")
     usage: ChatGPTUsage = Field(..., description="使用量统计")
 
 
@@ -168,7 +168,7 @@ class ChatGPTCompletionChunk(BaseModel):
     created: int = Field(..., description="创建时间")
     model: str = Field(..., description="使用的模型")
     system_fingerprint: Optional[str] = Field(None, description="系统指纹")
-    choices: List[ChatGPTChoice] = Field(..., description="选择列表")
+    choices: list[ChatGPTChoice] = Field(..., description="选择列表")
 
 
 # --- Router Factory ---
@@ -185,7 +185,7 @@ def create_chatgpt_router(
 
     @router.post(
         "/chat/completions",
-        response_model=Union[ChatGPTCompletionResponse, List[ChatGPTCompletionChunk]],
+        response_model=Union[ChatGPTCompletionResponse, list[ChatGPTCompletionChunk]],
     )
     async def chat_completions(
         request: ChatGPTCompletionRequest,
@@ -232,7 +232,7 @@ def create_chatgpt_router(
                         "code": e.status_code,
                     }
                 },
-            )
+            ) from e
         except Exception as e:
             logger.error(f"Unexpected error in ChatGPT completions: {e}", exc_info=True)
             raise HTTPException(
@@ -244,7 +244,7 @@ def create_chatgpt_router(
                         "code": 500,
                     }
                 },
-            )
+            ) from e
 
     return router
 
@@ -311,8 +311,8 @@ def convert_to_chat_request(
 
 
 def convert_to_chatgpt_response(
-    response: Dict[str, Any], request: ChatGPTCompletionRequest
-) -> Dict[str, Any]:
+    response: dict[str, Any], request: ChatGPTCompletionRequest
+) -> dict[str, Any]:
     """将内部响应转换为OpenAI格式"""
 
     # 生成响应ID和创建时间
@@ -414,7 +414,7 @@ async def stream_chatgpt_response(
                         # 错误消息
                         yield f"data: {json.dumps(chunk_data)}\n\n"
                         return
-                except:
+                except (json.JSONDecodeError, ValueError):
                     # 如果不是JSON，当作普通处理
                     continue
             else:
@@ -475,7 +475,7 @@ class ChatGPTAPIError(Exception):
         self.status_code = status_code
         super().__init__(message)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为错误响应格式"""
         return {
             "error": {

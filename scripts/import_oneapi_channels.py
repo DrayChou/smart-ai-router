@@ -3,7 +3,6 @@
 从One-API数据库导入渠道配置到Smart AI Router
 """
 
-import json
 import sqlite3
 from pathlib import Path
 
@@ -19,9 +18,9 @@ def import_channels_from_oneapi():
     # 查询活跃渠道
     cursor = conn.execute(
         """
-        SELECT id, name, type, status, key, base_url, models, priority, other 
-        FROM channels 
-        WHERE status = 1 
+        SELECT id, name, type, status, key, base_url, models, priority, other
+        FROM channels
+        WHERE status = 1
         ORDER BY priority DESC
     """
     )
@@ -32,7 +31,7 @@ def import_channels_from_oneapi():
 
     # 加载现有配置
     config_path = Path("config/router_config.yaml")
-    with open(config_path, "r", encoding="utf-8") as f:
+    with open(config_path, encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
     # 备份现有渠道
@@ -143,7 +142,7 @@ def import_channels_from_oneapi():
             config, f, default_flow_style=False, allow_unicode=True, sort_keys=False
         )
 
-    print(f"\n[SUMMARY] 导入完成:")
+    print("\n[SUMMARY] 导入完成:")
     print(f"  - 新增云端渠道: {len(new_channels)}")
     print(
         f"  - 保留本地服务: {len([ch for ch in existing_channels if ch.get('tags') and 'local' in ch['tags']])}"

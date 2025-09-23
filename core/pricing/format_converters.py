@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 多平台定价格式转换器
 将各平台的定价格式转换为统一格式
@@ -11,7 +10,7 @@ import re
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from .unified_format import (
     Architecture,
@@ -35,7 +34,7 @@ class BaseFormatConverter(ABC):
         self.capability_inference = ModelCapabilityInference()
 
     @abstractmethod
-    def convert_to_unified(self, source_data: Dict[str, Any]) -> UnifiedPricingFile:
+    def convert_to_unified(self, source_data: dict[str, Any]) -> UnifiedPricingFile:
         """转换为统一格式"""
         pass
 
@@ -81,7 +80,7 @@ class OpenRouterConverter(BaseFormatConverter):
     def __init__(self):
         super().__init__("openrouter")
 
-    def convert_to_unified(self, source_data: Dict[str, Any]) -> UnifiedPricingFile:
+    def convert_to_unified(self, source_data: dict[str, Any]) -> UnifiedPricingFile:
         """转换OpenRouter格式到统一格式"""
         unified_file = UnifiedPricingFile(
             provider="openrouter",
@@ -103,7 +102,7 @@ class OpenRouterConverter(BaseFormatConverter):
         return unified_file
 
     def _convert_single_model(
-        self, model_id: str, model_info: Dict[str, Any]
+        self, model_id: str, model_info: dict[str, Any]
     ) -> Optional[UnifiedModelData]:
         """转换单个模型"""
         raw_data = model_info.get("raw_data", {})
@@ -174,7 +173,7 @@ class SiliconFlowConverter(BaseFormatConverter):
         super().__init__("siliconflow")
         self.exchange_rate = 0.14  # 人民币到美元汇率
 
-    def convert_to_unified(self, source_data: Dict[str, Any]) -> UnifiedPricingFile:
+    def convert_to_unified(self, source_data: dict[str, Any]) -> UnifiedPricingFile:
         """转换SiliconFlow格式到统一格式"""
         unified_file = UnifiedPricingFile(
             provider="siliconflow",
@@ -199,7 +198,7 @@ class SiliconFlowConverter(BaseFormatConverter):
         return unified_file
 
     def _convert_single_model(
-        self, model_id: str, model_info: Dict[str, Any], exchange_rate: float
+        self, model_id: str, model_info: dict[str, Any], exchange_rate: float
     ) -> Optional[UnifiedModelData]:
         """转换单个模型"""
         # 价格转换: 元/M tokens → USD/token
@@ -321,7 +320,7 @@ def convert_platform_to_unified(source_file: Path, platform: str, output_file: P
     logger.info(f"开始转换 {platform} 格式: {source_file} -> {output_file}")
 
     # 加载源数据
-    with open(source_file, "r", encoding="utf-8") as f:
+    with open(source_file, encoding="utf-8") as f:
         source_data = json.load(f)
 
     # 获取转换器并转换

@@ -1,16 +1,13 @@
-# -*- coding: utf-8 -*-
 """
 审计日志分析工具 - 专门分析审计事件和生成审计报告
 """
-import asyncio
 import json
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
-from core.utils.audit_logger import AuditEventType, AuditLevel
 from core.utils.log_analyzer import LogAnalyzer, LogQuery
 
 
@@ -18,15 +15,15 @@ from core.utils.log_analyzer import LogAnalyzer, LogQuery
 class AuditSummary:
     """审计摘要"""
 
-    time_period: Dict[str, datetime]
+    time_period: dict[str, datetime]
     total_events: int
-    event_type_counts: Dict[str, int]
-    level_counts: Dict[str, int]
-    outcome_counts: Dict[str, int]
+    event_type_counts: dict[str, int]
+    level_counts: dict[str, int]
+    outcome_counts: dict[str, int]
     unique_users: int
     unique_ips: int
-    top_users: List[Dict[str, Any]]
-    top_ips: List[Dict[str, Any]]
+    top_users: list[dict[str, Any]]
+    top_ips: list[dict[str, Any]]
     security_events: int
     failed_operations: int
 
@@ -35,14 +32,14 @@ class AuditSummary:
 class SecurityReport:
     """安全审计报告"""
 
-    period: Dict[str, datetime]
+    period: dict[str, datetime]
     total_security_events: int
     authentication_failures: int
     rate_limit_violations: int
     suspicious_activities: int
-    security_violations: List[Dict[str, Any]]
-    ip_threat_analysis: List[Dict[str, Any]]
-    user_risk_analysis: List[Dict[str, Any]]
+    security_violations: list[dict[str, Any]]
+    ip_threat_analysis: list[dict[str, Any]]
+    user_risk_analysis: list[dict[str, Any]]
 
 
 @dataclass
@@ -50,12 +47,12 @@ class UserActivityReport:
     """用户活动报告"""
 
     user_id: str
-    period: Dict[str, datetime]
+    period: dict[str, datetime]
     total_actions: int
-    action_breakdown: Dict[str, int]
-    resource_access: Dict[str, int]
+    action_breakdown: dict[str, int]
+    resource_access: dict[str, int]
     success_rate: float
-    peak_activity_times: List[str]
+    peak_activity_times: list[str]
     security_events: int
     last_activity: Optional[datetime]
 
@@ -72,10 +69,10 @@ class AuditAnalyzer:
         self,
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
-        event_types: Optional[List[str]] = None,
-        user_ids: Optional[List[str]] = None,
+        event_types: Optional[list[str]] = None,
+        user_ids: Optional[list[str]] = None,
         limit: int = 1000,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """获取审计事件"""
         # 构建查询
         query = LogQuery(
@@ -388,7 +385,7 @@ class AuditAnalyzer:
 
     async def detect_anomalies(
         self, start_time: datetime, end_time: datetime
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """检测异常活动模式"""
         events = await self.get_audit_events(start_time, end_time, limit=10000)
 
@@ -445,7 +442,7 @@ class AuditAnalyzer:
             # 检测来自单一IP的大量请求
             if len(ip_events) > 500:  # 单IP超过500次请求
                 unique_users = len(
-                    set(e.get("user_id") for e in ip_events if e.get("user_id"))
+                    {e.get("user_id") for e in ip_events if e.get("user_id")}
                 )
 
                 anomalies.append(
@@ -467,7 +464,7 @@ class AuditAnalyzer:
         end_time: datetime,
         output_file: Path,
         format: str = "json",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """导出完整审计报告"""
         # 生成各种报告
         summary = await self.generate_audit_summary(start_time, end_time)

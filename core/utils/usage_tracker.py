@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 使用情况跟踪器 - 收集和记录每次API调用的成本信息
 """
@@ -12,7 +11,7 @@ from dataclasses import asdict, dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from threading import Lock
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +53,7 @@ class UsageRecord:
     # 额外信息
     user_agent: Optional[str] = None  # 用户代理
     client_ip: Optional[str] = None  # 客户端IP
-    tags: Optional[List[str]] = None  # 标签信息
+    tags: Optional[list[str]] = None  # 标签信息
 
 
 class UsageTracker:
@@ -111,7 +110,7 @@ class UsageTracker:
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(None, self.record_usage, record)
 
-    def get_daily_stats(self, target_date: Optional[date] = None) -> Dict[str, Any]:
+    def get_daily_stats(self, target_date: Optional[date] = None) -> dict[str, Any]:
         """获取每日统计"""
         if target_date is None:
             target_date = date.today()
@@ -137,7 +136,7 @@ class UsageTracker:
         }
 
         try:
-            with open(log_file, "r", encoding="utf-8") as f:
+            with open(log_file, encoding="utf-8") as f:
                 for line in f:
                     if not line.strip():
                         continue
@@ -165,7 +164,7 @@ class UsageTracker:
 
         return stats
 
-    def get_weekly_stats(self, target_date: Optional[date] = None) -> Dict[str, Any]:
+    def get_weekly_stats(self, target_date: Optional[date] = None) -> dict[str, Any]:
         """获取本周统计"""
         if target_date is None:
             target_date = date.today()
@@ -191,7 +190,7 @@ class UsageTracker:
 
     def get_monthly_stats(
         self, year: Optional[int] = None, month: Optional[int] = None
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """获取本月统计"""
         if year is None or month is None:
             today = date.today()
@@ -217,7 +216,7 @@ class UsageTracker:
 
         return monthly_stats
 
-    def _empty_stats(self) -> Dict[str, Any]:
+    def _empty_stats(self) -> dict[str, Any]:
         """返回空统计结构"""
         return {
             "total_requests": 0,
@@ -234,7 +233,7 @@ class UsageTracker:
             "avg_cost_per_1k_tokens": 0.0,
         }
 
-    def _update_stats(self, stats: Dict[str, Any], record: Dict[str, Any]):
+    def _update_stats(self, stats: dict[str, Any], record: dict[str, Any]):
         """更新统计数据"""
         stats["total_requests"] += 1
         stats["total_cost"] += record.get("total_cost", 0.0)
@@ -271,7 +270,7 @@ class UsageTracker:
         stats["models"][model]["cost"] += record.get("total_cost", 0.0)
         stats["models"][model]["tokens"] += record.get("total_tokens", 0)
 
-    def _merge_stats(self, target_stats: Dict[str, Any], source_stats: Dict[str, Any]):
+    def _merge_stats(self, target_stats: dict[str, Any], source_stats: dict[str, Any]):
         """合并统计数据"""
         target_stats["total_requests"] += source_stats["total_requests"]
         target_stats["total_cost"] += source_stats["total_cost"]
@@ -365,7 +364,7 @@ def create_usage_record(
     response_time_ms: Optional[int] = None,
     user_agent: Optional[str] = None,
     client_ip: Optional[str] = None,
-    tags: Optional[List[str]] = None,
+    tags: Optional[list[str]] = None,
 ) -> UsageRecord:
     """创建使用记录"""
     if request_id is None:

@@ -5,8 +5,8 @@
 import json
 import logging
 import time
-from dataclasses import asdict, dataclass
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ class RequestMetadata:
     error_message: Optional[str] = None
 
     # 成本预览信息
-    cost_preview: Optional[Dict[str, Any]] = None
+    cost_preview: Optional[dict[str, Any]] = None
 
     def finish_request(self, end_time: Optional[float] = None):
         """结束请求，计算最终指标"""
@@ -64,7 +64,7 @@ class ResponseAggregator:
     """响应汇总器 - 统一处理不同类型的响应输出"""
 
     def __init__(self):
-        self.active_requests: Dict[str, RequestMetadata] = {}
+        self.active_requests: dict[str, RequestMetadata] = {}
 
     def create_request_metadata(
         self,
@@ -79,7 +79,7 @@ class ResponseAggregator:
         routing_strategy: str = "balanced",
         routing_score: float = 0.0,
         routing_reason: str = "",
-        cost_preview: Optional[Dict[str, Any]] = None,
+        cost_preview: Optional[dict[str, Any]] = None,
     ) -> RequestMetadata:
         """创建请求元数据"""
         metadata = RequestMetadata(
@@ -163,7 +163,7 @@ class ResponseAggregator:
 
         return metadata
 
-    def get_headers_summary(self, request_id: str) -> Dict[str, str]:
+    def get_headers_summary(self, request_id: str) -> dict[str, str]:
         """获取用于HTTP头的汇总信息（流式请求使用）"""
         if request_id not in self.active_requests:
             return {}
@@ -181,7 +181,7 @@ class ResponseAggregator:
             "X-Router-Streaming": "true" if metadata.is_streaming else "false",
         }
 
-    def get_final_summary(self, metadata: RequestMetadata) -> Dict[str, Any]:
+    def get_final_summary(self, metadata: RequestMetadata) -> dict[str, Any]:
         """获取最终的完整汇总信息"""
         summary = {
             "request_metadata": {
@@ -301,8 +301,8 @@ class ResponseAggregator:
         return f"data: {json.dumps(summary_chunk)}\n\n"
 
     def enhance_response_with_summary(
-        self, response_data: Dict[str, Any], metadata: RequestMetadata
-    ) -> Dict[str, Any]:
+        self, response_data: dict[str, Any], metadata: RequestMetadata
+    ) -> dict[str, Any]:
         """为响应数据添加汇总信息（非流式请求使用）"""
         enhanced_response = response_data.copy()
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 状态监控页面API和WebSocket接口
 提供实时的系统状态、请求日志、渠道监控等功能
@@ -6,8 +5,8 @@
 
 import json
 import logging
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from datetime import datetime
+from typing import Any, Optional
 
 from fastapi import APIRouter, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
@@ -21,11 +20,11 @@ from core.yaml_config import YAMLConfigLoader
 logger = logging.getLogger(__name__)
 
 # 请求日志存储（内存中保存最近1000条）
-request_logs: List[Dict[str, Any]] = []
+request_logs: list[dict[str, Any]] = []
 MAX_LOGS = 1000
 
 # WebSocket连接管理
-active_connections: List[WebSocket] = []
+active_connections: list[WebSocket] = []
 
 # 请求上下文存储（用于在请求期间传递渠道信息）
 import threading
@@ -147,7 +146,7 @@ def create_status_monitor_router(
         models = channel_cache.get("models", [])
 
         blacklist_manager = get_model_blacklist_manager()
-        blacklisted_models = blacklist_manager.get_blacklisted_models_for_channel(
+        blacklist_manager.get_blacklisted_models_for_channel(
             channel_id
         )
 
@@ -555,7 +554,7 @@ async def broadcast_update(event_type: str, data: Any):
     for connection in active_connections:
         try:
             await connection.send_text(json.dumps(message))
-        except:
+        except (ConnectionResetError, ConnectionClosedError, Exception):
             disconnected.append(connection)
 
     for connection in disconnected:

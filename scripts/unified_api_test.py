@@ -10,7 +10,6 @@ Smart AI Router 统一API测试脚本
 import base64
 import json
 import time
-from typing import Any, Dict, List
 
 import requests
 
@@ -744,7 +743,7 @@ class UnifiedAPITester:
         # 保存详细结果
         with open("api_test_results.json", "w", encoding="utf-8") as f:
             json.dump(self.results, f, ensure_ascii=False, indent=2)
-        print(f"\n详细结果已保存到: api_test_results.json")
+        print("\n详细结果已保存到: api_test_results.json")
 
 
 def main():

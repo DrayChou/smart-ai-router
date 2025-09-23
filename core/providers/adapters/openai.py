@@ -5,7 +5,7 @@ OpenAI Provider适配器
 
 import json
 from collections.abc import AsyncGenerator
-from typing import Any, Dict, List
+from typing import Any
 
 import httpx
 
@@ -25,7 +25,7 @@ logger = get_logger(__name__)
 class OpenAIAdapter(BaseAdapter):
     """OpenAI适配器"""
 
-    def __init__(self, provider_name: str, config: Dict[str, Any]):
+    def __init__(self, provider_name: str, config: dict[str, Any]):
         super().__init__(provider_name, config)
 
         # OpenAI特定配置
@@ -40,7 +40,7 @@ class OpenAIAdapter(BaseAdapter):
             "default_output_cost", 0.06
         )
 
-    def get_auth_headers(self, api_key: str) -> Dict[str, str]:
+    def get_auth_headers(self, api_key: str) -> dict[str, str]:
         """获取OpenAI认证头"""
         headers = {"Authorization": f"Bearer {api_key}"}
         if self.organization:
@@ -70,7 +70,7 @@ class OpenAIAdapter(BaseAdapter):
 
         except httpx.HTTPError as e:
             logger.error(f"OpenAI API请求失败: {e}")
-            raise ProviderError(f"网络请求失败: {e}")
+            raise ProviderError(f"网络请求失败: {e}") from e
 
     async def chat_completions_stream(
         self, request: ChatRequest, api_key: str, **kwargs
@@ -89,7 +89,7 @@ class OpenAIAdapter(BaseAdapter):
             ) as response:
 
                 if not response.is_success:
-                    error = await response.aread()
+                    await response.aread()
                     raise await self.handle_error(response)
 
                 async for chunk in response.aiter_lines():
@@ -110,9 +110,9 @@ class OpenAIAdapter(BaseAdapter):
 
         except httpx.HTTPError as e:
             logger.error(f"OpenAI流式API请求失败: {e}")
-            raise ProviderError(f"流式网络请求失败: {e}")
+            raise ProviderError(f"流式网络请求失败: {e}") from e
 
-    async def list_models(self, api_key: str) -> List[ModelInfo]:
+    async def list_models(self, api_key: str) -> list[ModelInfo]:
         """获取OpenAI模型列表"""
         url = f"{self.base_url}/v1/models"
         headers = {**self.default_headers, **self.get_auth_headers(api_key)}
@@ -159,9 +159,9 @@ class OpenAIAdapter(BaseAdapter):
 
         except httpx.HTTPError as e:
             logger.error(f"获取OpenAI模型列表失败: {e}")
-            raise ProviderError(f"获取模型列表失败: {e}")
+            raise ProviderError(f"获取模型列表失败: {e}") from e
 
-    def transform_request(self, request: ChatRequest) -> Dict[str, Any]:
+    def transform_request(self, request: ChatRequest) -> dict[str, Any]:
         """转换为OpenAI格式请求"""
         payload = {
             "model": request.model,
@@ -187,7 +187,7 @@ class OpenAIAdapter(BaseAdapter):
 
         return payload
 
-    def _process_messages(self, request: ChatRequest) -> List[Dict[str, Any]]:
+    def _process_messages(self, request: ChatRequest) -> list[dict[str, Any]]:
         """处理消息格式，将system参数转换为system消息"""
         messages = request.messages.copy()
 
@@ -205,7 +205,7 @@ class OpenAIAdapter(BaseAdapter):
         # OpenAI兼容API只返回它支持的模型，所以不需要客户端过滤
         return True
 
-    def _get_model_capabilities(self, model_id: str) -> List[str]:
+    def _get_model_capabilities(self, model_id: str) -> list[str]:
         """根据模型ID推断能力"""
         capabilities = ["text"]
 

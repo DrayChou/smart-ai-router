@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 渠道监控器 - 监控渠道余额和状态，提供余额不足提醒
 """
 
-import asyncio
 import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +22,7 @@ class ChannelAlert:
     alert_type: str  # 'quota_exhausted', 'low_balance', 'api_error'
     message: str
     timestamp: str
-    details: Optional[Dict] = None
+    details: Optional[dict] = None
 
 
 class ChannelMonitor:
@@ -35,11 +33,11 @@ class ChannelMonitor:
         self.alerts_file.parent.mkdir(exist_ok=True)
 
         # 已通知的渠道，避免重复通知
-        self._notified_channels: Set[str] = set()
+        self._notified_channels: set[str] = set()
 
         # 渠道错误计数，用于判断是否需要告警
-        self._error_counts: Dict[str, int] = {}
-        self._last_error_time: Dict[str, datetime] = {}
+        self._error_counts: dict[str, int] = {}
+        self._last_error_time: dict[str, datetime] = {}
 
         # 配置
         self.max_errors_before_alert = 3  # 连续错误次数阈值
@@ -52,7 +50,7 @@ class ChannelMonitor:
         channel_name: str,
         error_type: str,
         error_message: str,
-        details: Optional[Dict] = None,
+        details: Optional[dict] = None,
     ):
         """记录渠道错误"""
         current_time = datetime.utcnow()
@@ -78,7 +76,7 @@ class ChannelMonitor:
             )
 
     def record_quota_exhausted(
-        self, channel_id: str, channel_name: str, details: Optional[Dict] = None
+        self, channel_id: str, channel_name: str, details: Optional[dict] = None
     ):
         """记录配额用完"""
         message = f"渠道 {channel_name} 配额已用完"
@@ -89,7 +87,7 @@ class ChannelMonitor:
         channel_id: str,
         channel_name: str,
         remaining_balance: float,
-        details: Optional[Dict] = None,
+        details: Optional[dict] = None,
     ):
         """记录余额不足"""
         message = f"渠道 {channel_name} 余额不足，剩余: ${remaining_balance:.4f}"
@@ -101,7 +99,7 @@ class ChannelMonitor:
         )
 
     def record_api_key_invalid(
-        self, channel_id: str, channel_name: str, details: Optional[Dict] = None
+        self, channel_id: str, channel_name: str, details: Optional[dict] = None
     ):
         """记录API密钥无效"""
         message = f"渠道 {channel_name} API密钥无效或已过期"
@@ -134,7 +132,7 @@ class ChannelMonitor:
         channel_name: str,
         alert_type: str,
         message: str,
-        details: Optional[Dict] = None,
+        details: Optional[dict] = None,
     ):
         """发送告警"""
         try:
@@ -188,7 +186,7 @@ class ChannelMonitor:
     def _send_console_notification(self, alert: ChannelAlert):
         """发送控制台通知"""
         print(f"\n{'='*60}")
-        print(f"🚨 渠道告警通知")
+        print("🚨 渠道告警通知")
         print(f"{'='*60}")
         print(f"时间: {alert.timestamp}")
         print(f"渠道: {alert.channel_name} ({alert.channel_id})")
@@ -198,7 +196,7 @@ class ChannelMonitor:
             print(f"详情: {json.dumps(alert.details, ensure_ascii=False, indent=2)}")
         print(f"{'='*60}\n")
 
-    def get_recent_alerts(self, hours: int = 24) -> List[ChannelAlert]:
+    def get_recent_alerts(self, hours: int = 24) -> list[ChannelAlert]:
         """获取最近的告警"""
         if not self.alerts_file.exists():
             return []
@@ -207,7 +205,7 @@ class ChannelMonitor:
         alerts = []
 
         try:
-            with open(self.alerts_file, "r", encoding="utf-8") as f:
+            with open(self.alerts_file, encoding="utf-8") as f:
                 for line in f:
                     if not line.strip():
                         continue
@@ -256,7 +254,7 @@ class ChannelMonitor:
 
         logger.info("已清除所有渠道的通知状态")
 
-    def get_channel_status(self) -> Dict[str, Dict]:
+    def get_channel_status(self) -> dict[str, dict]:
         """获取渠道状态概览"""
         return {
             "notified_channels": list(self._notified_channels),

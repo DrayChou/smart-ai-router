@@ -4,7 +4,7 @@
 """
 
 import logging
-from typing import Any, Callable, Optional, TypeVar, Union
+from typing import Any, Callable, Optional, TypeVar
 
 logger = logging.getLogger(__name__)
 

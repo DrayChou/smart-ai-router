@@ -7,7 +7,7 @@ import json
 import logging
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import httpx
 
@@ -29,7 +29,7 @@ class ModelCapabilities:
     supports_streaming: bool = True  # 默认支持流式
     max_context_length: Optional[int] = None
     tested_at: Optional[datetime] = None
-    test_results: Dict[str, Any] = None
+    test_results: dict[str, Any] = None
     is_local: bool = False
 
 
@@ -38,8 +38,8 @@ class CapabilityTestRequest:
     """能力测试请求"""
 
     capability: str
-    test_payload: Dict[str, Any]
-    expected_response_fields: List[str]
+    test_payload: dict[str, Any]
+    expected_response_fields: list[str]
     timeout: float = 10.0
 
 
@@ -52,10 +52,10 @@ class LocalModelCapabilityDetector:
             cache_ttl: 缓存时间（秒）
         """
         self.cache_ttl = cache_ttl
-        self.capability_cache: Dict[str, ModelCapabilities] = {}
+        self.capability_cache: dict[str, ModelCapabilities] = {}
 
         # 预定义能力测试案例
-        self.test_cases: Dict[str, CapabilityTestRequest] = {
+        self.test_cases: dict[str, CapabilityTestRequest] = {
             "vision": CapabilityTestRequest(
                 capability="vision",
                 test_payload={
@@ -352,7 +352,7 @@ class LocalModelCapabilityDetector:
 
     async def _test_basic_capabilities(
         self, base_url: str, api_key: str, model_name: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """测试基础能力（代码生成、流式等）"""
         results = {
             "code_generation": True,  # 默认支持
@@ -410,7 +410,7 @@ class LocalModelCapabilityDetector:
 
         return results
 
-    def _get_auth_headers(self, api_key: str) -> Dict[str, str]:
+    def _get_auth_headers(self, api_key: str) -> dict[str, str]:
         """获取认证头"""
         return {
             "Authorization": f"Bearer {api_key}",
@@ -449,7 +449,7 @@ class LocalModelCapabilityDetector:
             logger.debug(f"缓存能力信息失败: {e}")
 
     def can_handle_request(
-        self, capabilities: ModelCapabilities, request_data: Dict[str, Any]
+        self, capabilities: ModelCapabilities, request_data: dict[str, Any]
     ) -> bool:
         """
         检查模型是否能处理特定请求
@@ -488,7 +488,7 @@ class LocalModelCapabilityDetector:
 
         return True
 
-    def _request_needs_vision(self, request_data: Dict[str, Any]) -> bool:
+    def _request_needs_vision(self, request_data: dict[str, Any]) -> bool:
         """检查请求是否需要视觉能力"""
         messages = request_data.get("messages", [])
         for message in messages:
@@ -499,7 +499,7 @@ class LocalModelCapabilityDetector:
                         return True
         return False
 
-    def _request_needs_function_calling(self, request_data: Dict[str, Any]) -> bool:
+    def _request_needs_function_calling(self, request_data: dict[str, Any]) -> bool:
         """检查请求是否需要函数调用能力"""
         return (
             "tools" in request_data
@@ -508,7 +508,7 @@ class LocalModelCapabilityDetector:
             or "function_call" in request_data
         )
 
-    def _estimate_request_tokens(self, request_data: Dict[str, Any]) -> int:
+    def _estimate_request_tokens(self, request_data: dict[str, Any]) -> int:
         """估算请求的token数量"""
         # 简单估算：每个字符约0.25个token
         text_content = json.dumps(request_data, ensure_ascii=False)
@@ -517,9 +517,9 @@ class LocalModelCapabilityDetector:
     async def get_fallback_channels(
         self,
         original_channel: str,
-        request_data: Dict[str, Any],
-        available_channels: List[Dict[str, Any]],
-    ) -> List[Dict[str, Any]]:
+        request_data: dict[str, Any],
+        available_channels: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
         """
         获取备用渠道（当本地模型不支持特定能力时）
 
@@ -571,7 +571,7 @@ class LocalModelCapabilityDetector:
         return fallback_channels
 
     def _calculate_fallback_priority(
-        self, capabilities: ModelCapabilities, channel: Dict[str, Any]
+        self, capabilities: ModelCapabilities, channel: dict[str, Any]
     ) -> float:
         """计算备用渠道的优先级分数"""
         score = 0.0

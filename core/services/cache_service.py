@@ -5,7 +5,7 @@
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ class CacheService:
         self.cache_dir.mkdir(exist_ok=True)
 
         # 内存缓存
-        self._memory_cache: Dict[str, Any] = {}
+        self._memory_cache: dict[str, Any] = {}
 
         logger.info(f"缓存服务初始化完成，缓存目录: {self.cache_dir}")
 
@@ -90,7 +90,7 @@ class CacheService:
 
         logger.info(f"已清空命名空间缓存: {namespace}")
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """获取缓存统计信息"""
         return {
             "memory_cache_size": len(self._memory_cache),
@@ -107,7 +107,7 @@ class CacheService:
 
             import json
 
-            with open(cache_file, "r", encoding="utf-8") as f:
+            with open(cache_file, encoding="utf-8") as f:
                 data = json.load(f)
                 return data.get("value")
         except Exception as e:
@@ -146,7 +146,7 @@ class CacheService:
         except Exception as e:
             logger.warning(f"删除文件缓存失败: {e}")
 
-    def _get_namespaces(self) -> List[str]:
+    def _get_namespaces(self) -> list[str]:
         """获取所有命名空间"""
         namespaces = set()
 
@@ -161,7 +161,7 @@ class CacheService:
                 if item.is_dir():
                     namespaces.add(item.name)
 
-        return sorted(list(namespaces))
+        return sorted(namespaces)
 
 
 # 全局缓存服务实例

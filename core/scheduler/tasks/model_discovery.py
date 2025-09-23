@@ -204,8 +204,6 @@ class ModelDiscoveryTask:
         Returns:
             第一个可用的 base_url
         """
-        import socket
-        from urllib.parse import urlparse
 
         # 获取所有候选 URLs
         candidate_urls = []
@@ -305,7 +303,7 @@ class ModelDiscoveryTask:
 
             # 检查 /proc/1/cgroup 中是否包含 docker
             if os.path.exists("/proc/1/cgroup"):
-                with open("/proc/1/cgroup", "r") as f:
+                with open("/proc/1/cgroup") as f:
                     return "docker" in f.read()
 
             return False

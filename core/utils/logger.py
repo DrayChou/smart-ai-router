@@ -11,7 +11,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import Lock
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional, Union
 
 try:
     import structlog
@@ -42,11 +42,11 @@ class LogEntry:
     request_id: Optional[str] = None
     user_id: Optional[str] = None
     session_id: Optional[str] = None
-    extra_data: Optional[Dict[str, Any]] = None
+    extra_data: Optional[dict[str, Any]] = None
     exception_info: Optional[str] = None
     stack_trace: Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
         return {k: v for k, v in asdict(self).items() if v is not None}
 
@@ -131,7 +131,7 @@ class PersistentLogHandler:
             self._write_entries_sync(entries_to_write)
             self._last_flush = datetime.now()
 
-    async def _write_entries_async(self, entries: List[LogEntry]) -> None:
+    async def _write_entries_async(self, entries: list[LogEntry]) -> None:
         """异步写入日志条目"""
         try:
             import aiofiles
@@ -149,7 +149,7 @@ class PersistentLogHandler:
             print(f"Async log write failed, falling back to sync: {e}", file=sys.stderr)
             self._write_entries_sync(entries)
 
-    def _write_entries_sync(self, entries: List[LogEntry]) -> None:
+    def _write_entries_sync(self, entries: list[LogEntry]) -> None:
         """同步写入日志条目"""
         try:
             # 检查文件大小并轮换
@@ -248,12 +248,12 @@ class SmartAILogger:
 
     def __init__(
         self,
-        config: Optional[Dict[str, Any]] = None,
+        config: Optional[dict[str, Any]] = None,
         log_file: Optional[Union[str, Path]] = None,
     ):
         self.config = config or {}
         self.persistent_handler: Optional[PersistentLogHandler] = None
-        self.context_data: Dict[str, Any] = {}
+        self.context_data: dict[str, Any] = {}
 
         # 设置默认日志文件
         if log_file:
@@ -427,7 +427,7 @@ _global_logger: Optional[SmartAILogger] = None
 
 
 def setup_logging(
-    config: Dict[str, Any] = None, log_file: Optional[Union[str, Path]] = None
+    config: dict[str, Any] = None, log_file: Optional[Union[str, Path]] = None
 ) -> SmartAILogger:
     """
     设置全局日志系统

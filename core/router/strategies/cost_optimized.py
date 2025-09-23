@@ -4,7 +4,6 @@ Cost-optimized routing strategy
 """
 
 from decimal import Decimal
-from typing import List
 
 from core.models.channel import Channel
 from core.router.base import BaseRoutingStrategy, RoutingRequest, RoutingScore
@@ -19,8 +18,8 @@ class CostOptimizedStrategy(BaseRoutingStrategy):
         )
 
     async def calculate_scores(
-        self, channels: List[Channel], request: RoutingRequest
-    ) -> List[RoutingScore]:
+        self, channels: list[Channel], request: RoutingRequest
+    ) -> list[RoutingScore]:
         """按成本排序计算评分"""
         scores = []
         costs = []

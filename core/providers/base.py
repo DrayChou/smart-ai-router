@@ -6,7 +6,7 @@ Provider基础适配器
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 import httpx
 
@@ -23,14 +23,14 @@ class ChatRequest:
     """标准化的聊天请求"""
 
     model: str
-    messages: List[Dict[str, Any]]
+    messages: list[dict[str, Any]]
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
     stream: bool = False
-    tools: Optional[List[Dict[str, Any]]] = None
+    tools: Optional[list[dict[str, Any]]] = None
     tool_choice: Optional[str] = None
     system: Optional[str] = None
-    extra_params: Optional[Dict[str, Any]] = None
+    extra_params: Optional[dict[str, Any]] = None
 
 
 @dataclass
@@ -39,10 +39,10 @@ class ChatResponse:
 
     content: str
     finish_reason: str
-    usage: Dict[str, int]
+    usage: dict[str, int]
     model: str
-    provider_response: Optional[Dict[str, Any]] = None
-    tools_called: Optional[List[Dict[str, Any]]] = None
+    provider_response: Optional[dict[str, Any]] = None
+    tools_called: Optional[list[dict[str, Any]]] = None
 
 
 @dataclass
@@ -52,7 +52,7 @@ class ModelInfo:
     id: str
     name: str
     provider: str
-    capabilities: List[str]  # ["text", "vision", "function_calling", "code_generation"]
+    capabilities: list[str]  # ["text", "vision", "function_calling", "code_generation"]
     context_length: int
     input_cost_per_1k: float
     output_cost_per_1k: float
@@ -63,7 +63,7 @@ class ModelInfo:
 class BaseAdapter(ABC):
     """Provider适配器基类"""
 
-    def __init__(self, provider_name: str, config: Dict[str, Any]):
+    def __init__(self, provider_name: str, config: dict[str, Any]):
         """
         初始化适配器
 
@@ -85,7 +85,7 @@ class BaseAdapter(ABC):
 
         logger.info(f"初始化{provider_name}适配器，使用 base_url: {self.base_url}")
 
-    def _select_available_base_url(self, config: Dict[str, Any]) -> str:
+    def _select_available_base_url(self, config: dict[str, Any]) -> str:
         """
         选择可用的 base_url
 
@@ -100,8 +100,6 @@ class BaseAdapter(ABC):
         Returns:
             第一个可用的 base_url
         """
-        import socket
-        from urllib.parse import urlparse
 
         # 获取所有候选 URLs
         candidate_urls = []
@@ -201,7 +199,7 @@ class BaseAdapter(ABC):
 
             # 检查 /proc/1/cgroup 中是否包含 docker
             if os.path.exists("/proc/1/cgroup"):
-                with open("/proc/1/cgroup", "r") as f:
+                with open("/proc/1/cgroup") as f:
                     return "docker" in f.read()
 
             return False
@@ -260,7 +258,7 @@ class BaseAdapter(ABC):
         pass
 
     @abstractmethod
-    async def list_models(self, api_key: str) -> List[ModelInfo]:
+    async def list_models(self, api_key: str) -> list[ModelInfo]:
         """
         获取可用模型列表
 
@@ -289,7 +287,7 @@ class BaseAdapter(ABC):
             logger.warning(f"API密钥检查失败: {e}")
             return False
 
-    def transform_request(self, request: ChatRequest) -> Dict[str, Any]:
+    def transform_request(self, request: ChatRequest) -> dict[str, Any]:
         """
         将标准请求转换为Provider特定格式
 
@@ -324,7 +322,7 @@ class BaseAdapter(ABC):
 
         return payload
 
-    def transform_response(self, provider_response: Dict[str, Any]) -> ChatResponse:
+    def transform_response(self, provider_response: dict[str, Any]) -> ChatResponse:
         """
         将Provider响应转换为标准格式
 
@@ -347,7 +345,7 @@ class BaseAdapter(ABC):
             tools_called=message.get("tool_calls"),
         )
 
-    def get_auth_headers(self, api_key: str) -> Dict[str, str]:
+    def get_auth_headers(self, api_key: str) -> dict[str, str]:
         """
         获取认证头
 
@@ -371,7 +369,7 @@ class BaseAdapter(ABC):
 
     def get_request_headers(
         self, channel: "Channel", request: ChatRequest
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         """
         获取完整的请求头（包含认证和标准头）
 
@@ -433,10 +431,10 @@ class BaseAdapter(ABC):
 
     def calculate_cost(
         self,
-        usage: Dict[str, int],
+        usage: dict[str, int],
         model_info: ModelInfo,
-        currency_exchange: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        currency_exchange: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
         """
         计算请求成本，支持货币转换
 
@@ -465,7 +463,7 @@ class BaseAdapter(ABC):
         )
 
     def calculate_cost_legacy(
-        self, usage: Dict[str, int], model_info: ModelInfo
+        self, usage: dict[str, int], model_info: ModelInfo
     ) -> float:
         """
         传统成本计算方法（保持向后兼容）

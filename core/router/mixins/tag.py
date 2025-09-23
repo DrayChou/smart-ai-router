@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Optional
 
 from core.config_models import Channel
 from core.exceptions import TagNotFoundError
@@ -19,7 +18,7 @@ class TagRoutingMixin:
 
     def _handle_tag_queries(
         self, request: RoutingRequest
-    ) -> Optional[list[ChannelCandidate]]:
+    ) -> list[ChannelCandidate] | None:
         if (
             "," in request.model
             and not request.model.startswith("tag:")
@@ -211,7 +210,7 @@ class TagRoutingMixin:
     def _get_candidate_channels_by_auto_tags(
         self,
         positive_tags: list[str],
-        negative_tags: Optional[list[str]] = None,
+        negative_tags: list[str] | None = None,
     ) -> list[ChannelCandidate]:
         if negative_tags is None:
             negative_tags = []
@@ -638,7 +637,7 @@ class TagRoutingMixin:
         model_lower = model_name.lower()
         return not any(keyword in model_lower for keyword in unsuitable_keywords)
 
-    def _extract_channel_id(self, cache_key: str) -> Optional[str]:
+    def _extract_channel_id(self, cache_key: str) -> str | None:
         if not cache_key:
             return None
 

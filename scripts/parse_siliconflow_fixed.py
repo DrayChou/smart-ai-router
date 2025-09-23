@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 修复的SiliconFlow HTML解析脚本
 
@@ -286,7 +285,7 @@ def main():
     print(f"读取HTML文件: {html_path}")
 
     try:
-        with open(html_path, "r", encoding="utf-8") as f:
+        with open(html_path, encoding="utf-8") as f:
             html_content = f.read()
         print(f"文件大小: {len(html_content):,} 字符")
     except Exception as e:
@@ -400,7 +399,7 @@ def print_statistics(models_data):
         if data.get("context_length", 0) >= 128000:  # 128K+
             long_context.append((name, data.get("context_length", 0)))
 
-    print(f"\n分类分布:")
+    print("\n分类分布:")
     for cat, count in sorted(categories.items(), key=lambda x: x[1], reverse=True):
         percentage = (count / total) * 100
         print(f"  {cat:>10}: {count:>3} 个 ({percentage:>4.1f}%)")
@@ -428,7 +427,7 @@ def print_statistics(models_data):
     # 关键统计
     context_lengths = [data.get("context_length", 0) for data in models_data.values()]
     if context_lengths:
-        print(f"\n上下文长度统计:")
+        print("\n上下文长度统计:")
         print(f"   最短: {min(context_lengths):,} tokens")
         print(f"   最长: {max(context_lengths):,} tokens")
         print(f"   平均: {sum(context_lengths)//len(context_lengths):,} tokens")
@@ -443,7 +442,7 @@ def print_statistics(models_data):
         ]
     )
     paid_count = total - free_count
-    print(f"\n价格分布:")
+    print("\n价格分布:")
     print(f"   免费模型: {free_count} 个 ({(free_count/total)*100:.1f}%)")
     print(f"   付费模型: {paid_count} 个 ({(paid_count/total)*100:.1f}%)")
 

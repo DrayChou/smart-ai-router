@@ -9,12 +9,12 @@ import threading
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import yaml
 
 from .auth import generate_secure_token as generate_random_token
-from .config.async_loader import get_async_config_loader, load_config_async
+from .config.async_loader import load_config_async
 from .config_models import Channel, Config, Provider
 from .utils.api_key_cache import get_api_key_cache_manager
 from .utils.async_file_ops import get_async_file_manager
@@ -26,10 +26,10 @@ logger = logging.getLogger(__name__)
 class RuntimeState:
     """运行时状态"""
 
-    channel_stats: Dict[str, Any] = field(default_factory=dict)
-    request_history: List[Dict[str, Any]] = field(default_factory=list)
-    health_scores: Dict[str, float] = field(default_factory=dict)
-    cost_tracking: Dict[str, Any] = field(default_factory=dict)
+    channel_stats: dict[str, Any] = field(default_factory=dict)
+    request_history: list[dict[str, Any]] = field(default_factory=list)
+    health_scores: dict[str, float] = field(default_factory=dict)
+    cost_tracking: dict[str, Any] = field(default_factory=dict)
 
 
 class YAMLConfigLoader:
@@ -42,7 +42,7 @@ class YAMLConfigLoader:
         self.runtime_state: RuntimeState = RuntimeState()
 
         # 模型缓存
-        self.model_cache: Dict[str, Dict] = {}
+        self.model_cache: dict[str, dict] = {}
 
         # API Key缓存管理器
         self.api_key_cache_manager = get_api_key_cache_manager()
@@ -153,7 +153,7 @@ class YAMLConfigLoader:
             logger.error(f"异步加载模型缓存失败: {e}")
             # 不抛出异常，允许系统继续运行
 
-    async def _async_cache_migration(self, raw_cache: Dict[str, Dict]):
+    async def _async_cache_migration(self, raw_cache: dict[str, dict]):
         """异步缓存迁移任务"""
         try:
             logger.info("开始后台缓存迁移...")
@@ -182,7 +182,7 @@ class YAMLConfigLoader:
             logger.error(f"后台缓存迁移失败: {e}")
             self._migration_in_progress = False
 
-    def _perform_cache_migration(self, raw_cache: Dict[str, Dict]) -> Dict[str, Dict]:
+    def _perform_cache_migration(self, raw_cache: dict[str, dict]) -> dict[str, dict]:
         """执行缓存迁移逻辑（CPU密集型，在线程池中运行）"""
         # 这里放置原有的缓存迁移逻辑
         migrated_cache = {}
@@ -225,7 +225,7 @@ class YAMLConfigLoader:
     def _load_and_validate_config(self) -> Config:
         """加载并验证配置文件（同步版本，为兼容性保留）"""
         try:
-            with open(self.config_path, "r", encoding="utf-8") as f:
+            with open(self.config_path, encoding="utf-8") as f:
                 raw_data = yaml.safe_load(f) or {}
 
             # 检查Token配置并自动生成
@@ -266,7 +266,7 @@ class YAMLConfigLoader:
             logger.error(f"Failed to load config from {self.config_path}: {e}")
             raise
 
-    def _ensure_auth_token(self, config_data: Dict[str, Any]) -> bool:
+    def _ensure_auth_token(self, config_data: dict[str, Any]) -> bool:
         """
         确保认证配置中有Token，如果启用认证但没有Token则自动生成
 
@@ -290,7 +290,7 @@ class YAMLConfigLoader:
 
         return False
 
-    def _save_config_to_file(self, config_data: Dict[str, Any]) -> None:
+    def _save_config_to_file(self, config_data: dict[str, Any]) -> None:
         """
         保存配置数据到文件（同步版本，为兼容性保留）
         """
@@ -308,7 +308,7 @@ class YAMLConfigLoader:
             logger.error(f"Failed to save config to {self.config_path}: {e}")
             raise
 
-    async def _save_config_to_file_async(self, config_data: Dict[str, Any]) -> None:
+    async def _save_config_to_file_async(self, config_data: dict[str, Any]) -> None:
         """
         异步保存配置数据到文件
         """
@@ -324,7 +324,7 @@ class YAMLConfigLoader:
             logger.error(f"Failed to save config to {self.config_path}: {e}")
             raise
 
-    def _schedule_cache_migration(self, raw_cache: Dict[str, Any]) -> None:
+    def _schedule_cache_migration(self, raw_cache: dict[str, Any]) -> None:
         """Schedule cache migration regardless of event loop availability."""
 
         async def _runner():
@@ -360,7 +360,7 @@ class YAMLConfigLoader:
                 Path(__file__).parent.parent / "cache" / "discovered_models.json"
             )
             if cache_file.exists():
-                with open(cache_file, "r", encoding="utf-8") as f:
+                with open(cache_file, encoding="utf-8") as f:
                     raw_cache = json.load(f)
 
                     # 检查是否需要迁移缓存格式
@@ -438,11 +438,11 @@ class YAMLConfigLoader:
                 )
                 self.model_cache = {}
 
-    def get_channels_by_model(self, model_name: str) -> List[Channel]:
+    def get_channels_by_model(self, model_name: str) -> list[Channel]:
         """根据模型名称获取渠道"""
         return [ch for ch in self.get_enabled_channels() if ch.model_name == model_name]
 
-    def get_channels_by_tag(self, tag: str) -> List[Channel]:
+    def get_channels_by_tag(self, tag: str) -> list[Channel]:
         """根据标签获取渠道"""
         return [ch for ch in self.get_enabled_channels() if tag in ch.tags]
 
@@ -483,7 +483,7 @@ class YAMLConfigLoader:
             logger.error(f"MEMORY INDEX BUILD FAILED: {e}")
             # 不影响系统启动，继续运行
 
-    def _needs_cache_migration(self, cache: Dict[str, Any]) -> bool:
+    def _needs_cache_migration(self, cache: dict[str, Any]) -> bool:
         """检查缓存是否需要迁移到API Key级别格式"""
         if not cache:
             return False
@@ -494,7 +494,7 @@ class YAMLConfigLoader:
                 return True
         return False
 
-    def _get_channels_for_migration(self) -> Dict[str, Any]:
+    def _get_channels_for_migration(self) -> dict[str, Any]:
         """获取用于缓存迁移的渠道映射"""
         channels_map = {}
         for channel in self.config.channels:
@@ -538,7 +538,7 @@ class YAMLConfigLoader:
         except Exception as e:
             logger.error(f"Failed to save migrated cache async: {e}")
 
-    async def _migrate_cache_background(self, raw_cache: Dict[str, Any]):
+    async def _migrate_cache_background(self, raw_cache: dict[str, Any]):
         """后台迁移缓存格式（不阻塞主线程）"""
         try:
             logger.info("BACKGROUND MIGRATION: Starting cache migration in background")
@@ -648,18 +648,18 @@ class YAMLConfigLoader:
                 )
                 self.model_cache = {}
 
-    def get_model_cache(self) -> Dict[str, Dict]:
+    def get_model_cache(self) -> dict[str, dict]:
         """获取模型缓存（兼容性方法）"""
         return self.model_cache
 
     def get_model_cache_by_channel_and_key(
         self, channel_id: str, api_key: str
-    ) -> Optional[Dict]:
+    ) -> Optional[dict]:
         """获取特定API Key的模型缓存"""
         cache_key = self.api_key_cache_manager.generate_cache_key(channel_id, api_key)
         return self.model_cache.get(cache_key)
 
-    def get_model_cache_by_channel(self, channel_id: str) -> Dict[str, Any]:
+    def get_model_cache_by_channel(self, channel_id: str) -> dict[str, Any]:
         """获取渠道下所有API Key的缓存（兼容性方法）"""
         # 查找该渠道的所有缓存条目
         channel_cache_keys = self.api_key_cache_manager.find_cache_entries_by_channel(
@@ -693,7 +693,7 @@ class YAMLConfigLoader:
                 latest_status = cache_data.get("status", "unknown")
 
         # 去重并排序
-        unique_models = sorted(list(set(merged_models)))
+        unique_models = sorted(set(merged_models))
 
         return {
             "channel_id": channel_id,
@@ -705,7 +705,7 @@ class YAMLConfigLoader:
             "note": f"Merged from {len(channel_cache_keys)} API keys",
         }
 
-    def get_enabled_channels(self) -> List[Channel]:
+    def get_enabled_channels(self) -> list[Channel]:
         """获取所有启用的渠道"""
         return [ch for ch in self.config.channels if ch.enabled]
 
@@ -716,7 +716,7 @@ class YAMLConfigLoader:
                 return channel
         return None
 
-    def update_model_cache(self, new_cache: Dict[str, Dict]):
+    def update_model_cache(self, new_cache: dict[str, dict]):
         """更新模型缓存（支持API Key级别缓存）"""
         # 检查是否需要迁移新的缓存数据
         if self._needs_cache_migration(new_cache):
@@ -736,7 +736,7 @@ class YAMLConfigLoader:
         )
 
     def update_model_cache_for_channel_and_key(
-        self, channel_id: str, api_key: str, cache_data: Dict[str, Any]
+        self, channel_id: str, api_key: str, cache_data: dict[str, Any]
     ):
         """更新特定渠道和API Key的模型缓存"""
         cache_key = self.api_key_cache_manager.generate_cache_key(channel_id, api_key)
@@ -826,7 +826,7 @@ class YAMLConfigLoader:
                 f"Channel {channel_id} health score is low: {new_health:.3f}"
             )
 
-    def get_server_config(self) -> Dict[str, Any]:
+    def get_server_config(self) -> dict[str, Any]:
         """获取服务器配置"""
         return {
             "host": self.config.server.host,
@@ -835,7 +835,7 @@ class YAMLConfigLoader:
             "cors_origins": self.config.server.cors_origins,
         }
 
-    def get_routing_config(self) -> Dict[str, Any]:
+    def get_routing_config(self) -> dict[str, Any]:
         """获取路由配置"""
         return {
             "default_strategy": self.config.routing.default_strategy,
@@ -843,7 +843,7 @@ class YAMLConfigLoader:
             "max_retry_attempts": self.config.routing.max_retry_attempts,
         }
 
-    def get_tasks_config(self) -> Dict[str, Any]:
+    def get_tasks_config(self) -> dict[str, Any]:
         """获取任务配置"""
         return {
             "model_discovery": {
@@ -864,7 +864,7 @@ class YAMLConfigLoader:
             },
         }
 
-    def get_system_config(self) -> Dict[str, Any]:
+    def get_system_config(self) -> dict[str, Any]:
         """获取系统配置"""
         return {
             "name": self.config.system.name,
@@ -900,11 +900,10 @@ class YAMLConfigLoader:
         refreshes the in-memory Pydantic config and maps.
         """
         try:
-            from copy import deepcopy
 
             import yaml as _yaml
 
-            with open(self.config_path, "r", encoding="utf-8") as f:
+            with open(self.config_path, encoding="utf-8") as f:
                 raw = _yaml.safe_load(f) or {}
 
             changed = False
@@ -937,7 +936,7 @@ class YAMLConfigLoader:
         try:
             import yaml as _yaml
 
-            with open(self.config_path, "r", encoding="utf-8") as f:
+            with open(self.config_path, encoding="utf-8") as f:
                 raw = _yaml.safe_load(f) or {}
 
             changed = False
@@ -965,7 +964,7 @@ class YAMLConfigLoader:
             return False
 
     @property
-    def config_data(self) -> Dict[str, Any]:
+    def config_data(self) -> dict[str, Any]:
         """为兼容性提供config_data属性"""
         return {
             "system": self.get_system_config(),

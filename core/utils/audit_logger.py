@@ -1,15 +1,12 @@
-# -*- coding: utf-8 -*-
 """
 审计日志系统 - 专门用于记录用户行为和系统操作的审计追踪
 """
-import json
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from enum import Enum
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional
 
-from core.utils.logger import LogEntry, SmartAILogger, get_smart_logger
+from core.utils.logger import SmartAILogger, get_smart_logger
 
 
 class AuditEventType(Enum):
@@ -74,12 +71,12 @@ class AuditEvent:
     resource: Optional[str] = None
     action: Optional[str] = None
     outcome: str = "success"
-    details: Optional[Dict[str, Any]] = None
-    before_state: Optional[Dict[str, Any]] = None
-    after_state: Optional[Dict[str, Any]] = None
+    details: Optional[dict[str, Any]] = None
+    before_state: Optional[dict[str, Any]] = None
+    after_state: Optional[dict[str, Any]] = None
     error_message: Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
         data = asdict(self)
         data["event_type"] = self.event_type.value
@@ -92,7 +89,7 @@ class AuditLogger:
 
     def __init__(self, smart_logger: Optional[SmartAILogger] = None):
         self.smart_logger = smart_logger or get_smart_logger()
-        self.context: Dict[str, Any] = {}
+        self.context: dict[str, Any] = {}
 
     def set_context(self, **context_data) -> None:
         """设置审计上下文信息"""
@@ -109,9 +106,9 @@ class AuditLogger:
         outcome: str = "success",
         resource: Optional[str] = None,
         action: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None,
-        before_state: Optional[Dict[str, Any]] = None,
-        after_state: Optional[Dict[str, Any]] = None,
+        details: Optional[dict[str, Any]] = None,
+        before_state: Optional[dict[str, Any]] = None,
+        after_state: Optional[dict[str, Any]] = None,
         error_message: Optional[str] = None,
         **extra_context,
     ) -> None:
@@ -260,7 +257,7 @@ class AuditLogger:
     # --- 路由审计方法 ---
 
     def log_route_selected(
-        self, model: str, selected_channel: str, strategy: str, alternatives: List[str]
+        self, model: str, selected_channel: str, strategy: str, alternatives: list[str]
     ) -> None:
         """记录路由选择"""
         self.log_event(
@@ -316,8 +313,8 @@ class AuditLogger:
     def log_config_update(
         self,
         config_section: str,
-        changes: Dict[str, Any],
-        before_values: Optional[Dict[str, Any]] = None,
+        changes: dict[str, Any],
+        before_values: Optional[dict[str, Any]] = None,
     ) -> None:
         """记录配置更新"""
         self.log_event(
@@ -351,7 +348,7 @@ class AuditLogger:
 
     # --- 系统操作审计方法 ---
 
-    def log_system_startup(self, version: str, config_info: Dict[str, Any]) -> None:
+    def log_system_startup(self, version: str, config_info: dict[str, Any]) -> None:
         """记录系统启动"""
         self.log_event(
             AuditEventType.SYSTEM_STARTUP,
@@ -388,7 +385,7 @@ class AuditLogger:
         export_type: str,
         records_count: int,
         format: str,
-        filters: Optional[Dict[str, Any]] = None,
+        filters: Optional[dict[str, Any]] = None,
     ) -> None:
         """记录数据导出"""
         self.log_event(
@@ -405,7 +402,7 @@ class AuditLogger:
         )
 
     def log_data_cleanup(
-        self, cleanup_type: str, deleted_count: int, criteria: Dict[str, Any]
+        self, cleanup_type: str, deleted_count: int, criteria: dict[str, Any]
     ) -> None:
         """记录数据清理"""
         self.log_event(
