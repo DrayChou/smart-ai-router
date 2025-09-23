@@ -180,6 +180,7 @@ def create_minimal_app() -> FastAPI:
     # 注册异步配置加载器（如果支持）
     try:
         import importlib.util
+
         if importlib.util.find_spec("core.config.async_loader"):
             logger.info("异步配置加载器已注册，后续可使用 create_minimal_app_async()")
     except ImportError:
