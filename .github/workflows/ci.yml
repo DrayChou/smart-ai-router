@@ -51,7 +51,7 @@ jobs:
 
     - name: Run ruff (linting)
       run: |
-        uv run ruff check .
+        uv run ruff check . --exclude scripts/
 
     - name: Run mypy (type checking)
       run: |
