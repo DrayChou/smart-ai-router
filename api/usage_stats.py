@@ -43,7 +43,9 @@ def create_usage_stats_router(config_loader: YAMLConfigLoader) -> APIRouter:
                 status_code=400, detail="日期格式错误，请使用YYYY-MM-DD格式"
             ) from None
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"获取每日统计失败: {str(e)}") from e
+            raise HTTPException(
+                status_code=500, detail=f"获取每日统计失败: {str(e)}"
+            ) from e
 
     @router.get("/weekly")
     async def get_weekly_stats(
@@ -67,7 +69,9 @@ def create_usage_stats_router(config_loader: YAMLConfigLoader) -> APIRouter:
                 status_code=400, detail="日期格式错误，请使用YYYY-MM-DD格式"
             ) from None
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"获取周统计失败: {str(e)}") from e
+            raise HTTPException(
+                status_code=500, detail=f"获取周统计失败: {str(e)}"
+            ) from e
 
     @router.get("/monthly")
     async def get_monthly_stats(
@@ -81,7 +85,9 @@ def create_usage_stats_router(config_loader: YAMLConfigLoader) -> APIRouter:
             return JSONResponse(content={"success": True, "data": stats})
 
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"获取月度统计失败: {str(e)}") from e
+            raise HTTPException(
+                status_code=500, detail=f"获取月度统计失败: {str(e)}"
+            ) from e
 
     @router.get("/summary")
     async def get_usage_summary(auth: bool = Depends(get_admin_auth_dependency)):
@@ -127,7 +133,9 @@ def create_usage_stats_router(config_loader: YAMLConfigLoader) -> APIRouter:
             return JSONResponse(content={"success": True, "data": summary})
 
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"获取汇总统计失败: {str(e)}") from e
+            raise HTTPException(
+                status_code=500, detail=f"获取汇总统计失败: {str(e)}"
+            ) from e
 
     @router.get("/top-models")
     async def get_top_models(
@@ -192,7 +200,9 @@ def create_usage_stats_router(config_loader: YAMLConfigLoader) -> APIRouter:
                 status_code=400, detail="日期格式错误，请使用YYYY-MM-DD格式"
             ) from None
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"获取模型排行失败: {str(e)}") from e
+            raise HTTPException(
+                status_code=500, detail=f"获取模型排行失败: {str(e)}"
+            ) from e
 
     @router.get("/top-channels")
     async def get_top_channels(
@@ -257,7 +267,9 @@ def create_usage_stats_router(config_loader: YAMLConfigLoader) -> APIRouter:
                 status_code=400, detail="日期格式错误，请使用YYYY-MM-DD格式"
             ) from None
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"获取渠道排行失败: {str(e)}") from e
+            raise HTTPException(
+                status_code=500, detail=f"获取渠道排行失败: {str(e)}"
+            ) from e
 
     @router.get("/cost-breakdown")
     async def get_cost_breakdown(
@@ -324,7 +336,9 @@ def create_usage_stats_router(config_loader: YAMLConfigLoader) -> APIRouter:
                 status_code=400, detail="日期格式错误，请使用YYYY-MM-DD格式"
             ) from None
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"获取成本分解失败: {str(e)}") from e
+            raise HTTPException(
+                status_code=500, detail=f"获取成本分解失败: {str(e)}"
+            ) from e
 
     @router.get("/alerts")
     async def get_channel_alerts(
@@ -370,7 +384,9 @@ def create_usage_stats_router(config_loader: YAMLConfigLoader) -> APIRouter:
             )
 
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"获取告警信息失败: {str(e)}") from e
+            raise HTTPException(
+                status_code=500, detail=f"获取告警信息失败: {str(e)}"
+            ) from e
 
     @router.get("/channel-status")
     async def get_channel_status(auth: bool = Depends(get_admin_auth_dependency)):
@@ -380,7 +396,9 @@ def create_usage_stats_router(config_loader: YAMLConfigLoader) -> APIRouter:
             return JSONResponse(content={"success": True, "data": status})
 
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"获取渠道状态失败: {str(e)}") from e
+            raise HTTPException(
+                status_code=500, detail=f"获取渠道状态失败: {str(e)}"
+            ) from e
 
     @router.post("/clear-alerts/{channel_id}")
     async def clear_channel_alerts(
@@ -397,7 +415,9 @@ def create_usage_stats_router(config_loader: YAMLConfigLoader) -> APIRouter:
             )
 
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"清除告警状态失败: {str(e)}") from e
+            raise HTTPException(
+                status_code=500, detail=f"清除告警状态失败: {str(e)}"
+            ) from e
 
     @router.post("/clear-all-alerts")
     async def clear_all_alerts(auth: bool = Depends(get_admin_auth_dependency)):
@@ -409,6 +429,8 @@ def create_usage_stats_router(config_loader: YAMLConfigLoader) -> APIRouter:
             )
 
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"清除告警状态失败: {str(e)}") from e
+            raise HTTPException(
+                status_code=500, detail=f"清除告警状态失败: {str(e)}"
+            ) from e
 
     return router

@@ -1,6 +1,7 @@
 """
 Pydantic models for configuration validation.
 """
+
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field

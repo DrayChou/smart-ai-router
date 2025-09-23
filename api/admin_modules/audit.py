@@ -121,7 +121,9 @@ async def get_audit_events(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取审计事件失败: {str(e)}") from e
+        raise HTTPException(
+            status_code=500, detail=f"获取审计事件失败: {str(e)}"
+        ) from e
 
 
 @router.get("/summary")
@@ -163,7 +165,9 @@ async def get_audit_summary(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取审计摘要失败: {str(e)}") from e
+        raise HTTPException(
+            status_code=500, detail=f"获取审计摘要失败: {str(e)}"
+        ) from e
 
 
 @router.get("/security")
@@ -216,7 +220,9 @@ async def get_security_analysis(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取安全分析失败: {str(e)}") from e
+        raise HTTPException(
+            status_code=500, detail=f"获取安全分析失败: {str(e)}"
+        ) from e
 
 
 @router.get("/user/{user_id}/activity")
@@ -267,7 +273,9 @@ async def get_user_activity(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取用户活动报告失败: {str(e)}") from e
+        raise HTTPException(
+            status_code=500, detail=f"获取用户活动报告失败: {str(e)}"
+        ) from e
 
 
 @router.get("/anomalies")
@@ -370,7 +378,9 @@ async def generate_audit_report(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"生成审计报告失败: {str(e)}") from e
+        raise HTTPException(
+            status_code=500, detail=f"生成审计报告失败: {str(e)}"
+        ) from e
 
 
 @router.get("/compliance/summary")
@@ -446,7 +456,9 @@ async def get_compliance_summary(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取合规性摘要失败: {str(e)}") from e
+        raise HTTPException(
+            status_code=500, detail=f"获取合规性摘要失败: {str(e)}"
+        ) from e
 
 
 @router.get("/health")
@@ -509,4 +521,6 @@ async def get_audit_health(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取审计健康状态失败: {str(e)}") from e
+        raise HTTPException(
+            status_code=500, detail=f"获取审计健康状态失败: {str(e)}"
+        ) from e

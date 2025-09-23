@@ -1,6 +1,7 @@
 """
 Chat completion request handler with improved architecture
 """
+
 import asyncio
 import json
 import logging

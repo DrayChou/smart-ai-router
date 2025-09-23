@@ -3,7 +3,6 @@ Speed-optimized routing strategy
 速度优化路由策略
 """
 
-
 from core.models.channel import Channel
 from core.router.base import BaseRoutingStrategy, RoutingRequest, RoutingScore
 

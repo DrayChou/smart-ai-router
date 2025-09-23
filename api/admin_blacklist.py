@@ -232,7 +232,9 @@ async def trigger_recovery_check(admin_token: str = Depends(verify_admin_token))
         await recovery_manager._perform_recovery_check()
         return {"message": "Recovery check completed successfully"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Recovery check failed: {str(e)}") from e
+        raise HTTPException(
+            status_code=500, detail=f"Recovery check failed: {str(e)}"
+        ) from e
 
 
 @router.post("/recovery/service/{action}")

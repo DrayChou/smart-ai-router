@@ -146,9 +146,7 @@ def create_status_monitor_router(
         models = channel_cache.get("models", [])
 
         blacklist_manager = get_model_blacklist_manager()
-        blacklist_manager.get_blacklisted_models_for_channel(
-            channel_id
-        )
+        blacklist_manager.get_blacklisted_models_for_channel(channel_id)
 
         models_data = []
         for model in models:

@@ -143,7 +143,9 @@ def create_token_estimation_router(config_loader) -> APIRouter:
 
         except Exception as e:
             logger.error(f"Token预估失败: {e}")
-            raise HTTPException(status_code=500, detail=f"Token预估失败: {str(e)}") from e
+            raise HTTPException(
+                status_code=500, detail=f"Token预估失败: {str(e)}"
+            ) from e
 
     @router.post("/pricing", response_model=ModelPricingResponse)
     async def calculate_model_pricing(request: ModelPricingRequest):
@@ -192,7 +194,9 @@ def create_token_estimation_router(config_loader) -> APIRouter:
             raise
         except Exception as e:
             logger.error(f"定价计算失败: {e}")
-            raise HTTPException(status_code=500, detail=f"定价计算失败: {str(e)}") from e
+            raise HTTPException(
+                status_code=500, detail=f"定价计算失败: {str(e)}"
+            ) from e
 
     @router.get("/complexity/{text}")
     async def detect_task_complexity(text: str):
@@ -217,7 +221,9 @@ def create_token_estimation_router(config_loader) -> APIRouter:
 
         except Exception as e:
             logger.error(f"复杂度检测失败: {e}")
-            raise HTTPException(status_code=500, detail=f"复杂度检测失败: {str(e)}") from e
+            raise HTTPException(
+                status_code=500, detail=f"复杂度检测失败: {str(e)}"
+            ) from e
 
     @router.get("/models/quality")
     async def get_model_quality_scores():

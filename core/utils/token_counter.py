@@ -1,6 +1,7 @@
 """
 Unified token counting and cost calculation utilities
 """
+
 import logging
 from typing import Any, Optional
 

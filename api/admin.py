@@ -45,7 +45,9 @@ def create_admin_router(config_loader: YAMLConfigLoader) -> APIRouter:
                 "timestamp": int(time.time()),
             }
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"获取配置状态失败: {str(e)}") from e
+            raise HTTPException(
+                status_code=500, detail=f"获取配置状态失败: {str(e)}"
+            ) from e
 
     @router.post("/config/reload")
     async def reload_config_endpoint(
@@ -74,7 +76,9 @@ def create_admin_router(config_loader: YAMLConfigLoader) -> APIRouter:
             }
 
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"配置重新加载失败: {str(e)}") from e
+            raise HTTPException(
+                status_code=500, detail=f"配置重新加载失败: {str(e)}"
+            ) from e
 
     @router.get("/logs/search")
     async def search_logs(
@@ -109,7 +113,9 @@ def create_admin_router(config_loader: YAMLConfigLoader) -> APIRouter:
             }
 
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"日志搜索失败: {str(e)}") from e
+            raise HTTPException(
+                status_code=500, detail=f"日志搜索失败: {str(e)}"
+            ) from e
 
     @router.get("/cost/optimize")
     async def get_cost_optimization(auth: bool = Depends(get_admin_auth_dependency)):
@@ -152,6 +158,8 @@ def create_admin_router(config_loader: YAMLConfigLoader) -> APIRouter:
             }
 
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"成本优化分析失败: {str(e)}") from e
+            raise HTTPException(
+                status_code=500, detail=f"成本优化分析失败: {str(e)}"
+            ) from e
 
     return router

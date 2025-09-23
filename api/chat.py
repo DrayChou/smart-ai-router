@@ -3,7 +3,6 @@ Chat completion API endpoints
 聊天完成API接口
 """
 
-
 from fastapi import APIRouter
 
 from core.handlers.chat_handler import ChatCompletionHandler, ChatCompletionRequest

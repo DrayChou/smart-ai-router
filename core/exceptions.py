@@ -1,6 +1,7 @@
 """
 Unified exception hierarchy for Smart AI Router
 """
+
 from typing import Any, Optional
 
 from fastapi.responses import JSONResponse

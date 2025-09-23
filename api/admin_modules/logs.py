@@ -96,7 +96,9 @@ async def get_log_statistics(
             time_range=stats.time_range,
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取日志统计失败: {str(e)}") from e
+        raise HTTPException(
+            status_code=500, detail=f"获取日志统计失败: {str(e)}"
+        ) from e
 
 
 @router.post("/search")
@@ -163,7 +165,9 @@ async def get_recent_errors(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取错误日志失败: {str(e)}") from e
+        raise HTTPException(
+            status_code=500, detail=f"获取错误日志失败: {str(e)}"
+        ) from e
 
 
 @router.get("/slow-requests")
@@ -196,7 +200,9 @@ async def get_slow_requests(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取慢请求日志失败: {str(e)}") from e
+        raise HTTPException(
+            status_code=500, detail=f"获取慢请求日志失败: {str(e)}"
+        ) from e
 
 
 @router.get("/request/{request_id}/timeline")
@@ -229,7 +235,9 @@ async def get_request_timeline(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取请求时间线失败: {str(e)}") from e
+        raise HTTPException(
+            status_code=500, detail=f"获取请求时间线失败: {str(e)}"
+        ) from e
 
 
 @router.post("/export")
@@ -290,7 +298,9 @@ async def check_log_alerts(
         return AlertCheckResponse(alerts=alerts, checked_at=datetime.now())
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"检查日志警报失败: {str(e)}") from e
+        raise HTTPException(
+            status_code=500, detail=f"检查日志警报失败: {str(e)}"
+        ) from e
 
 
 @router.get("/report")
@@ -323,7 +333,9 @@ async def generate_log_report(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"生成日志报告失败: {str(e)}") from e
+        raise HTTPException(
+            status_code=500, detail=f"生成日志报告失败: {str(e)}"
+        ) from e
 
 
 @router.delete("/cleanup")
@@ -412,4 +424,6 @@ async def get_logging_health(
         return health_info
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取日志健康状态失败: {str(e)}") from e
+        raise HTTPException(
+            status_code=500, detail=f"获取日志健康状态失败: {str(e)}"
+        ) from e

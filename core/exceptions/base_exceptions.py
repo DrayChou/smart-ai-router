@@ -2,6 +2,7 @@
 统一异常基类
 定义所有系统异常的基础结构
 """
+
 import traceback
 from datetime import datetime
 from typing import Any, Optional

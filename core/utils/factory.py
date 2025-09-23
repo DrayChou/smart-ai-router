@@ -2,6 +2,7 @@
 统一工厂函数
 减少重复的单例模式代码
 """
+
 import threading
 from typing import Callable, Optional, TypeVar
 
