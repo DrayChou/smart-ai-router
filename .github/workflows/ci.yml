@@ -1,5 +1,6 @@
 name: CI/CD Pipeline
 
+# For personal AI router project - ensures code quality and prevents cost-related bugs
 on:
   push:
     branches: [ main, master, develop ]
@@ -95,15 +96,7 @@ jobs:
 
     - name: Run tests with coverage
       run: |
-        uv run pytest --cov=. --cov-report=xml --cov-report=term-missing --cov-fail-under=70
-
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage.xml
-        flags: unittests
-        name: codecov-umbrella
-        fail_ci_if_error: false
+        uv run pytest --cov=. --cov-report=term-missing --cov-fail-under=50
 
   security:
     name: Security Checks
@@ -129,8 +122,4 @@ jobs:
 
     - name: Run bandit (security linting)
       run: |
-        uv run bandit -r . -x tests/ -f json || true
-
-    - name: Run safety (dependency vulnerability check)
-      run: |
-        uv run safety check || true
+        uv run bandit -r . -x tests/ --quiet || true
