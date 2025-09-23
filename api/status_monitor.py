@@ -10,14 +10,14 @@ from datetime import datetime
 from typing import Any, Optional
 
 from fastapi import APIRouter, Query, Request, WebSocket, WebSocketDisconnect
-from starlette.websockets import WebSocketState
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
+from starlette.websockets import WebSocketState
 
 from core.json_router import JSONRouter
-from core.utils.model_channel_blacklist import get_model_blacklist_manager
 from core.utils.model_capabilities import get_model_capabilities_from_openrouter
+from core.utils.model_channel_blacklist import get_model_blacklist_manager
 from core.yaml_config import YAMLConfigLoader
 
 logger = logging.getLogger(__name__)
