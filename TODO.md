@@ -1,4 +1,4 @@
-# Smart AI Router - TODO (2025-09-16 Review) / 智能 AI 路由器 - TODO（2025-09-16 审查）
+# Smart AI Router - TODO (2025-09-22 P0 Complete) / 智能 AI 路由器 - TODO（2025-09-22 P0完成）
 
 ## Completed and Verified / 已完成并确认
 
@@ -9,33 +9,48 @@
 - Pricing refactor including Doubao and tiered rules is present (`core/pricing`, `core/utils/tiered_pricing.py`). / 包含豆包及阶梯定价的定价重构已完成（`core/pricing`、`core/utils/tiered_pricing.py`）。
 - Pytest suite covers routing, pricing, and compatibility scenarios (`tests/test_routing_logic.py`, `tests/test_new_architecture.py`). / Pytest 测试套件已覆盖路由、定价与兼容性场景（`tests/test_routing_logic.py`、`tests/test_new_architecture.py`）。
 
-## P0 - High Priority / P0 - 高优先级
+## ✅ P0 - COMPLETED (2025-09-22) / P0 - 已完成（2025-09-22）
 
-1. Core routing engine consolidation / 核心路由引擎整合
+**STATUS: ALL P0 TASKS COMPLETED** / **状态：所有P0任务已完成**
+
+1. ✅ **Core routing engine consolidation** / 核心路由引擎整合
    - ✅ Split `core/json_router.py` into mixins and shared types under `core/router/*`. / ✅ 已拆分 `core/json_router.py`，核心逻辑迁移到 `core/router/*` 的 mixin 与类型模块。
-   - ✅ Fully retired legacy modules under `core/routing/*` and updated imports to use new router structure. / ✅ 完全移除 `core/routing/*` 遗留模块并更新所有导入引用至新路由器结构。
-   - Wire `main.py` and `api/*` to a single RoutingEngine with dependency injection (RouterService wrapper in place; update FastAPI routers and middleware next). / 通过依赖注入让 `main.py` 和 `api/*` 接入统一的 RoutingEngine（RouterService 已就绪，后续同步 FastAPI 路由与中间件）。
-2. Complete API key aware routing path / 完成 API Key 感知的路由路径
-   - Update call sites still using channel cache only (`api/status_monitor.py:95`) to rely on `_get_discovered_info` / `get_model_cache_by_channel_and_key`. / 修正仍仅读取渠道级缓存的调用（如 `api/status_monitor.py:95`），统一改用 `_get_discovered_info` / `get_model_cache_by_channel_and_key`。
-   - Ensure chat handlers and scoring propagate the request API key for cost estimation and monitoring. / 确保聊天处理与评分链路向下传递请求的 API Key，用于成本估算与监控。
-3. CI and quality gate / CI 与质量门禁
-   - ✅ Added GitHub Actions for `ruff`, `black`, `isort`, `mypy`, and `pytest` with caching and coverage collection (70% threshold). / ✅ 新增 GitHub Actions，执行 `ruff`、`black`、`isort`、`mypy`、`pytest` 并启用缓存和覆盖率收集（70% 阈值）。
-4. Unified error handling / 统一错误处理
-   - ✅ Applied `core/utils/exception_handler.py` via `ExceptionHandlerMiddleware` to all API endpoints with unified response schema and severity/category tagging. / ✅ 通过 `ExceptionHandlerMiddleware` 在所有 API 端点应用 `core/utils/exception_handler.py`，实现统一返回结构与错误级别/类别标记。
+   - ✅ **COMPLETE**: Fully retired legacy modules under `core/routing/*` and updated imports (commit fec6cac). / ✅ **已完成**：完全移除 `core/routing/*` 遗留模块并更新所有导入引用（提交 fec6cac）。
+   - ✅ **COMPLETE**: FastAPI routers and middleware unified via dependency injection with modern lifespan management. / ✅ **已完成**：通过依赖注入和现代生命周期管理统一 FastAPI 路由与中间件。
 
-## P1 - Mid Term Focus / P1 - 中期重点
+2. ✅ **Complete API key aware routing path** / 完成 API Key 感知的路由路径
+   - ✅ **COMPLETE**: Updated `api/status_monitor.py` to use API key-aware caching with fallback mechanisms. / ✅ **已完成**：更新 `api/status_monitor.py` 使用API密钥感知缓存及回退机制。
+   - ✅ **COMPLETE**: Chat handlers and scoring propagate request API key for cost estimation and monitoring. / ✅ **已完成**：聊天处理与评分链路传递请求API密钥用于成本估算与监控。
 
-- Configuration and legacy clean-up / 配置与遗留清理
-  - Continue isolating `core/router/*` and `core/models/virtual_model.py` as optional; remove or guard managers that depend on them (`core/manager/channel_manager.py`). / 继续将 `core/router/*`、`core/models/virtual_model.py` 标记为可选模块，并清理或隔离依赖它们的管理器（如 `core/manager/channel_manager.py`）。
-  - Keep docs centred on YAML + tags (follow up on `docs/LEGACY.md`) and drop remaining DB-first wording from README/docs. / 文档继续以 YAML + 标签为中心（参考 `docs/LEGACY.md`），清除 README/文档中残留的 DB 优先描述。
-- Web management surface / Web 管理面增强
-  - Extend `/status` with channel enable/disable, priority editing, key metadata, and live refresh. / 为 `/status` 页面新增渠道启停、优先级编辑、密钥元数据与实时刷新。
-- Smart budget management / 智能预算管理
-  - Use `core/utils/usage_tracker.py` data to enforce spend thresholds, send alerts, and auto switch strategies when limits reach. / 利用 `core/utils/usage_tracker.py` 数据设置支出阈值、发送告警并在触及阈值时自动切换策略。
-- Observability upgrade / 可观测性升级
-  - Export Prometheus metrics, standardise trace/log fields, and separate debug log channels. / 输出 Prometheus 指标，规范追踪/日志字段，并划分调试日志通道。
-- Dependency upgrades / 依赖升级
-  - Plan migration to SQLAlchemy 2.x, Pydantic 2.x, and python-json-logger new import path to remove deprecation warnings. / 规划升级 SQLAlchemy 2.x、Pydantic 2.x 以及 python-json-logger 新路径，消除弃用警告。
+3. ✅ **CI and quality gate** / CI 与质量门禁
+   - ✅ **COMPLETE**: GitHub Actions pipeline with ruff, black, isort, mypy, pytest, security scanning (bandit, safety), 70% coverage threshold. / ✅ **已完成**：GitHub Actions管道包含代码质量检查、安全扫描、70%覆盖率要求。
+
+4. ✅ **Unified error handling** / 统一错误处理
+   - ✅ **COMPLETE**: `ExceptionHandlerMiddleware` with enterprise-grade error classification, request tracing, and structured logging. / ✅ **已完成**：企业级 `ExceptionHandlerMiddleware` 包含错误分类、请求追踪、结构化日志。
+
+## P1 - Mid Term Focus (Updated 2025-09-22) / P1 - 中期重点（2025-09-22更新）
+
+**PRIORITY ORDER BASED ON VALUE & IMPACT** / **基于价值和影响的优先级排序**
+
+1. **🚀 Web management surface** / Web 管理面增强 **[HIGH VALUE]**
+   - Extend `/status` with channel enable/disable, priority editing, key metadata, and live refresh. / 为 `/status` 页面新增渠道启停、优先级编辑、密钥元数据与实时刷新。
+   - **Rationale**: Direct user experience improvement, builds on existing status monitor. / **理由**：直接提升用户体验，基于现有状态监控扩展。
+
+2. **💰 Smart budget management** / 智能预算管理 **[CORE NEED]**
+   - Use `core/utils/usage_tracker.py` data to enforce spend thresholds, send alerts, and auto switch strategies when limits reach. / 利用 `core/utils/usage_tracker.py` 数据设置支出阈值、发送告警并在触及阈值时自动切换策略。
+   - **Rationale**: Essential for personal cost control, existing tracker infrastructure ready. / **理由**：个人成本控制核心需求，现有追踪基础设施就绪。
+
+3. **🔧 Configuration and legacy clean-up** / 配置与遗留清理 **[MAINTENANCE]**
+   - **UPDATED**: Clean up remaining optional modules (`core/models/virtual_model.py`) and unused managers (`core/manager/channel_manager.py`). / **已更新**：清理剩余可选模块（`core/models/virtual_model.py`）和未使用的管理器（`core/manager/channel_manager.py`）。
+   - Keep docs centred on YAML + tags (follow up on `docs/LEGACY.md`) and drop remaining DB-first wording from README/docs. / 文档继续以 YAML + 标签为中心（参考 `docs/LEGACY.md`），清除 README/文档中残留的 DB 优先描述。
+
+4. **🛠️ Dependency upgrades** / 依赖升级 **[UPDATED - PARTIAL COMPLETE]**
+   - ✅ **COMPLETE**: Pydantic 2.x compatibility achieved (commit fec6cac). / ✅ **已完成**：Pydantic 2.x 兼容性已实现（提交 fec6cac）。
+   - **REMAINING**: Migrate to SQLAlchemy 2.x to remove deprecation warnings from `declarative_base()`. / **剩余**：迁移到 SQLAlchemy 2.x 消除 `declarative_base()` 弃用警告。
+
+5. **📊 Observability upgrade** / 可观测性升级 **[ADVANCED]**
+   - Export Prometheus metrics, standardise trace/log fields, and separate debug log channels. / 输出 Prometheus 指标，规范追踪/日志字段，并划分调试日志通道。
+   - **Rationale**: Lower priority as basic monitoring exists, suitable for enterprise scaling. / **理由**：基础监控已存在，优先级较低，适合企业级扩展。
 
 ## P2+ - Longer Term / P2+ - 长期规划
 
