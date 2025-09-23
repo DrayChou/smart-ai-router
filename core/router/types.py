@@ -1,4 +1,5 @@
 """Shared routing data structures for Smart AI Router."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

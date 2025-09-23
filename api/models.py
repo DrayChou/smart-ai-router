@@ -11,23 +11,25 @@ from pydantic import BaseModel
 
 from core.json_router import get_router
 from core.utils.logger import get_logger
-from core.yaml_config import YAMLConfigLoader
-
 from core.utils.memory_index import get_memory_index
+from core.yaml_config import YAMLConfigLoader
 
 logger = get_logger(__name__)
 
 # --- Response Models ---
 
+
 class ChannelCost(BaseModel):
     input: Optional[float] = None
     output: Optional[float] = None
+
 
 class ModelCapabilities(BaseModel):
     supports_vision: bool = False
     supports_function_calling: bool = False
     supports_code_generation: bool = False
     supports_streaming: bool = False
+
 
 class ChannelInfo(BaseModel):
     id: str
@@ -43,6 +45,7 @@ class ChannelInfo(BaseModel):
     # 渠道特定的tags（从渠道配置或模型分析得出）
     channel_tags: Optional[List[str]] = None
 
+
 class ModelInfo(BaseModel):
     model_config = {"protected_namespaces": ()}
 
@@ -53,32 +56,35 @@ class ModelInfo(BaseModel):
     name: Optional[str] = None
     model_type: str = "model"
     available: bool = True
-    
+
     # 模型基础信息
     parameter_count: Optional[int] = None  # 参数数量(百万)
     parameter_size_text: Optional[str] = None  # "7b", "70b"等
     context_length: Optional[int] = None  # 上下文长度
     context_text: Optional[str] = None  # "32k", "128k"等
-    
+
     # 模型能力
     capabilities: Optional[ModelCapabilities] = None
-    
+
     # 定价信息
     input_price: Optional[float] = None
     output_price: Optional[float] = None
-    
+
     # 渠道和标签信息
     channel_count: Optional[int] = None
     tags: Optional[List[str]] = None
     channels: Optional[List[ChannelInfo]] = None
+
 
 class ModelsResponse(BaseModel):
     object: str = "list"
     data: List[ModelInfo]
     total_models: int = 0
 
+
 # 创建路由器
 router = APIRouter(prefix="/v1", tags=["models"])
+
 
 def create_models_router(config_loader: YAMLConfigLoader) -> APIRouter:
     json_router = get_router()
@@ -143,17 +149,27 @@ def create_models_router(config_loader: YAMLConfigLoader) -> APIRouter:
                 if model_info.capabilities:
                     channel_caps = ModelCapabilities(
                         supports_vision=model_info.capabilities.get("vision", False),
-                        supports_function_calling=model_info.capabilities.get("function_calling", False),
-                        supports_code_generation=model_info.capabilities.get("code_generation", False),
-                        supports_streaming=model_info.capabilities.get("streaming", False),
+                        supports_function_calling=model_info.capabilities.get(
+                            "function_calling", False
+                        ),
+                        supports_code_generation=model_info.capabilities.get(
+                            "code_generation", False
+                        ),
+                        supports_streaming=model_info.capabilities.get(
+                            "streaming", False
+                        ),
                     )
                     if model_capabilities is None:
                         model_capabilities = channel_caps
 
                 cost_info = None
                 if model_info.pricing:
-                    input_cost = model_info.pricing.get("input") or model_info.pricing.get("prompt")
-                    output_cost = model_info.pricing.get("output") or model_info.pricing.get("completion")
+                    input_cost = model_info.pricing.get(
+                        "input"
+                    ) or model_info.pricing.get("prompt")
+                    output_cost = model_info.pricing.get(
+                        "output"
+                    ) or model_info.pricing.get("completion")
                     if input_cost is not None or output_cost is not None:
                         cost_info = ChannelCost(input=input_cost, output=output_cost)
 
@@ -182,7 +198,11 @@ def create_models_router(config_loader: YAMLConfigLoader) -> APIRouter:
                     created=current_time,
                     owned_by=owner,
                     name=model_id,
-                    model_type="model_group" if model_id.startswith("auto:") or model_id.startswith("tag:") else "model",
+                    model_type=(
+                        "model_group"
+                        if model_id.startswith("auto:") or model_id.startswith("tag:")
+                        else "model"
+                    ),
                     available=True,
                     parameter_count=parameter_count,
                     context_length=context_length,

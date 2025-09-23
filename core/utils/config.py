@@ -29,7 +29,9 @@ def load_config(config_path: str = None) -> Dict[str, Any]:
         # 如果 config.yaml 不存在，尝试 example.yaml
         if not config_path.exists():
             config_path = project_root / "config" / "example.yaml"
-            print(f"警告: 配置文件 config/config.yaml 不存在，使用示例配置 {config_path}")
+            print(
+                f"警告: 配置文件 config/config.yaml 不存在，使用示例配置 {config_path}"
+            )
 
     # 读取配置文件
     try:

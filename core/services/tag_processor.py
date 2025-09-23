@@ -5,10 +5,11 @@ This module centralizes tag parsing/extraction so routing, APIs, and tools
 share the exact same logic. Keep functions small and dependency‑free so they
 can be reused without pulling router internals.
 """
+
 from __future__ import annotations
 
-from typing import List
 import re
+from typing import List
 
 
 def extract_complete_segments(model_name: str) -> List[str]:
@@ -74,7 +75,11 @@ def extract_complete_segments(model_name: str) -> List[str]:
         if len(segment) <= 1:
             continue
 
-        if len(segment) >= 3 and re.search(r"[a-zA-Z]", segment) and re.search(r"[\d\-]", segment):
+        if (
+            len(segment) >= 3
+            and re.search(r"[a-zA-Z]", segment)
+            and re.search(r"[\d\-]", segment)
+        ):
             complete_segments.append(segment_lower)
 
             # Handle date suffix variants: -YYYYMMDD, -YYYYMM, -YYYY-MM-DD
@@ -82,7 +87,10 @@ def extract_complete_segments(model_name: str) -> List[str]:
             match = re.search(date_pattern, segment_lower)
             if match:
                 segment_without_date = segment_lower[: match.start()]
-                if len(segment_without_date) >= 3 and segment_without_date not in complete_segments:
+                if (
+                    len(segment_without_date) >= 3
+                    and segment_without_date not in complete_segments
+                ):
                     complete_segments.append(segment_without_date)
 
     return complete_segments
@@ -134,4 +142,3 @@ def extract_tags_with_aliases(model_name: str, channel) -> List[str]:
     # Merge and deduplicate while keeping order
     all_tags = list(dict.fromkeys(base_tags + alias_tags))
     return all_tags
-

@@ -12,45 +12,46 @@ from typing import Any, Dict
 if sys.platform == "win32":
     os.environ["PYTHONIOENCODING"] = "utf-8"
 
+import argparse
+import logging
+import sys
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+import uvicorn
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from api.admin import create_admin_router
+from api.admin_blacklist import router as admin_blacklist_router
+from api.anthropic import create_anthropic_router
+
+# API路由模块
+from api.chat import create_chat_router
+from api.chatgpt import create_chatgpt_router
+from api.gemini import create_gemini_router
+from api.health import create_health_router
+from api.models import create_models_router
+from api.status_monitor import create_status_monitor_router
+from api.token_estimation import create_token_estimation_router
+from api.usage_stats import create_usage_stats_router
+from core.auth import AuthenticationMiddleware, initialize_admin_auth
+from core.handlers.chat_handler import ChatCompletionHandler
+from core.json_router import JSONRouter
+from core.middleware.audit import AuditMiddleware, SecurityAuditMiddleware
+from core.middleware.exception_middleware import ExceptionHandlerMiddleware
+from core.middleware.logging import LoggingMiddleware, RequestContextMiddleware
 from core.scheduler.task_manager import (
     initialize_background_tasks,
     stop_background_tasks,
 )
+from core.utils.audit_logger import get_audit_logger, initialize_audit_logger
 from core.utils.blacklist_recovery import start_recovery_service, stop_recovery_service
-from core.json_router import JSONRouter
-from core.yaml_config import get_yaml_config_loader, YAMLConfigLoader
 from core.utils.http_client_pool import close_global_pool
-from core.utils.smart_cache import close_global_cache
-from core.handlers.chat_handler import ChatCompletionHandler
-from core.auth import AuthenticationMiddleware, initialize_admin_auth
 from core.utils.logger import setup_logging, shutdown_logging
-from core.middleware.logging import LoggingMiddleware, RequestContextMiddleware
-from core.utils.audit_logger import initialize_audit_logger, get_audit_logger
-from core.middleware.audit import AuditMiddleware, SecurityAuditMiddleware
 from core.utils.logging_integration import enable_smart_logging, get_enhanced_logger
-from core.middleware.exception_middleware import ExceptionHandlerMiddleware
-
-# API路由模块
-from api.chat import create_chat_router
-from api.models import create_models_router
-from api.health import create_health_router
-from api.admin import create_admin_router
-from api.anthropic import create_anthropic_router
-from api.chatgpt import create_chatgpt_router
-from api.gemini import create_gemini_router
-from api.usage_stats import create_usage_stats_router
-from api.token_estimation import create_token_estimation_router
-from api.admin_blacklist import router as admin_blacklist_router
-from api.status_monitor import create_status_monitor_router
-
-import uvicorn
-import sys
-import argparse
-import logging
-from pathlib import Path
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI
-from contextlib import asynccontextmanager
+from core.utils.smart_cache import close_global_cache
+from core.yaml_config import YAMLConfigLoader, get_yaml_config_loader
 
 # 添加项目根目录到 Python 路径
 sys.path.insert(0, str(Path(__file__).parent))
@@ -73,11 +74,11 @@ async def _startup_refresh_minimal(config_loader):
             )
 
             # 🚀 性能优化：预构建内存索引（避免请求时重建）
+            from core.scheduler.tasks.model_discovery import get_merged_config
             from core.utils.memory_index import (
                 get_memory_index,
                 rebuild_index_if_needed,
             )
-            from core.scheduler.tasks.model_discovery import get_merged_config
 
             try:
                 # 获取渠道配置用于标签继承
@@ -104,6 +105,7 @@ async def _startup_refresh_minimal(config_loader):
 
         # 只清除路由器的查询缓存，不清除模型数据缓存
         from core.json_router import get_router
+
         router = get_router()
         router.clear_cache()
         logger.info("[MINIMAL] Router query cache cleared, model data preserved")
@@ -179,6 +181,7 @@ def create_minimal_app() -> FastAPI:
     # 注册异步配置加载器（如果支持）
     try:
         from core.config.async_loader import get_async_config_loader
+
         logger.info("异步配置加载器已注册，后续可使用 create_minimal_app_async()")
     except ImportError:
         logger.debug("异步配置加载器不可用，使用同步模式")
@@ -203,7 +206,9 @@ def create_minimal_app() -> FastAPI:
                 enable_content_truncation=True,
                 max_content_length=800,
             )
-            logger.info("[MINIMAL] Smart logging enabled: sensitive cleaning, content truncation")
+            logger.info(
+                "[MINIMAL] Smart logging enabled: sensitive cleaning, content truncation"
+            )
         else:
             logger.info("[MINIMAL] Smart logging disabled by configuration")
     except Exception as e:
@@ -287,6 +292,7 @@ async def create_minimal_app_async() -> FastAPI:
     预期效果：启动时间减少 70-80%
     """
     import time
+
     start_time = time.time()
 
     # 🚀 使用异步配置加载器

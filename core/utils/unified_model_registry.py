@@ -5,11 +5,11 @@
 
 import json
 import logging
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Union
-from datetime import datetime
 
 logger = logging.getLogger(__name__)
 

@@ -9,8 +9,8 @@ SiliconFlow HTML解析脚本 - 统一格式版本
 import json
 import re
 import sys
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 # 添加项目根目录到路径
 project_root = Path(__file__).parent.parent
@@ -18,8 +18,13 @@ sys.path.insert(0, str(project_root))
 
 # 导入统一格式定义
 from core.pricing.unified_format import (
-    UnifiedModelData, UnifiedPricingFile, Architecture, Pricing,
-    ModelCategory, DataSource, ModelCapabilityInference
+    Architecture,
+    DataSource,
+    ModelCapabilityInference,
+    ModelCategory,
+    Pricing,
+    UnifiedModelData,
+    UnifiedPricingFile,
 )
 
 
@@ -155,14 +160,14 @@ def find_models_recursive(data, path="root", max_depth=10):
 def convert_to_unified_format(models_list, exchange_rate=0.14):
     """将SiliconFlow模型数据转换为统一格式"""
     print(f"开始转换 {len(models_list)} 个模型为统一格式...")
-    
+
     # 创建统一格式文件
     unified_file = UnifiedPricingFile(
         provider="siliconflow",
         source="siliconflow_html_parsed",
-        description=f"SiliconFlow HTML解析数据，包含{len(models_list)}个真实模型信息"
+        description=f"SiliconFlow HTML解析数据，包含{len(models_list)}个真实模型信息",
     )
-    
+
     capability_inference = ModelCapabilityInference()
     success_count = 0
 
@@ -181,9 +186,13 @@ def convert_to_unified_format(models_list, exchange_rate=0.14):
             # 价格转换: 元/M tokens → USD/token
             input_price_yuan_per_m = float(model.get("inputPrice", 0))
             output_price_yuan_per_m = float(model.get("outputPrice", 0))
-            
-            input_price_usd_per_token = (input_price_yuan_per_m * exchange_rate) / 1_000_000
-            output_price_usd_per_token = (output_price_yuan_per_m * exchange_rate) / 1_000_000
+
+            input_price_usd_per_token = (
+                input_price_yuan_per_m * exchange_rate
+            ) / 1_000_000
+            output_price_usd_per_token = (
+                output_price_yuan_per_m * exchange_rate
+            ) / 1_000_000
 
             # 基本信息
             context_length = int(model.get("contextLen", 32768))
@@ -194,35 +203,35 @@ def convert_to_unified_format(models_list, exchange_rate=0.14):
                 context_length=context_length,
                 description=model.get("description", ""),
                 data_source=DataSource.SILICONFLOW,
-                last_updated=datetime.now()
+                last_updated=datetime.now(),
             )
-            
+
             # 架构信息推断
             model_type = model.get("type", "text")
             sub_type = model.get("subType", "chat")
             vision_support = model.get("vlm", False)
-            
+
             modality = "text->text"
             input_modalities = ["text"]
             output_modalities = ["text"]
-            
+
             # 检查多模态能力
             if vision_support:
                 modality = "text+image->text"
                 input_modalities.append("image")
-            
-            if model_type == 'audio':
-                if sub_type == 'text-to-speech':
+
+            if model_type == "audio":
+                if sub_type == "text-to-speech":
                     modality = "text->audio"
                     output_modalities = ["audio"]
-                elif sub_type == 'speech-to-text':
+                elif sub_type == "speech-to-text":
                     modality = "audio->text"
                     input_modalities = ["audio"]
-            
+
             unified_model.architecture = Architecture(
                 modality=modality,
                 input_modalities=input_modalities,
-                output_modalities=output_modalities
+                output_modalities=output_modalities,
             )
 
             # 定价信息
@@ -232,14 +241,14 @@ def convert_to_unified_format(models_list, exchange_rate=0.14):
                 completion=output_price_usd_per_token,
                 original_currency="CNY",
                 exchange_rate=exchange_rate,
-                confidence_level=0.9  # SiliconFlow数据较可信
+                confidence_level=0.9,  # SiliconFlow数据较可信
             )
 
             # 能力推断
             capabilities = []
             if model_type == "text":
                 capabilities.append("chat")
-            
+
             if model.get("functionCallSupport", False):
                 capabilities.append("function_calling")
             if vision_support:
@@ -250,7 +259,7 @@ def convert_to_unified_format(models_list, exchange_rate=0.14):
                 capabilities.append("fim_completion")
             if model.get("chatPrefixCompletionSupport", False):
                 capabilities.append("prefix_completion")
-            
+
             # 处理非文本模型
             if model_type == "audio":
                 capabilities = ["audio", "tts"]
@@ -264,7 +273,7 @@ def convert_to_unified_format(models_list, exchange_rate=0.14):
                 capabilities = ["image"]
 
             unified_model.capabilities = list(set(capabilities))  # 去重
-            
+
             # 分类推断
             model_size = int(model.get("size", 0))
             if is_free:
@@ -280,8 +289,10 @@ def convert_to_unified_format(models_list, exchange_rate=0.14):
             elif max(input_price_yuan_per_m, output_price_yuan_per_m) >= 15:
                 unified_model.category = ModelCategory.PREMIUM
             else:
-                unified_model.category = capability_inference.infer_category_from_params(
-                    None, context_length
+                unified_model.category = (
+                    capability_inference.infer_category_from_params(
+                        None, context_length
+                    )
                 )
 
             unified_file.models[model_id] = unified_model
@@ -339,6 +350,7 @@ def main():
             / f"siliconflow_unified_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
         )
         import shutil
+
         shutil.copy2(output_path, backup_path)
         print(f"已备份到: {backup_path}")
 
@@ -373,9 +385,9 @@ def print_statistics(models_data):
 
         if model_data.category == ModelCategory.FREE:
             free_models.append((model_id, model_data.context_length or 0))
-        if 'vision' in (model_data.capabilities or []):
+        if "vision" in (model_data.capabilities or []):
             vision_models.append(model_id)
-        if 'function_calling' in (model_data.capabilities or []):
+        if "function_calling" in (model_data.capabilities or []):
             function_models.append(model_id)
         if model_data.context_length and model_data.context_length >= 128000:  # 128K+
             long_context.append((model_id, model_data.context_length))
@@ -408,15 +420,17 @@ def print_statistics(models_data):
     # 价格统计
     free_count = 0
     paid_count = 0
-    
+
     for model_data in models_data.values():
-        if (model_data.pricing and 
-            model_data.pricing.prompt == 0 and 
-            model_data.pricing.completion == 0):
+        if (
+            model_data.pricing
+            and model_data.pricing.prompt == 0
+            and model_data.pricing.completion == 0
+        ):
             free_count += 1
         else:
             paid_count += 1
-    
+
     print(f"\n价格分布:")
     print(f"   免费模型: {free_count} 个 ({(free_count/total)*100:.1f}%)")
     print(f"   付费模型: {paid_count} 个 ({(paid_count/total)*100:.1f}%)")

@@ -1,14 +1,15 @@
 """Tag-based routing engine wired for YAML configuration."""
+
 from __future__ import annotations
 
 import logging
 import threading
 from typing import Any, Optional
 
+from core.exceptions import ParameterComparisonError, TagNotFoundError
 from core.router.mixins.candidate import CandidateDiscoveryMixin
 from core.router.mixins.scoring import ScoringMixin
 from core.router.types import ChannelCandidate, RoutingRequest, RoutingScore
-from core.exceptions import ParameterComparisonError, TagNotFoundError
 from core.utils.capability_mapper import get_capability_mapper
 from core.utils.channel_cache_manager import get_channel_cache_manager
 from core.utils.local_model_capabilities import get_capability_detector
@@ -63,16 +64,18 @@ class JSONRouter(CandidateDiscoveryMixin, ScoringMixin):
 
         fingerprint = RequestFingerprint(
             model=request.model,
-            routing_strategy=getattr(request, 'strategy', 'cost_first'),
-            required_capabilities=getattr(request, 'required_capabilities', None),
-            min_context_length=getattr(request, 'min_context_length', None),
-            max_cost_per_1k=getattr(request, 'max_cost_per_1k', None),
-            prefer_local=getattr(request, 'prefer_local', False),
-            exclude_providers=getattr(request, 'exclude_providers', None),
-            max_tokens=getattr(request, 'max_tokens', None),
-            temperature=getattr(request, 'temperature', None),
-            stream=getattr(request, 'stream', False),
-            has_functions=bool(getattr(request, 'functions', None) or getattr(request, 'tools', None)),
+            routing_strategy=getattr(request, "strategy", "cost_first"),
+            required_capabilities=getattr(request, "required_capabilities", None),
+            min_context_length=getattr(request, "min_context_length", None),
+            max_cost_per_1k=getattr(request, "max_cost_per_1k", None),
+            prefer_local=getattr(request, "prefer_local", False),
+            exclude_providers=getattr(request, "exclude_providers", None),
+            max_tokens=getattr(request, "max_tokens", None),
+            temperature=getattr(request, "temperature", None),
+            stream=getattr(request, "stream", False),
+            has_functions=bool(
+                getattr(request, "functions", None) or getattr(request, "tools", None)
+            ),
         )
 
         cache = get_request_cache()
@@ -104,7 +107,9 @@ class JSONRouter(CandidateDiscoveryMixin, ScoringMixin):
 
             for index, backup_channel in enumerate(cached_result.backup_channels):
                 backup_matched_model = None
-                if cached_result.backup_matched_models and index < len(cached_result.backup_matched_models):
+                if cached_result.backup_matched_models and index < len(
+                    cached_result.backup_matched_models
+                ):
                     backup_matched_model = cached_result.backup_matched_models[index]
 
                 scores.append(
@@ -127,20 +132,31 @@ class JSONRouter(CandidateDiscoveryMixin, ScoringMixin):
             logger.info("STEP 1: Finding candidate channels...")
             candidates = self._get_candidate_channels(request)
             if not candidates:
-                logger.warning("ROUTING FAILED: No suitable channels found for model '%s'", request.model)
+                logger.warning(
+                    "ROUTING FAILED: No suitable channels found for model '%s'",
+                    request.model,
+                )
                 return []
             logger.info("STEP 1 COMPLETE: Found %s candidate channels", len(candidates))
 
             logger.info("STEP 2: Filtering channels by health and availability...")
             filtered_candidates = self._filter_channels(candidates, request)
             if not filtered_candidates:
-                logger.warning("ROUTING FAILED: No available channels after filtering for model '%s'", request.model)
+                logger.warning(
+                    "ROUTING FAILED: No available channels after filtering for model '%s'",
+                    request.model,
+                )
                 return []
 
             logger.info("STEP 2.5: Checking model capabilities...")
-            capability_filtered = await self._filter_by_capabilities(filtered_candidates, request)
+            capability_filtered = await self._filter_by_capabilities(
+                filtered_candidates, request
+            )
             if not capability_filtered:
-                logger.warning("ROUTING FAILED: No channels with required capabilities for model '%s'", request.model)
+                logger.warning(
+                    "ROUTING FAILED: No channels with required capabilities for model '%s'",
+                    request.model,
+                )
                 return []
             logger.info(
                 "STEP 2.5 COMPLETE: %s channels passed capability check (filtered out %s)",
@@ -150,15 +166,26 @@ class JSONRouter(CandidateDiscoveryMixin, ScoringMixin):
             filtered_candidates = capability_filtered
 
             if len(filtered_candidates) > 20:
-                logger.info("STEP 2.7: Pre-filtering %s channels to reduce scoring overhead...", len(filtered_candidates))
-                pre_filtered = await self._pre_filter_channels(filtered_candidates, request, max_channels=20)
-                logger.info("STEP 2.7 COMPLETE: Pre-filtered to %s channels for detailed scoring", len(pre_filtered))
+                logger.info(
+                    "STEP 2.7: Pre-filtering %s channels to reduce scoring overhead...",
+                    len(filtered_candidates),
+                )
+                pre_filtered = await self._pre_filter_channels(
+                    filtered_candidates, request, max_channels=20
+                )
+                logger.info(
+                    "STEP 2.7 COMPLETE: Pre-filtered to %s channels for detailed scoring",
+                    len(pre_filtered),
+                )
                 filtered_candidates = pre_filtered
 
             logger.info("🎯 STEP 3: Scoring and ranking channels...")
             scored_channels = await self._score_channels(filtered_candidates, request)
             if not scored_channels:
-                logger.warning("ROUTING FAILED: Failed to score any channels for model '%s'", request.model)
+                logger.warning(
+                    "ROUTING FAILED: Failed to score any channels for model '%s'",
+                    request.model,
+                )
                 return []
             logger.info("STEP 3 COMPLETE: Scored %s channels", len(scored_channels))
 
@@ -166,9 +193,13 @@ class JSONRouter(CandidateDiscoveryMixin, ScoringMixin):
                 primary_channel = scored_channels[0].channel
                 backup_channels = [score.channel for score in scored_channels[1:6]]
                 selection_reason = scored_channels[0].reason
-                cost_estimate = self._estimate_cost_for_channel(primary_channel, request)
+                cost_estimate = self._estimate_cost_for_channel(
+                    primary_channel, request
+                )
                 primary_matched_model = scored_channels[0].matched_model
-                backup_matched_models = [score.matched_model for score in scored_channels[1:6]]
+                backup_matched_models = [
+                    score.matched_model for score in scored_channels[1:6]
+                ]
 
                 try:
                     await cache.cache_selection(
@@ -181,9 +212,14 @@ class JSONRouter(CandidateDiscoveryMixin, ScoringMixin):
                         primary_matched_model=primary_matched_model,
                         backup_matched_models=backup_matched_models,
                     )
-                    logger.debug("💾 CACHED RESULT: %s -> %s", cache_key, primary_channel.name)
+                    logger.debug(
+                        "💾 CACHED RESULT: %s -> %s", cache_key, primary_channel.name
+                    )
                 except Exception as cache_error:
-                    logger.warning("⚠️  CACHE SAVE FAILED: %s, continuing without caching", cache_error)
+                    logger.warning(
+                        "⚠️  CACHE SAVE FAILED: %s, continuing without caching",
+                        cache_error,
+                    )
 
             logger.info(
                 "🎉 ROUTING SUCCESS: Ready to attempt %s channels in ranked order for model '%s'",
@@ -198,7 +234,12 @@ class JSONRouter(CandidateDiscoveryMixin, ScoringMixin):
         except ParameterComparisonError:
             raise
         except Exception as exc:
-            logger.error("ROUTING ERROR: Request failed for model '%s': %s", request.model, exc, exc_info=True)
+            logger.error(
+                "ROUTING ERROR: Request failed for model '%s': %s",
+                request.model,
+                exc,
+                exc_info=True,
+            )
             return []
 
     def clear_cache(self) -> None:
@@ -208,7 +249,9 @@ class JSONRouter(CandidateDiscoveryMixin, ScoringMixin):
         self._available_models_cache = None
         logger.info("Router cache cleared")
 
-    def update_channel_health(self, channel_id: str, success: bool, latency: Optional[float] = None) -> None:
+    def update_channel_health(
+        self, channel_id: str, success: bool, latency: Optional[float] = None
+    ) -> None:
         """更新渠道健康状态"""
         self.config_loader.update_channel_health(channel_id, success, latency)
 
@@ -233,4 +276,3 @@ def get_router() -> JSONRouter:
             if _router is None:
                 _router = JSONRouter()
     return _router
-

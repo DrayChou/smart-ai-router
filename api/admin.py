@@ -32,19 +32,25 @@ def create_admin_router(config_loader: YAMLConfigLoader) -> APIRouter:
                     "channels": len(config.channels),
                     "auth_enabled": config.auth.enabled,
                     "model_cache_size": len(config_loader.model_cache),
-                    "routing_strategy": getattr(config.routing, 'default_strategy', 'cost_first') if hasattr(config, 'routing') else 'cost_first'
+                    "routing_strategy": (
+                        getattr(config.routing, "default_strategy", "cost_first")
+                        if hasattr(config, "routing")
+                        else "cost_first"
+                    ),
                 },
                 "cache": {
                     "model_cache_entries": len(config_loader.model_cache),
-                    "router_cache_active": True
+                    "router_cache_active": True,
                 },
-                "timestamp": int(time.time())
+                "timestamp": int(time.time()),
             }
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"获取配置状态失败: {str(e)}")
 
     @router.post("/config/reload")
-    async def reload_config_endpoint(request: Dict[str, Any], auth: bool = Depends(get_admin_auth_dependency)):
+    async def reload_config_endpoint(
+        request: Dict[str, Any], auth: bool = Depends(get_admin_auth_dependency)
+    ):
         """重新加载配置文件并刷新缓存"""
         try:
             clear_cache = request.get("clear_cache", True)
@@ -64,7 +70,7 @@ def create_admin_router(config_loader: YAMLConfigLoader) -> APIRouter:
                 "status": "success",
                 "message": "Configuration reloaded successfully",
                 "cache_cleared": clear_cache,
-                "timestamp": int(time.time())
+                "timestamp": int(time.time()),
             }
 
         except Exception as e:
@@ -75,7 +81,7 @@ def create_admin_router(config_loader: YAMLConfigLoader) -> APIRouter:
         query: Optional[str] = None,
         level: Optional[str] = None,
         limit: int = 100,
-        auth: bool = Depends(get_admin_auth_dependency)
+        auth: bool = Depends(get_admin_auth_dependency),
     ):
         """搜索和查询日志 - 合并所有日志功能"""
         try:
@@ -83,7 +89,7 @@ def create_admin_router(config_loader: YAMLConfigLoader) -> APIRouter:
             log_file = "logs/smart-ai-router-minimal.log"
 
             if os.path.exists(log_file):
-                with open(log_file, encoding='utf-8') as f:
+                with open(log_file, encoding="utf-8") as f:
                     lines = f.readlines()[-limit:]  # 获取最后N行
 
                     for line in lines:
@@ -99,7 +105,7 @@ def create_admin_router(config_loader: YAMLConfigLoader) -> APIRouter:
                 "count": len(log_entries),
                 "query": query,
                 "level": level,
-                "limit": limit
+                "limit": limit,
             }
 
         except Exception as e:
@@ -114,7 +120,7 @@ def create_admin_router(config_loader: YAMLConfigLoader) -> APIRouter:
             paid_channels = []
 
             for channel_name, channel in config_loader.config.channels.items():
-                if hasattr(channel, 'tags') and 'free' in channel.tags:
+                if hasattr(channel, "tags") and "free" in channel.tags:
                     free_channels.append(channel_name)
                 else:
                     paid_channels.append(channel_name)
@@ -127,7 +133,7 @@ def create_admin_router(config_loader: YAMLConfigLoader) -> APIRouter:
                 f"发现 {len(free_channels)} 个免费渠道，优先使用可节省成本",
                 f"当前会话成本: ${session_cost:.6f}",
                 "建议使用 'tag:free' 查询免费模型",
-                "本地模型 (Ollama/LMStudio) 完全免费"
+                "本地模型 (Ollama/LMStudio) 完全免费",
             ]
 
             return {
@@ -136,11 +142,13 @@ def create_admin_router(config_loader: YAMLConfigLoader) -> APIRouter:
                     "session_cost": session_cost,
                     "free_channels": len(free_channels),
                     "paid_channels": len(paid_channels),
-                    "free_channel_ratio": len(free_channels) / (len(free_channels) + len(paid_channels)) * 100
+                    "free_channel_ratio": len(free_channels)
+                    / (len(free_channels) + len(paid_channels))
+                    * 100,
                 },
                 "optimization_tips": optimization_tips,
                 "free_channels": free_channels[:5],  # 显示前5个免费渠道
-                "timestamp": int(time.time())
+                "timestamp": int(time.time()),
             }
 
         except Exception as e:

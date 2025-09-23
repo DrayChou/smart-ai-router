@@ -7,14 +7,14 @@
 
 import asyncio
 import json
+import logging
 import time
-import yaml
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Union
-import logging
+from typing import Any, Dict, List, Optional, Union
 
 import aiofiles
+import yaml
 from pydantic import ValidationError
 
 from ..config_models import Config
@@ -67,16 +67,13 @@ class AsyncConfigFailoverManager:
         self._timeout_seconds = timeout_seconds
 
     async def load_with_timeout_and_fallback(
-        self,
-        primary_loader_coro,
-        fallback_config: Optional[Dict[str, Any]] = None
+        self, primary_loader_coro, fallback_config: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """带超时和回退的配置加载"""
         try:
             # 主要加载路径，带超时
             config = await asyncio.wait_for(
-                primary_loader_coro,
-                timeout=self._timeout_seconds
+                primary_loader_coro, timeout=self._timeout_seconds
             )
             logger.info("配置主要加载路径成功")
             return config
@@ -89,7 +86,9 @@ class AsyncConfigFailoverManager:
             logger.error(f"配置加载失败: {e}，使用回退配置")
             return self._get_fallback_config(fallback_config)
 
-    def _get_fallback_config(self, fallback_config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    def _get_fallback_config(
+        self, fallback_config: Optional[Dict[str, Any]]
+    ) -> Dict[str, Any]:
         """获取回退配置"""
         if fallback_config:
             return fallback_config
@@ -99,10 +98,7 @@ class AsyncConfigFailoverManager:
             "providers": [],
             "channels": [],
             "auth": {"enabled": False},
-            "routing": {
-                "default_strategy": "cost_first",
-                "timeout_seconds": 30
-            }
+            "routing": {"default_strategy": "cost_first", "timeout_seconds": 30},
         }
 
 
@@ -119,7 +115,9 @@ class AsyncYAMLConfigLoader:
 
     def __init__(self):
         self._config_cache = {}
-        self._validation_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="config-validation")
+        self._validation_pool = ThreadPoolExecutor(
+            max_workers=4, thread_name_prefix="config-validation"
+        )
         self._file_manager = get_async_file_manager()
         self._monitor = AsyncConfigLoadingMonitor()
         self._failover = AsyncConfigFailoverManager()
@@ -136,7 +134,7 @@ class AsyncYAMLConfigLoader:
             config_tasks = [
                 asyncio.create_task(
                     self._load_yaml_async(file_path, file_type),
-                    name=f"load-{file_type}"
+                    name=f"load-{file_type}",
                 )
                 for file_path, file_type in config_files
             ]
@@ -160,7 +158,9 @@ class AsyncYAMLConfigLoader:
             # 尝试同步回退加载
             return await self._fallback_sync_load(config_path)
 
-    def _identify_config_files(self, primary_config_path: Union[str, Path]) -> List[tuple]:
+    def _identify_config_files(
+        self, primary_config_path: Union[str, Path]
+    ) -> List[tuple]:
         """识别需要加载的配置文件"""
         config_files = []
 
@@ -184,7 +184,9 @@ class AsyncYAMLConfigLoader:
         logger.debug(f"识别到 {len(config_files)} 个配置文件需要加载")
         return config_files
 
-    async def _load_yaml_async(self, file_path: Union[str, Path], file_type: str) -> Dict[str, Any]:
+    async def _load_yaml_async(
+        self, file_path: Union[str, Path], file_type: str
+    ) -> Dict[str, Any]:
         """异步 YAML 文件加载"""
         try:
             start_time = time.time()
@@ -196,15 +198,13 @@ class AsyncYAMLConfigLoader:
                 return self._config_cache[file_key]
 
             # 异步读取文件内容
-            async with aiofiles.open(file_path, 'r', encoding='utf-8') as f:
+            async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
                 content = await f.read()
 
             # 使用线程池进行 YAML 解析 (CPU 密集型)
             loop = asyncio.get_event_loop()
             parsed_data = await loop.run_in_executor(
-                self._validation_pool,
-                yaml.safe_load,
-                content
+                self._validation_pool, yaml.safe_load, content
             )
 
             # 缓存结果
@@ -221,15 +221,22 @@ class AsyncYAMLConfigLoader:
 
         except Exception as e:
             logger.error(f"配置文件 {file_type} 加载失败 ({file_path}): {e}")
-            return {"type": file_type, "data": {}, "path": str(file_path), "error": str(e)}
+            return {
+                "type": file_type,
+                "data": {},
+                "path": str(file_path),
+                "error": str(e),
+            }
 
-    async def _merge_configs(self, config_results: List[Dict[str, Any]], config_files: List[tuple]) -> Dict[str, Any]:
+    async def _merge_configs(
+        self, config_results: List[Dict[str, Any]], config_files: List[tuple]
+    ) -> Dict[str, Any]:
         """合并配置结果"""
         merged_config = {
             "providers": {},  # 修复：providers 应该是字典，不是列表
             "channels": [],
             "auth": {"enabled": False},
-            "routing": {}
+            "routing": {},
         }
 
         for result in config_results:
@@ -246,7 +253,9 @@ class AsyncYAMLConfigLoader:
                     if isinstance(providers_data, dict):
                         merged_config["providers"] = providers_data
                     else:
-                        logger.warning(f"providers 配置格式不正确，期望字典但得到: {type(providers_data)}")
+                        logger.warning(
+                            f"providers 配置格式不正确，期望字典但得到: {type(providers_data)}"
+                        )
                 elif config_type == "pricing" and config_data:
                     merged_config.setdefault("pricing", {}).update(config_data)
                 elif config_type == "routing" and config_data:
@@ -261,9 +270,7 @@ class AsyncYAMLConfigLoader:
             # 使用线程池进行 Pydantic 验证 (CPU 密集型)
             loop = asyncio.get_event_loop()
             validated_config = await loop.run_in_executor(
-                self._validation_pool,
-                self._validate_with_pydantic,
-                config_data
+                self._validation_pool, self._validate_with_pydantic, config_data
             )
 
             logger.debug("配置验证成功")
@@ -285,7 +292,7 @@ class AsyncYAMLConfigLoader:
         logger.warning("使用同步回退加载配置")
 
         try:
-            with open(config_path, 'r', encoding='utf-8') as f:
+            with open(config_path, "r", encoding="utf-8") as f:
                 config_data = yaml.safe_load(f)
 
             return Config.parse_obj(config_data)
@@ -296,7 +303,7 @@ class AsyncYAMLConfigLoader:
             minimal_config = {
                 "providers": [],
                 "channels": [],
-                "auth": {"enabled": False}
+                "auth": {"enabled": False},
             }
             return Config.parse_obj(minimal_config)
 
@@ -312,14 +319,16 @@ class AsyncConfigPerformanceProfiler:
 
     def __init__(self):
         self._metrics = {
-            'total_load_time': [],
-            'file_load_times': {},
-            'validation_time': [],
-            'merge_time': [],
-            'cache_hit_rate': 0.0
+            "total_load_time": [],
+            "file_load_times": {},
+            "validation_time": [],
+            "merge_time": [],
+            "cache_hit_rate": 0.0,
         }
 
-    async def profile_config_loading(self, loader: AsyncYAMLConfigLoader, config_path: Union[str, Path]):
+    async def profile_config_loading(
+        self, loader: AsyncYAMLConfigLoader, config_path: Union[str, Path]
+    ):
         """性能分析包装器"""
         start_time = time.time()
 
@@ -327,7 +336,7 @@ class AsyncConfigPerformanceProfiler:
             config = await loader.async_load_config(config_path)
 
             total_time = time.time() - start_time
-            self._metrics['total_load_time'].append(total_time)
+            self._metrics["total_load_time"].append(total_time)
 
             logger.info(f"配置加载性能: {total_time:.3f}s")
             return config
@@ -338,15 +347,16 @@ class AsyncConfigPerformanceProfiler:
 
     def get_performance_stats(self) -> Dict[str, Any]:
         """获取性能统计"""
-        if not self._metrics['total_load_time']:
+        if not self._metrics["total_load_time"]:
             return {"message": "无性能数据"}
 
         return {
-            "average_load_time": sum(self._metrics['total_load_time']) / len(self._metrics['total_load_time']),
-            "min_load_time": min(self._metrics['total_load_time']),
-            "max_load_time": max(self._metrics['total_load_time']),
-            "total_loads": len(self._metrics['total_load_time']),
-            "cache_hit_rate": self._metrics['cache_hit_rate']
+            "average_load_time": sum(self._metrics["total_load_time"])
+            / len(self._metrics["total_load_time"]),
+            "min_load_time": min(self._metrics["total_load_time"]),
+            "max_load_time": max(self._metrics["total_load_time"]),
+            "total_loads": len(self._metrics["total_load_time"]),
+            "cache_hit_rate": self._metrics["cache_hit_rate"],
         }
 
 

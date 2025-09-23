@@ -4,10 +4,11 @@
 """
 import time
 from typing import Callable
+
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from core.utils.audit_logger import get_audit_logger, AuditEventType, AuditLevel
+from core.utils.audit_logger import AuditEventType, AuditLevel, get_audit_logger
 
 
 class AuditMiddleware(BaseHTTPMiddleware):
@@ -19,7 +20,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         audit_api_requests: bool = True,
         audit_admin_requests: bool = True,
         audit_auth_failures: bool = True,
-        skip_paths: set = None
+        skip_paths: set = None,
     ):
         super().__init__(app)
         self.audit_api_requests = audit_api_requests
@@ -30,7 +31,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
             "/docs",
             "/redoc",
             "/openapi.json",
-            "/favicon.ico"
+            "/favicon.ico",
         }
         self.audit_logger = get_audit_logger()
 
@@ -57,9 +58,9 @@ class AuditMiddleware(BaseHTTPMiddleware):
         }
 
         # 从request state获取请求ID和用户ID（由其他中间件设置）
-        if hasattr(request.state, 'request_id'):
+        if hasattr(request.state, "request_id"):
             context["request_id"] = request.state.request_id
-        if hasattr(request.state, 'user_id'):
+        if hasattr(request.state, "user_id"):
             context["user_id"] = request.state.user_id
 
         self.audit_logger.set_context(**context)
@@ -86,10 +87,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
             self.audit_logger.clear_context()
 
     async def _audit_request(
-        self,
-        request: Request,
-        response: Response,
-        process_time: float
+        self, request: Request, response: Response, process_time: float
     ) -> None:
         """审计正常请求"""
         try:
@@ -119,7 +117,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 status_code=status_code,
                 process_time=process_time,
                 request_size=request_size,
-                response_size=response_size
+                response_size=response_size,
             )
 
             # 特殊处理认证失败
@@ -130,7 +128,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 self.audit_logger.log_login_failure(
                     ip_address=client_ip,
                     user_agent=user_agent,
-                    reason="Invalid or missing authentication credentials"
+                    reason="Invalid or missing authentication credentials",
                 )
 
             # 特殊处理管理操作
@@ -142,10 +140,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
             pass
 
     async def _audit_error(
-        self,
-        request: Request,
-        error_message: str,
-        process_time: float
+        self, request: Request, error_message: str, process_time: float
     ) -> None:
         """审计错误请求"""
         try:
@@ -155,17 +150,13 @@ class AuditMiddleware(BaseHTTPMiddleware):
                     path=request.url.path,
                     error_code=500,
                     error_message=error_message,
-                    process_time=process_time
+                    process_time=process_time,
                 )
         except Exception:
             pass
 
     def _audit_admin_operation(
-        self,
-        request: Request,
-        method: str,
-        path: str,
-        status_code: int
+        self, request: Request, method: str, path: str, status_code: int
     ) -> None:
         """审计管理操作"""
         try:
@@ -179,7 +170,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
                     AuditLevel.HIGH,
                     resource="admin",
                     action=operation_details["action"],
-                    details=operation_details
+                    details=operation_details,
                 )
 
         except Exception:
@@ -190,20 +181,20 @@ class AuditMiddleware(BaseHTTPMiddleware):
         operations = {
             ("POST", "/v1/admin/routing/strategy"): {
                 "action": "change_routing_strategy",
-                "resource_type": "routing_strategy"
+                "resource_type": "routing_strategy",
             },
             ("POST", "/v1/admin/siliconflow/pricing/refresh"): {
                 "action": "refresh_pricing",
-                "resource_type": "pricing_data"
+                "resource_type": "pricing_data",
             },
             ("DELETE", "/v1/admin/logs/cleanup"): {
                 "action": "cleanup_logs",
-                "resource_type": "log_files"
+                "resource_type": "log_files",
             },
             ("POST", "/v1/admin/logs/export"): {
                 "action": "export_logs",
-                "resource_type": "log_data"
-            }
+                "resource_type": "log_data",
+            },
         }
 
         key = (method, path)
@@ -214,7 +205,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         if "/admin/" in path:
             return {
                 "action": f"{method.lower()}_{path.split('/')[-1]}",
-                "resource_type": "admin_resource"
+                "resource_type": "admin_resource",
             }
 
         return None
@@ -233,12 +224,12 @@ class AuditMiddleware(BaseHTTPMiddleware):
         # 检查代理头
         for header in ["x-forwarded-for", "x-real-ip", "x-client-ip"]:
             if header in request.headers:
-                ip = request.headers[header].split(',')[0].strip()
+                ip = request.headers[header].split(",")[0].strip()
                 if ip:
                     return ip
 
         # 使用客户端地址
-        if hasattr(request, 'client') and request.client:
+        if hasattr(request, "client") and request.client:
             return request.client.host
 
         return "unknown"
@@ -257,14 +248,14 @@ class AuditMiddleware(BaseHTTPMiddleware):
     def _get_response_size(self, response: Response) -> int:
         """获取响应大小"""
         try:
-            if hasattr(response, 'body') and response.body:
+            if hasattr(response, "body") and response.body:
                 if isinstance(response.body, bytes):
                     return len(response.body)
                 elif isinstance(response.body, str):
-                    return len(response.body.encode('utf-8'))
+                    return len(response.body.encode("utf-8"))
 
             # 检查Content-Length头
-            if hasattr(response, 'headers') and "content-length" in response.headers:
+            if hasattr(response, "headers") and "content-length" in response.headers:
                 return int(response.headers["content-length"])
 
         except (ValueError, TypeError):
@@ -277,10 +268,7 @@ class SecurityAuditMiddleware(BaseHTTPMiddleware):
     """安全审计中间件 - 专门检测和记录安全相关事件"""
 
     def __init__(
-        self,
-        app,
-        rate_limit_check: bool = True,
-        suspicious_pattern_check: bool = True
+        self, app, rate_limit_check: bool = True, suspicious_pattern_check: bool = True
     ):
         super().__init__(app)
         self.rate_limit_check = rate_limit_check
@@ -334,8 +322,7 @@ class SecurityAuditMiddleware(BaseHTTPMiddleware):
         cutoff_time = current_time - 60  # 1分钟前
         for ip in list(self.ip_requests.keys()):
             self.ip_requests[ip] = [
-                req_time for req_time in self.ip_requests[ip]
-                if req_time > cutoff_time
+                req_time for req_time in self.ip_requests[ip] if req_time > cutoff_time
             ]
             if not self.ip_requests[ip]:
                 del self.ip_requests[ip]
@@ -352,18 +339,26 @@ class SecurityAuditMiddleware(BaseHTTPMiddleware):
                 endpoint=request.url.path,
                 limit=self.max_requests_per_minute,
                 window="1 minute",
-                ip_address=client_ip
+                ip_address=client_ip,
             )
 
-    async def _check_suspicious_patterns(self, request: Request, client_ip: str) -> None:
+    async def _check_suspicious_patterns(
+        self, request: Request, client_ip: str
+    ) -> None:
         """检查可疑访问模式"""
         path = request.url.path.lower()
         user_agent = request.headers.get("user-agent", "").lower()
 
         # 检查可疑路径
         suspicious_paths = [
-            "/admin/", "/.env", "/config", "/backup",
-            "/database", "/secret", "/../", "/./"
+            "/admin/",
+            "/.env",
+            "/config",
+            "/backup",
+            "/database",
+            "/secret",
+            "/../",
+            "/./",
         ]
 
         for suspicious in suspicious_paths:
@@ -372,14 +367,20 @@ class SecurityAuditMiddleware(BaseHTTPMiddleware):
                     violation_type="suspicious_path_access",
                     severity="medium",
                     description=f"Access to suspicious path: {path}",
-                    ip_address=client_ip
+                    ip_address=client_ip,
                 )
                 break
 
         # 检查可疑User-Agent
         suspicious_agents = [
-            "sqlmap", "nmap", "nikto", "burp", "scanner",
-            "bot", "crawler", "spider"
+            "sqlmap",
+            "nmap",
+            "nikto",
+            "burp",
+            "scanner",
+            "bot",
+            "crawler",
+            "spider",
         ]
 
         for suspicious in suspicious_agents:
@@ -388,7 +389,7 @@ class SecurityAuditMiddleware(BaseHTTPMiddleware):
                     violation_type="suspicious_user_agent",
                     severity="low",
                     description=f"Suspicious user agent: {user_agent[:100]}",
-                    ip_address=client_ip
+                    ip_address=client_ip,
                 )
                 break
 
@@ -397,12 +398,12 @@ class SecurityAuditMiddleware(BaseHTTPMiddleware):
         # 检查代理头
         for header in ["x-forwarded-for", "x-real-ip", "x-client-ip"]:
             if header in request.headers:
-                ip = request.headers[header].split(',')[0].strip()
+                ip = request.headers[header].split(",")[0].strip()
                 if ip:
                     return ip
 
         # 使用客户端地址
-        if hasattr(request, 'client') and request.client:
+        if hasattr(request, "client") and request.client:
             return request.client.host
 
         return "unknown"

@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ModelCapabilities:
     """模型能力数据结构"""
+
     model_name: str
     provider: str
     base_url: str
@@ -35,6 +36,7 @@ class ModelCapabilities:
 @dataclass
 class CapabilityTestRequest:
     """能力测试请求"""
+
     capability: str
     test_payload: Dict[str, Any]
     expected_response_fields: List[str]
@@ -67,22 +69,25 @@ class LocalModelCapabilityDetector:
                                     "type": "image_url",
                                     "image_url": {
                                         "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
-                                    }
-                                }
-                            ]
+                                    },
+                                },
+                            ],
                         }
                     ],
-                    "max_tokens": 50
+                    "max_tokens": 50,
                 },
                 expected_response_fields=["choices"],
-                timeout=15.0
+                timeout=15.0,
             ),
             "function_calling": CapabilityTestRequest(
                 capability="function_calling",
                 test_payload={
                     "model": "test-model",
                     "messages": [
-                        {"role": "user", "content": "What's the weather like in San Francisco?"}
+                        {
+                            "role": "user",
+                            "content": "What's the weather like in San Francisco?",
+                        }
                     ],
                     "tools": [
                         {
@@ -93,19 +98,22 @@ class LocalModelCapabilityDetector:
                                 "parameters": {
                                     "type": "object",
                                     "properties": {
-                                        "location": {"type": "string", "description": "The city name"}
+                                        "location": {
+                                            "type": "string",
+                                            "description": "The city name",
+                                        }
                                     },
-                                    "required": ["location"]
-                                }
-                            }
+                                    "required": ["location"],
+                                },
+                            },
                         }
                     ],
                     "tool_choice": "auto",
-                    "max_tokens": 50
+                    "max_tokens": 50,
                 },
                 expected_response_fields=["choices"],
-                timeout=15.0
-            )
+                timeout=15.0,
+            ),
         }
 
     def _generate_cache_key(self, model_name: str, provider: str, base_url: str) -> str:
@@ -115,17 +123,22 @@ class LocalModelCapabilityDetector:
     def _is_local_provider(self, provider: str, base_url: str) -> bool:
         """判断是否为本地提供商"""
         local_indicators = [
-            "localhost", "127.0.0.1", "0.0.0.0",
-            "local", "ollama", "lmstudio",
-            "192.168.", "10.", "172."
+            "localhost",
+            "127.0.0.1",
+            "0.0.0.0",
+            "local",
+            "ollama",
+            "lmstudio",
+            "192.168.",
+            "10.",
+            "172.",
         ]
 
         provider_lower = provider.lower()
         base_url_lower = base_url.lower()
 
-        return (
-            provider_lower in ["ollama", "lmstudio", "local"] or
-            any(indicator in base_url_lower for indicator in local_indicators)
+        return provider_lower in ["ollama", "lmstudio", "local"] or any(
+            indicator in base_url_lower for indicator in local_indicators
         )
 
     async def detect_model_capabilities(
@@ -134,18 +147,18 @@ class LocalModelCapabilityDetector:
         provider: str,
         base_url: str,
         api_key: str,
-        force_refresh: bool = False
+        force_refresh: bool = False,
     ) -> ModelCapabilities:
         """
         检测模型能力
-        
+
         Args:
             model_name: 模型名称
             provider: 提供商
             base_url: API基础URL
             api_key: API密钥
             force_refresh: 强制刷新缓存
-            
+
         Returns:
             模型能力信息
         """
@@ -165,7 +178,7 @@ class LocalModelCapabilityDetector:
             base_url=base_url,
             is_local=self._is_local_provider(provider, base_url),
             tested_at=datetime.now(),
-            test_results={}
+            test_results={},
         )
 
         # 如果不是本地模型，使用默认云端能力
@@ -183,15 +196,17 @@ class LocalModelCapabilityDetector:
         )
 
         # 测试函数调用能力
-        capabilities.supports_function_calling = await self._test_function_calling_capability(
-            base_url, api_key, model_name
+        capabilities.supports_function_calling = (
+            await self._test_function_calling_capability(base_url, api_key, model_name)
         )
 
         # 测试基础能力（代码生成、流式）
         basic_capabilities = await self._test_basic_capabilities(
             base_url, api_key, model_name
         )
-        capabilities.supports_code_generation = basic_capabilities.get("code_generation", True)
+        capabilities.supports_code_generation = basic_capabilities.get(
+            "code_generation", True
+        )
         capabilities.supports_streaming = basic_capabilities.get("streaming", True)
         capabilities.max_context_length = basic_capabilities.get("max_context_length")
 
@@ -207,40 +222,54 @@ class LocalModelCapabilityDetector:
 
         return capabilities
 
-    def _get_cloud_provider_capabilities(self, capabilities: ModelCapabilities) -> ModelCapabilities:
+    def _get_cloud_provider_capabilities(
+        self, capabilities: ModelCapabilities
+    ) -> ModelCapabilities:
         """获取云端提供商的默认能力（优先使用统一注册表）"""
         try:
             # 优先从统一注册表获取准确数据
             from core.utils.unified_model_registry import get_unified_model_registry
-            
+
             registry = get_unified_model_registry()
-            metadata = registry.get_model_metadata(capabilities.model_name, capabilities.provider)
-            
+            metadata = registry.get_model_metadata(
+                capabilities.model_name, capabilities.provider
+            )
+
             if metadata:
                 capabilities.supports_vision = metadata.supports_vision
-                capabilities.supports_function_calling = metadata.supports_function_calling
+                capabilities.supports_function_calling = (
+                    metadata.supports_function_calling
+                )
                 capabilities.supports_streaming = metadata.supports_streaming
                 capabilities.supports_code_generation = True  # 默认支持
                 if metadata.context_length:
                     capabilities.max_context_length = metadata.context_length
                 return capabilities
-                
+
         except Exception as e:
             logger.debug(f"统一注册表查询失败，使用基础推断: {e}")
 
         # 回退到基础推断
         provider = capabilities.provider.lower()
         model_name = capabilities.model_name.lower()
-        
+
         # 简化的基础能力推断
-        capabilities.supports_vision = any(keyword in model_name for keyword in ["vision", "gpt-4", "claude-3", "gemini"])
-        capabilities.supports_function_calling = provider not in ["ollama", "lmstudio"]  # 本地模型通常不支持
+        capabilities.supports_vision = any(
+            keyword in model_name
+            for keyword in ["vision", "gpt-4", "claude-3", "gemini"]
+        )
+        capabilities.supports_function_calling = provider not in [
+            "ollama",
+            "lmstudio",
+        ]  # 本地模型通常不支持
         capabilities.supports_code_generation = True
         capabilities.supports_streaming = True
 
         return capabilities
 
-    async def _test_vision_capability(self, base_url: str, api_key: str, model_name: str) -> bool:
+    async def _test_vision_capability(
+        self, base_url: str, api_key: str, model_name: str
+    ) -> bool:
         """测试视觉能力"""
         try:
             test_case = self.test_cases["vision"]
@@ -254,7 +283,7 @@ class LocalModelCapabilityDetector:
                 response = await client.post(
                     f"{base_url.rstrip('/')}/v1/chat/completions",
                     json=test_payload,
-                    headers=headers
+                    headers=headers,
                 )
 
                 if response.status_code == 200:
@@ -266,14 +295,18 @@ class LocalModelCapabilityDetector:
                             logger.debug(f"视觉能力测试成功: {model_name}")
                             return True
 
-                logger.debug(f"视觉能力测试失败: {model_name}, status: {response.status_code}")
+                logger.debug(
+                    f"视觉能力测试失败: {model_name}, status: {response.status_code}"
+                )
                 return False
 
         except Exception as e:
             logger.debug(f"视觉能力测试异常: {model_name}, error: {e}")
             return False
 
-    async def _test_function_calling_capability(self, base_url: str, api_key: str, model_name: str) -> bool:
+    async def _test_function_calling_capability(
+        self, base_url: str, api_key: str, model_name: str
+    ) -> bool:
         """测试函数调用能力"""
         try:
             test_case = self.test_cases["function_calling"]
@@ -287,7 +320,7 @@ class LocalModelCapabilityDetector:
                 response = await client.post(
                     f"{base_url.rstrip('/')}/v1/chat/completions",
                     json=test_payload,
-                    headers=headers
+                    headers=headers,
                 )
 
                 if response.status_code == 200:
@@ -299,27 +332,32 @@ class LocalModelCapabilityDetector:
                             message = choice["message"]
                             # 检查是否有tool_calls或function_call
                             has_tools = (
-                                message.get("tool_calls") or
-                                message.get("function_call") or
-                                "get_weather" in str(message.get("content", "")).lower()
+                                message.get("tool_calls")
+                                or message.get("function_call")
+                                or "get_weather"
+                                in str(message.get("content", "")).lower()
                             )
                             if has_tools:
                                 logger.debug(f"函数调用能力测试成功: {model_name}")
                                 return True
 
-                logger.debug(f"函数调用能力测试失败: {model_name}, status: {response.status_code}")
+                logger.debug(
+                    f"函数调用能力测试失败: {model_name}, status: {response.status_code}"
+                )
                 return False
 
         except Exception as e:
             logger.debug(f"函数调用能力测试异常: {model_name}, error: {e}")
             return False
 
-    async def _test_basic_capabilities(self, base_url: str, api_key: str, model_name: str) -> Dict[str, Any]:
+    async def _test_basic_capabilities(
+        self, base_url: str, api_key: str, model_name: str
+    ) -> Dict[str, Any]:
         """测试基础能力（代码生成、流式等）"""
         results = {
             "code_generation": True,  # 默认支持
-            "streaming": True,       # 默认支持
-            "max_context_length": None
+            "streaming": True,  # 默认支持
+            "max_context_length": None,
         }
 
         try:
@@ -327,10 +365,13 @@ class LocalModelCapabilityDetector:
             test_payload = {
                 "model": model_name,
                 "messages": [
-                    {"role": "user", "content": "Write a simple Python function to add two numbers."}
+                    {
+                        "role": "user",
+                        "content": "Write a simple Python function to add two numbers.",
+                    }
                 ],
                 "max_tokens": 100,
-                "stream": False
+                "stream": False,
             }
 
             headers = self._get_auth_headers(api_key)
@@ -340,22 +381,29 @@ class LocalModelCapabilityDetector:
                 response = await client.post(
                     f"{base_url.rstrip('/')}/v1/chat/completions",
                     json=test_payload,
-                    headers=headers
+                    headers=headers,
                 )
 
                 if response.status_code == 200:
                     data = response.json()
                     if "choices" in data and len(data["choices"]) > 0:
-                        content = data["choices"][0].get("message", {}).get("content", "")
+                        content = (
+                            data["choices"][0].get("message", {}).get("content", "")
+                        )
                         # 检查是否包含代码
-                        has_code = any(keyword in content.lower() for keyword in ["def ", "function", "```", "return"])
+                        has_code = any(
+                            keyword in content.lower()
+                            for keyword in ["def ", "function", "```", "return"]
+                        )
                         results["code_generation"] = has_code
 
                         # 从使用统计中推测上下文长度
                         if "usage" in data:
                             usage = data["usage"]
                             # 这只是一个估计，实际需要更复杂的测试
-                            results["max_context_length"] = usage.get("total_tokens", 0) * 100
+                            results["max_context_length"] = (
+                                usage.get("total_tokens", 0) * 100
+                            )
 
         except Exception as e:
             logger.debug(f"基础能力测试异常: {model_name}, error: {e}")
@@ -366,10 +414,12 @@ class LocalModelCapabilityDetector:
         """获取认证头"""
         return {
             "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
 
-    async def _get_cached_capabilities(self, cache_key: str) -> Optional[ModelCapabilities]:
+    async def _get_cached_capabilities(
+        self, cache_key: str
+    ) -> Optional[ModelCapabilities]:
         """获取缓存的能力信息"""
         try:
             cached_data = await cache_get(cache_key)
@@ -384,7 +434,9 @@ class LocalModelCapabilityDetector:
             logger.debug(f"获取缓存能力信息失败: {e}")
             return None
 
-    async def _cache_capabilities(self, cache_key: str, capabilities: ModelCapabilities) -> None:
+    async def _cache_capabilities(
+        self, cache_key: str, capabilities: ModelCapabilities
+    ) -> None:
         """缓存能力信息"""
         try:
             # 转换为可序列化的字典
@@ -396,24 +448,32 @@ class LocalModelCapabilityDetector:
         except Exception as e:
             logger.debug(f"缓存能力信息失败: {e}")
 
-    def can_handle_request(self, capabilities: ModelCapabilities, request_data: Dict[str, Any]) -> bool:
+    def can_handle_request(
+        self, capabilities: ModelCapabilities, request_data: Dict[str, Any]
+    ) -> bool:
         """
         检查模型是否能处理特定请求
-        
+
         Args:
             capabilities: 模型能力
             request_data: 请求数据
-            
+
         Returns:
             True表示可以处理
         """
         # 检查是否需要视觉能力
-        if self._request_needs_vision(request_data) and not capabilities.supports_vision:
+        if (
+            self._request_needs_vision(request_data)
+            and not capabilities.supports_vision
+        ):
             logger.debug(f"模型 {capabilities.model_name} 不支持视觉能力")
             return False
 
         # 检查是否需要函数调用能力
-        if self._request_needs_function_calling(request_data) and not capabilities.supports_function_calling:
+        if (
+            self._request_needs_function_calling(request_data)
+            and not capabilities.supports_function_calling
+        ):
             logger.debug(f"模型 {capabilities.model_name} 不支持函数调用能力")
             return False
 
@@ -421,7 +481,9 @@ class LocalModelCapabilityDetector:
         if capabilities.max_context_length:
             estimated_tokens = self._estimate_request_tokens(request_data)
             if estimated_tokens > capabilities.max_context_length:
-                logger.debug(f"请求过长 ({estimated_tokens} tokens) 超过模型上下文限制 ({capabilities.max_context_length})")
+                logger.debug(
+                    f"请求过长 ({estimated_tokens} tokens) 超过模型上下文限制 ({capabilities.max_context_length})"
+                )
                 return False
 
         return True
@@ -440,10 +502,10 @@ class LocalModelCapabilityDetector:
     def _request_needs_function_calling(self, request_data: Dict[str, Any]) -> bool:
         """检查请求是否需要函数调用能力"""
         return (
-            "tools" in request_data or
-            "functions" in request_data or
-            "tool_choice" in request_data or
-            "function_call" in request_data
+            "tools" in request_data
+            or "functions" in request_data
+            or "tool_choice" in request_data
+            or "function_call" in request_data
         )
 
     def _estimate_request_tokens(self, request_data: Dict[str, Any]) -> int:
@@ -456,16 +518,16 @@ class LocalModelCapabilityDetector:
         self,
         original_channel: str,
         request_data: Dict[str, Any],
-        available_channels: List[Dict[str, Any]]
+        available_channels: List[Dict[str, Any]],
     ) -> List[Dict[str, Any]]:
         """
         获取备用渠道（当本地模型不支持特定能力时）
-        
+
         Args:
             original_channel: 原始渠道ID
             request_data: 请求数据
             available_channels: 可用渠道列表
-            
+
         Returns:
             按优先级排序的备用渠道列表
         """
@@ -484,7 +546,7 @@ class LocalModelCapabilityDetector:
                 channel.get("model_name", ""),
                 channel.get("provider", ""),
                 channel.get("base_url", ""),
-                channel.get("api_key", "")
+                channel.get("api_key", ""),
             )
 
             # 检查是否满足需求
@@ -495,18 +557,22 @@ class LocalModelCapabilityDetector:
 
             # 计算优先级分数
             priority_score = self._calculate_fallback_priority(capabilities, channel)
-            fallback_channels.append({
-                **channel,
-                "fallback_priority": priority_score,
-                "capabilities": capabilities
-            })
+            fallback_channels.append(
+                {
+                    **channel,
+                    "fallback_priority": priority_score,
+                    "capabilities": capabilities,
+                }
+            )
 
         # 按优先级排序
         fallback_channels.sort(key=lambda x: x["fallback_priority"], reverse=True)
 
         return fallback_channels
 
-    def _calculate_fallback_priority(self, capabilities: ModelCapabilities, channel: Dict[str, Any]) -> float:
+    def _calculate_fallback_priority(
+        self, capabilities: ModelCapabilities, channel: Dict[str, Any]
+    ) -> float:
         """计算备用渠道的优先级分数"""
         score = 0.0
 

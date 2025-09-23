@@ -4,22 +4,22 @@
 """
 
 import asyncio
-import time
-from typing import Dict, Any, Optional
 import logging
-
-from .scheduler import (
-    get_scheduler,
-    add_task,
-    start_scheduler,
-    stop_scheduler,
-    get_task_status,
-)
-from .tasks.model_discovery import run_model_discovery, get_model_discovery_task
-# 🗑️ Removed pricing_discovery - was generating unused cache files
-from .tasks.service_health_check import run_health_check_task, ServiceHealthChecker
+import time
+from typing import Any, Dict, Optional
 
 from ..utils.api_key_validator import run_api_key_validation_task
+from .scheduler import (
+    add_task,
+    get_scheduler,
+    get_task_status,
+    start_scheduler,
+    stop_scheduler,
+)
+from .tasks.model_discovery import get_model_discovery_task, run_model_discovery
+
+# 🗑️ Removed pricing_discovery - was generating unused cache files
+from .tasks.service_health_check import ServiceHealthChecker, run_health_check_task
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ class TaskManager:
             logger.info(f"已添加模型发现任务，间隔 {interval/3600}h")
 
         # 🗑️ Removed pricing discovery task - was generating unused cache files
-        
+
         # 2. API密钥验证任务
         # 2. API密钥验证任务 - 🚀 修复：正确读取配置文件的 run_on_startup 设置
         api_key_config = task_config.get("api_key_validation", {})
@@ -217,9 +217,9 @@ class TaskManager:
 
         try:
             # 清理过期的缓存文件
-            from pathlib import Path
-            import time
             import os
+            import time
+            from pathlib import Path
 
             cache_dir = Path("cache")
             if not cache_dir.exists():

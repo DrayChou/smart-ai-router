@@ -1,4 +1,5 @@
 """Scoring, filtering, and capability helpers for JSON routing."""
+
 from __future__ import annotations
 
 import logging
@@ -15,20 +16,56 @@ logger = logging.getLogger(__name__)
 class ScoringMixin:
     """Provides scoring and filtering helpers for the router."""
 
-    def _filter_channels(self, channels: list[ChannelCandidate], request: RoutingRequest) -> list[ChannelCandidate]:
+    def _filter_channels(
+        self, channels: list[ChannelCandidate], request: RoutingRequest
+    ) -> list[ChannelCandidate]:
         """过滤渠道，包含能力检测"""
         filtered = []
 
-        routing_config = self.config.routing if hasattr(self.config, 'routing') else None
-        if routing_config and hasattr(routing_config, 'model_filters'):
+        routing_config = (
+            self.config.routing if hasattr(self.config, "routing") else None
+        )
+        if routing_config and hasattr(routing_config, "model_filters"):
             model_filters = routing_config.model_filters or {}
         else:
             model_filters = {}
 
-        min_context_length = getattr(model_filters, 'min_context_length', 0) if hasattr(model_filters, 'min_context_length') else model_filters.get('min_context_length', 0) if isinstance(model_filters, dict) else 0
-        min_parameter_count = getattr(model_filters, 'min_parameter_count', 0) if hasattr(model_filters, 'min_parameter_count') else model_filters.get('min_parameter_count', 0) if isinstance(model_filters, dict) else 0
-        exclude_embedding = getattr(model_filters, 'exclude_embedding_models', True) if hasattr(model_filters, 'exclude_embedding_models') else model_filters.get('exclude_embedding_models', True) if isinstance(model_filters, dict) else True
-        exclude_vision_only = getattr(model_filters, 'exclude_vision_only_models', True) if hasattr(model_filters, 'exclude_vision_only_models') else model_filters.get('exclude_vision_only_models', True) if isinstance(model_filters, dict) else True
+        min_context_length = (
+            getattr(model_filters, "min_context_length", 0)
+            if hasattr(model_filters, "min_context_length")
+            else (
+                model_filters.get("min_context_length", 0)
+                if isinstance(model_filters, dict)
+                else 0
+            )
+        )
+        min_parameter_count = (
+            getattr(model_filters, "min_parameter_count", 0)
+            if hasattr(model_filters, "min_parameter_count")
+            else (
+                model_filters.get("min_parameter_count", 0)
+                if isinstance(model_filters, dict)
+                else 0
+            )
+        )
+        exclude_embedding = (
+            getattr(model_filters, "exclude_embedding_models", True)
+            if hasattr(model_filters, "exclude_embedding_models")
+            else (
+                model_filters.get("exclude_embedding_models", True)
+                if isinstance(model_filters, dict)
+                else True
+            )
+        )
+        exclude_vision_only = (
+            getattr(model_filters, "exclude_vision_only_models", True)
+            if hasattr(model_filters, "exclude_vision_only_models")
+            else (
+                model_filters.get("exclude_vision_only_models", True)
+                if isinstance(model_filters, dict)
+                else True
+            )
+        )
 
         for candidate in channels:
             channel = candidate.channel
@@ -36,29 +73,48 @@ class ScoringMixin:
                 continue
 
             model_name = candidate.matched_model or channel.model_name
-            is_blacklisted, blacklist_entry = self.blacklist_manager.is_model_blacklisted(channel.id, model_name)
+            is_blacklisted, blacklist_entry = (
+                self.blacklist_manager.is_model_blacklisted(channel.id, model_name)
+            )
             if is_blacklisted:
-                remaining_time = blacklist_entry.get_remaining_time() if blacklist_entry else -1
+                remaining_time = (
+                    blacklist_entry.get_remaining_time() if blacklist_entry else -1
+                )
                 if remaining_time > 0:
                     logger.debug(
                         "BLACKLIST FILTER: Skipping %s -> %s (blacklisted for %ss due to %s)",
                         channel.name,
                         model_name,
                         remaining_time,
-                        blacklist_entry.error_type.value if blacklist_entry else "unknown",
+                        (
+                            blacklist_entry.error_type.value
+                            if blacklist_entry
+                            else "unknown"
+                        ),
                     )
                 else:
-                    logger.debug("BLACKLIST FILTER: Skipping %s -> %s (permanently blacklisted)", channel.name, model_name)
+                    logger.debug(
+                        "BLACKLIST FILTER: Skipping %s -> %s (permanently blacklisted)",
+                        channel.name,
+                        model_name,
+                    )
                 continue
 
-            if not hasattr(self, '_cached_health_scores'):
-                self._cached_health_scores = self.config_loader.runtime_state.health_scores.copy()
+            if not hasattr(self, "_cached_health_scores"):
+                self._cached_health_scores = (
+                    self.config_loader.runtime_state.health_scores.copy()
+                )
 
             health_score = self._cached_health_scores.get(channel.id, 1.0)
             if health_score < 0.3:
                 continue
 
-            if candidate.matched_model and (min_context_length > 0 or min_parameter_count > 0 or exclude_embedding or exclude_vision_only):
+            if candidate.matched_model and (
+                min_context_length > 0
+                or min_parameter_count > 0
+                or exclude_embedding
+                or exclude_vision_only
+            ):
                 model_name = candidate.matched_model
 
                 if exclude_embedding and self._is_embedding_model(model_name):
@@ -72,29 +128,49 @@ class ScoringMixin:
                 model_specs = self._get_model_specs(channel.id, model_name)
 
                 if min_context_length > 0:
-                    context_length = model_specs.get('context_length', 0) if model_specs else 0
+                    context_length = (
+                        model_specs.get("context_length", 0) if model_specs else 0
+                    )
                     if context_length < min_context_length:
-                        logger.debug("Filtered out model %s: context %s < %s", model_name, context_length, min_context_length)
+                        logger.debug(
+                            "Filtered out model %s: context %s < %s",
+                            model_name,
+                            context_length,
+                            min_context_length,
+                        )
                         continue
 
                 if min_parameter_count > 0:
-                    param_count = model_specs.get('parameter_count', 0) if model_specs else 0
+                    param_count = (
+                        model_specs.get("parameter_count", 0) if model_specs else 0
+                    )
                     if param_count < min_parameter_count:
-                        logger.debug("Filtered out model %s: params %sM < %sM", model_name, param_count, min_parameter_count)
+                        logger.debug(
+                            "Filtered out model %s: params %sM < %sM",
+                            model_name,
+                            param_count,
+                            min_parameter_count,
+                        )
                         continue
 
             filtered.append(candidate)
         return filtered
 
-    async def _score_channels(self, channels: list[ChannelCandidate], request: RoutingRequest) -> list[RoutingScore]:
+    async def _score_channels(
+        self, channels: list[ChannelCandidate], request: RoutingRequest
+    ) -> list[RoutingScore]:
         """计算渠道评分 - 委托到 ScoringService，保持行为不变。"""
         if getattr(self, "_scoring_service", None) is not None:
             return await self._scoring_service.score(channels, request)
         return await self._score_channels_individual(channels, request)
 
-    async def _score_channels_individual(self, channels: list[ChannelCandidate], request: RoutingRequest) -> list[RoutingScore]:
+    async def _score_channels_individual(
+        self, channels: list[ChannelCandidate], request: RoutingRequest
+    ) -> list[RoutingScore]:
         """单个渠道评分方式（用于小数量渠道）"""
-        logger.info("📊 SCORING: Using individual scoring for %s channels", len(channels))
+        logger.info(
+            "📊 SCORING: Using individual scoring for %s channels", len(channels)
+        )
 
         scored_channels: list[RoutingScore] = []
         strategy = self._get_routing_strategy(request)
@@ -103,10 +179,16 @@ class ScoringMixin:
             channel = candidate.channel
             cost_score = self._calculate_cost_score(channel, request)
             speed_score = self._calculate_speed_score(channel)
-            quality_score = self._calculate_quality_score(channel, candidate.matched_model)
+            quality_score = self._calculate_quality_score(
+                channel, candidate.matched_model
+            )
             reliability_score = self._calculate_reliability_score(channel)
-            parameter_score = self._calculate_parameter_score(channel, candidate.matched_model)
-            context_score = self._calculate_context_score(channel, candidate.matched_model)
+            parameter_score = self._calculate_parameter_score(
+                channel, candidate.matched_model
+            )
+            context_score = self._calculate_context_score(
+                channel, candidate.matched_model
+            )
             free_score = self._calculate_free_score(channel, candidate.matched_model)
             local_score = self._calculate_local_score(channel, candidate.matched_model)
 
@@ -159,17 +241,19 @@ class ScoringMixin:
 
     def _get_routing_strategy(self, request: RoutingRequest) -> list[dict[str, Any]]:
         """获取并解析路由策略，始终返回规则列表"""
-        routing_config = self.config.routing if hasattr(self.config, 'routing') else None
+        routing_config = (
+            self.config.routing if hasattr(self.config, "routing") else None
+        )
 
-        if hasattr(request, 'strategy') and request.strategy:
+        if hasattr(request, "strategy") and request.strategy:
             strategy_name = request.strategy
         else:
-            if routing_config and hasattr(routing_config, 'default_strategy'):
-                strategy_name = routing_config.default_strategy or 'cost_first'
+            if routing_config and hasattr(routing_config, "default_strategy"):
+                strategy_name = routing_config.default_strategy or "cost_first"
             else:
-                strategy_name = 'cost_first'
+                strategy_name = "cost_first"
 
-        if routing_config and hasattr(routing_config, 'sorting_strategies'):
+        if routing_config and hasattr(routing_config, "sorting_strategies"):
             custom_strategies = routing_config.sorting_strategies or {}
         else:
             custom_strategies = {}
@@ -221,7 +305,9 @@ class ScoringMixin:
             ],
         }
 
-        return predefined_strategies.get(strategy_name, predefined_strategies["cost_first"])
+        return predefined_strategies.get(
+            strategy_name, predefined_strategies["cost_first"]
+        )
 
     def _calculate_cost_score(self, channel: Channel, request: RoutingRequest) -> float:
         """计算成本评分(0-1，越低成本越高分)"""
@@ -235,7 +321,9 @@ class ScoringMixin:
 
             input_tokens = self._estimate_tokens(request.messages)
             max_output_tokens = request.max_tokens or 1000
-            logger.info("  📊 Tokens: input=%s, max_output=%s", input_tokens, max_output_tokens)
+            logger.info(
+                "  📊 Tokens: input=%s, max_output=%s", input_tokens, max_output_tokens
+            )
 
             cost_result = estimator.estimate_cost(
                 channel=channel,
@@ -247,7 +335,11 @@ class ScoringMixin:
 
             if cost_result and cost_result.total_cost > 0:
                 total_cost = cost_result.total_cost
-                logger.info("  ✅ COST SCORE: Using dynamic pricing for %s: $%.6f", request.model, total_cost)
+                logger.info(
+                    "  ✅ COST SCORE: Using dynamic pricing for %s: $%.6f",
+                    request.model,
+                    total_cost,
+                )
             else:
                 cost_estimate = self._estimate_cost_for_channel(channel, request)
                 total_cost = max(0.0001, cost_estimate)
@@ -257,7 +349,9 @@ class ScoringMixin:
                     total_cost,
                 )
         except Exception as e:
-            logger.warning("  ⚠️ COST SCORE: Cost estimator failed, fallback applied: %s", e)
+            logger.warning(
+                "  ⚠️ COST SCORE: Cost estimator failed, fallback applied: %s", e
+            )
             cost_estimate = self._estimate_cost_for_channel(channel, request)
             total_cost = max(0.0001, cost_estimate)
 
@@ -269,10 +363,18 @@ class ScoringMixin:
         cost_score = 1.0 - normalized_cost
         cost_score = max(0.0, min(cost_score, 1.0))
 
-        logger.debug("COST SCORE RESULT: Channel=%s, Model=%s, Cost=$%.6f, Score=%.4f", channel.name, request.model, total_cost, cost_score)
+        logger.debug(
+            "COST SCORE RESULT: Channel=%s, Model=%s, Cost=$%.6f, Score=%.4f",
+            channel.name,
+            request.model,
+            total_cost,
+            cost_score,
+        )
         return cost_score
 
-    def _calculate_fallback_cost(self, channel: Channel, input_tokens: int, max_output_tokens: int) -> float:
+    def _calculate_fallback_cost(
+        self, channel: Channel, input_tokens: int, max_output_tokens: int
+    ) -> float:
         """回退到渠道级定价计算成本"""
         if channel.cost_per_token:
             cost_per_token = channel.cost_per_token
@@ -280,15 +382,19 @@ class ScoringMixin:
             output_cost = cost_per_token.get("output", 0.0) * max_output_tokens
             return input_cost + output_cost
 
-        pricing = getattr(channel, 'pricing', None)
+        pricing = getattr(channel, "pricing", None)
         if pricing:
             input_cost_per_1k = pricing.get("input_cost_per_1k", 0.0)
             output_cost_per_1k = pricing.get("output_cost_per_1k", 0.0)
-            return (input_tokens / 1000) * input_cost_per_1k + (max_output_tokens / 1000) * output_cost_per_1k
+            return (input_tokens / 1000) * input_cost_per_1k + (
+                max_output_tokens / 1000
+            ) * output_cost_per_1k
 
         return 0.0
 
-    def _calculate_quality_score(self, channel: Channel, matched_model: Optional[str] = None) -> float:
+    def _calculate_quality_score(
+        self, channel: Channel, matched_model: Optional[str] = None
+    ) -> float:
         """计算模型质量评分"""
         model_name = matched_model or channel.model_name
         if not model_name:
@@ -318,7 +424,9 @@ class ScoringMixin:
 
         return 0.6
 
-    def _calculate_parameter_score(self, channel: Channel, matched_model: Optional[str] = None) -> float:
+    def _calculate_parameter_score(
+        self, channel: Channel, matched_model: Optional[str] = None
+    ) -> float:
         """计算模型参数量评分"""
         model_name = matched_model or channel.model_name
         if not model_name:
@@ -328,7 +436,7 @@ class ScoringMixin:
         if not model_specs:
             return 0.5
 
-        parameter_count = model_specs.get('parameter_count', 0)
+        parameter_count = model_specs.get("parameter_count", 0)
         if parameter_count >= 1000000:
             return 1.0
         if parameter_count >= 500000:
@@ -345,7 +453,9 @@ class ScoringMixin:
             return 0.4
         return 0.3
 
-    def _calculate_context_score(self, channel: Channel, matched_model: Optional[str] = None) -> float:
+    def _calculate_context_score(
+        self, channel: Channel, matched_model: Optional[str] = None
+    ) -> float:
         """计算上下文长度评分"""
         model_name = matched_model or channel.model_name
         if not model_name:
@@ -355,7 +465,7 @@ class ScoringMixin:
         if not model_specs:
             return 0.5
 
-        context_length = model_specs.get('context_length', 0)
+        context_length = model_specs.get("context_length", 0)
         if context_length >= 2000000:
             return 1.0
         if context_length >= 1000000:
@@ -378,7 +488,9 @@ class ScoringMixin:
             return 0.3
         return 0.2
 
-    def _get_model_specs(self, channel_id: str, model_name: str) -> Optional[dict[str, Any]]:
+    def _get_model_specs(
+        self, channel_id: str, model_name: str
+    ) -> Optional[dict[str, Any]]:
         model_cache = self.config_loader.get_model_cache()
         if not model_cache:
             return None
@@ -403,16 +515,18 @@ class ScoringMixin:
         if not model_name:
             return False
         model_lower = model_name.lower()
-        return any(keyword in model_lower for keyword in ['embedding', 'rerank', 'search'])
+        return any(
+            keyword in model_lower for keyword in ["embedding", "rerank", "search"]
+        )
 
     def _is_vision_only_model(self, model_name: str) -> bool:
         if not model_name:
             return False
         model_lower = model_name.lower()
-        return 'vision-only' in model_lower or model_lower.endswith('-vision')
+        return "vision-only" in model_lower or model_lower.endswith("-vision")
 
     def _calculate_speed_score(self, channel: Channel) -> float:
-        response_time = getattr(channel, 'avg_response_time', None)
+        response_time = getattr(channel, "avg_response_time", None)
         if response_time is None:
             return 0.6
 
@@ -429,15 +543,17 @@ class ScoringMixin:
         return 0.2
 
     def _calculate_reliability_score(self, channel: Channel) -> float:
-        success_rate = getattr(channel, 'success_rate', None)
+        success_rate = getattr(channel, "success_rate", None)
         if success_rate is None:
-            runtime_state = getattr(self.config_loader, 'runtime_state', None)
-            if runtime_state and hasattr(runtime_state, 'channel_stats'):
+            runtime_state = getattr(self.config_loader, "runtime_state", None)
+            if runtime_state and hasattr(runtime_state, "channel_stats"):
                 stats = runtime_state.channel_stats.get(channel.id)
                 if stats and isinstance(stats, dict):
                     # 修复：stats 是字典，需要使用字典访问方式
-                    request_count = stats.get('request_count', 0)
-                    success_count = stats.get('success_count', request_count)  # 如果没有 success_count，假设全部成功
+                    request_count = stats.get("request_count", 0)
+                    success_count = stats.get(
+                        "success_count", request_count
+                    )  # 如果没有 success_count，假设全部成功
                     if request_count >= 5:
                         success_rate = success_count / request_count
 
@@ -456,7 +572,9 @@ class ScoringMixin:
             return 0.4
         return 0.2
 
-    def _calculate_free_score(self, channel: Channel, model_name: Optional[str] = None) -> float:
+    def _calculate_free_score(
+        self, channel: Channel, model_name: Optional[str] = None
+    ) -> float:
         free_tags = {"free", "免费", "0cost", "nocost"}
 
         if model_name:
@@ -473,8 +591,12 @@ class ScoringMixin:
 
             if model_name and model_name in models_pricing:
                 pricing_info = models_pricing.get(model_name, {})
-                if pricing_info.get('is_free'):
-                    logger.debug("FREE SCORE: Channel '%s' model '%s' marked as free in pricing", channel.name, model_name)
+                if pricing_info.get("is_free"):
+                    logger.debug(
+                        "FREE SCORE: Channel '%s' model '%s' marked as free in pricing",
+                        channel.name,
+                        model_name,
+                    )
                     return 1.0
 
             if discounted_price:
@@ -482,7 +604,11 @@ class ScoringMixin:
                 output_cost = discounted_price.get("output_cost_per_1k", 0.001)
                 avg_cost = (input_cost + output_cost) / 2
                 if avg_cost <= 0.00005:
-                    logger.debug("FREE SCORE: Channel '%s' has discounted avg cost %.6f", channel.name, avg_cost)
+                    logger.debug(
+                        "FREE SCORE: Channel '%s' has discounted avg cost %.6f",
+                        channel.name,
+                        avg_cost,
+                    )
                     return 1.0
 
             if model_name and model_name in models_pricing:
@@ -490,48 +616,82 @@ class ScoringMixin:
                 input_price = model_price.get("input_cost_per_token", 0.0)
                 output_price = model_price.get("output_cost_per_token", 0.0)
                 if input_price <= 0.0000005 and output_price <= 0.0000005:
-                    logger.debug("FREE SCORE: Channel '%s' model '%s' token pricing indicates free", channel.name, model_name)
+                    logger.debug(
+                        "FREE SCORE: Channel '%s' model '%s' token pricing indicates free",
+                        channel.name,
+                        model_name,
+                    )
                     return 1.0
 
-        if hasattr(channel, 'cost_per_token') and channel.cost_per_token:
+        if hasattr(channel, "cost_per_token") and channel.cost_per_token:
             cost_per_token = channel.cost_per_token
             input_cost = cost_per_token.get("input", 0.0)
             output_cost = cost_per_token.get("output", 0.0)
             if input_cost <= 0.0 and output_cost <= 0.0:
-                logger.debug("FREE SCORE: Channel '%s' confirmed free via cost_per_token", channel.name)
+                logger.debug(
+                    "FREE SCORE: Channel '%s' confirmed free via cost_per_token",
+                    channel.name,
+                )
                 return 1.0
-            if model_name and (":free" in model_name.lower() or "-free" in model_name.lower()):
-                logger.debug("FREE SCORE: Channel '%s' has costs but model '%s' explicitly marked as free", channel.name, model_name)
+            if model_name and (
+                ":free" in model_name.lower() or "-free" in model_name.lower()
+            ):
+                logger.debug(
+                    "FREE SCORE: Channel '%s' has costs but model '%s' explicitly marked as free",
+                    channel.name,
+                    model_name,
+                )
                 return 1.0
             logger.debug("FREE SCORE: Channel '%s' has non-zero costs", channel.name)
             return 0.1
 
-        pricing = getattr(channel, 'pricing', None)
+        pricing = getattr(channel, "pricing", None)
         if pricing:
             input_cost = pricing.get("input_cost_per_1k", 0.001)
             output_cost = pricing.get("output_cost_per_1k", 0.002)
             avg_cost = (input_cost + output_cost) / 2
             if avg_cost <= 0.0001:
-                logger.debug("FREE SCORE: Channel '%s' very low cost (avg=%.6f)", channel.name, avg_cost)
+                logger.debug(
+                    "FREE SCORE: Channel '%s' very low cost (avg=%.6f)",
+                    channel.name,
+                    avg_cost,
+                )
                 return 0.9
             if avg_cost <= 0.001:
-                logger.debug("FREE SCORE: Channel '%s' low cost (avg=%.6f)", channel.name, avg_cost)
+                logger.debug(
+                    "FREE SCORE: Channel '%s' low cost (avg=%.6f)",
+                    channel.name,
+                    avg_cost,
+                )
                 return 0.7
-            if model_name and (":free" in model_name.lower() or "-free" in model_name.lower()):
-                logger.debug("FREE SCORE: Channel has costs but model '%s' explicitly marked as free", model_name)
+            if model_name and (
+                ":free" in model_name.lower() or "-free" in model_name.lower()
+            ):
+                logger.debug(
+                    "FREE SCORE: Channel has costs but model '%s' explicitly marked as free",
+                    model_name,
+                )
                 return 1.0
-            logger.debug("FREE SCORE: Channel '%s' has significant costs (avg=%.6f)", channel.name, avg_cost)
+            logger.debug(
+                "FREE SCORE: Channel '%s' has significant costs (avg=%.6f)",
+                channel.name,
+                avg_cost,
+            )
             return 0.1
 
-        channel_tags_lower = [tag.lower() for tag in getattr(channel, 'tags', [])]
+        channel_tags_lower = [tag.lower() for tag in getattr(channel, "tags", [])]
         if any(tag in free_tags for tag in channel_tags_lower):
-            logger.debug("FREE SCORE: Channel '%s' has free tag in channel tags", channel.name)
+            logger.debug(
+                "FREE SCORE: Channel '%s' has free tag in channel tags", channel.name
+            )
             return 1.0
 
         logger.debug("FREE SCORE: Channel '%s' no evidence of being free", channel.name)
         return 0.1
 
-    def _calculate_local_score(self, channel: Channel, model_name: Optional[str] = None) -> float:
+    def _calculate_local_score(
+        self, channel: Channel, model_name: Optional[str] = None
+    ) -> float:
         local_tags = {"local", "本地", "localhost", "127.0.0.1", "offline", "edge"}
 
         channel_tags_lower = [tag.lower() for tag in channel.tags]
@@ -544,7 +704,7 @@ class ScoringMixin:
             if any(tag in local_tags for tag in model_tags_lower):
                 return 1.0
 
-        base_url = getattr(channel, 'base_url', None)
+        base_url = getattr(channel, "base_url", None)
         if base_url:
             base_url_lower = base_url.lower()
             local_indicators = ["localhost", "127.0.0.1", "0.0.0.0", "::1"]
@@ -552,10 +712,17 @@ class ScoringMixin:
                 return 1.0
 
         provider_config = None
-        if hasattr(self.config, 'providers'):
-            provider_config = next((p for p in self.config.providers.values() if p.name == channel.provider), None)
+        if hasattr(self.config, "providers"):
+            provider_config = next(
+                (
+                    p
+                    for p in self.config.providers.values()
+                    if p.name == channel.provider
+                ),
+                None,
+            )
 
-        if provider_config and hasattr(provider_config, 'base_url'):
+        if provider_config and hasattr(provider_config, "base_url"):
             provider_url_lower = provider_config.base_url.lower()
             local_indicators = ["localhost", "127.0.0.1", "0.0.0.0", "::1"]
             if any(indicator in provider_url_lower for indicator in local_indicators):
@@ -607,8 +774,12 @@ class ScoringMixin:
 
         return total_score / total_weight
 
-    def _hierarchical_sort(self, scored_channels: list[RoutingScore]) -> list[RoutingScore]:
-        logger.info("HIERARCHICAL SORTING: 6-digit scoring system (Cost|Context|Param|Speed|Quality|Reliability)")
+    def _hierarchical_sort(
+        self, scored_channels: list[RoutingScore]
+    ) -> list[RoutingScore]:
+        logger.info(
+            "HIERARCHICAL SORTING: 6-digit scoring system (Cost|Context|Param|Speed|Quality|Reliability)"
+        )
 
         def sorting_key(score: RoutingScore):
             cost_tier = min(9, int(score.cost_score * 9))
@@ -619,12 +790,12 @@ class ScoringMixin:
             reliability_tier = min(9, int(score.reliability_score * 9))
 
             hierarchical_score = (
-                cost_tier * 100000 +
-                context_tier * 10000 +
-                parameter_tier * 1000 +
-                speed_tier * 100 +
-                quality_tier * 10 +
-                reliability_tier
+                cost_tier * 100000
+                + context_tier * 10000
+                + parameter_tier * 1000
+                + speed_tier * 100
+                + quality_tier * 10
+                + reliability_tier
             )
             return (-hierarchical_score, score.channel.name)
 
@@ -639,17 +810,24 @@ class ScoringMixin:
             reliability_tier = min(9, int(scored.reliability_score * 9))
 
             hierarchical_score = (
-                cost_tier * 100000 +
-                context_tier * 10000 +
-                parameter_tier * 1000 +
-                speed_tier * 100 +
-                quality_tier * 10 +
-                reliability_tier
+                cost_tier * 100000
+                + context_tier * 10000
+                + parameter_tier * 1000
+                + speed_tier * 100
+                + quality_tier * 10
+                + reliability_tier
             )
 
             score_display = f"{cost_tier}{context_tier}{parameter_tier}{speed_tier}{quality_tier}{reliability_tier}"
             is_free = "FREE" if scored.free_score >= 0.9 else "PAID"
-            logger.info("   #%s: '%s' [%s] Score: %s (Total: %s)", i + 1, scored.channel.name, is_free, score_display, f"{hierarchical_score:,}")
+            logger.info(
+                "   #%s: '%s' [%s] Score: %s (Total: %s)",
+                i + 1,
+                scored.channel.name,
+                is_free,
+                score_display,
+                f"{hierarchical_score:,}",
+            )
 
         return sorted_channels
 
@@ -679,13 +857,15 @@ class ScoringMixin:
                 total_chars += len(content)
                 all_content += content
 
-        chinese_chars = sum(1 for char in all_content if '\u4e00' <= char <= '\u9fff')
+        chinese_chars = sum(1 for char in all_content if "\u4e00" <= char <= "\u9fff")
         english_chars = len(all_content) - chinese_chars
         estimated_tokens = chinese_chars + (english_chars // 4) + (len(messages) * 4)
 
         return max(1, estimated_tokens)
 
-    def _estimate_cost_for_channel(self, channel: Channel, request: RoutingRequest) -> float:
+    def _estimate_cost_for_channel(
+        self, channel: Channel, request: RoutingRequest
+    ) -> float:
         try:
             from core.utils.cost_estimator import CostEstimator
 
@@ -721,7 +901,9 @@ class ScoringMixin:
             if model_pricing:
                 input_cost = model_pricing.get("input_cost_per_token", 0.0)
                 output_cost = model_pricing.get("output_cost_per_token", 0.0)
-                total_cost = input_tokens * input_cost + estimated_output_tokens * output_cost
+                total_cost = (
+                    input_tokens * input_cost + estimated_output_tokens * output_cost
+                )
                 return total_cost
 
         free_score = self._calculate_free_score(channel, request.model)
@@ -729,13 +911,19 @@ class ScoringMixin:
             return 0.0
         return 0.001
 
-    async def _filter_by_capabilities(self, channels: list[ChannelCandidate], request: RoutingRequest) -> list[ChannelCandidate]:
-        if not hasattr(request, 'data') or not request.data:
+    async def _filter_by_capabilities(
+        self, channels: list[ChannelCandidate], request: RoutingRequest
+    ) -> list[ChannelCandidate]:
+        if not hasattr(request, "data") or not request.data:
             return channels
 
-        capability_requirements = self.capability_mapper.get_capability_requirements(request.data)
+        capability_requirements = self.capability_mapper.get_capability_requirements(
+            request.data
+        )
         if not any(capability_requirements.values()):
-            logger.debug("Request doesn't require special capabilities, skipping capability check")
+            logger.debug(
+                "Request doesn't require special capabilities, skipping capability check"
+            )
             return channels
 
         logger.info("CAPABILITY REQUIREMENTS: %s", capability_requirements)
@@ -755,24 +943,38 @@ class ScoringMixin:
                     api_key=channel.api_key,
                 )
 
-                can_handle = self.capability_detector.can_handle_request(capabilities, request.data)
+                can_handle = self.capability_detector.can_handle_request(
+                    capabilities, request.data
+                )
 
                 if can_handle:
                     capability_filtered.append(candidate)
-                    logger.debug("CAPABILITY MATCH: %s can handle request", channel.name)
+                    logger.debug(
+                        "CAPABILITY MATCH: %s can handle request", channel.name
+                    )
                 else:
                     if capabilities.is_local:
                         fallback_channels.append((candidate, capabilities))
-                        logger.debug("⚠️ LOCAL LIMITATION: %s lacks required capabilities", channel.name)
+                        logger.debug(
+                            "⚠️ LOCAL LIMITATION: %s lacks required capabilities",
+                            channel.name,
+                        )
                     else:
-                        logger.debug("CAPABILITY MISMATCH: %s cannot handle request", channel.name)
+                        logger.debug(
+                            "CAPABILITY MISMATCH: %s cannot handle request",
+                            channel.name,
+                        )
 
             except Exception as e:
-                logger.warning("Error checking capabilities for %s: %s", channel.name, e)
+                logger.warning(
+                    "Error checking capabilities for %s: %s", channel.name, e
+                )
                 capability_filtered.append(candidate)
 
         if not capability_filtered and fallback_channels:
-            logger.info("FALLBACK SEARCH: Looking for cloud alternatives for local model limitations...")
+            logger.info(
+                "FALLBACK SEARCH: Looking for cloud alternatives for local model limitations..."
+            )
 
             all_channels = []
             for provider_config in self.config.providers:
@@ -784,21 +986,28 @@ class ScoringMixin:
                                 "name": channel_config.name,
                                 "provider": provider_config.name,
                                 "model_name": channel_config.model_name,
-                                "base_url": channel_config.base_url or provider_config.base_url,
+                                "base_url": channel_config.base_url
+                                or provider_config.base_url,
                                 "api_key": channel_config.api_key,
-                                "priority": getattr(channel_config, 'priority', 1),
+                                "priority": getattr(channel_config, "priority", 1),
                             }
                         )
 
             for failed_candidate, _failed_capabilities in fallback_channels[:1]:
-                fallback_candidates = await self.capability_detector.get_fallback_channels(
-                    original_channel=failed_candidate.channel.id,
-                    request_data=request.data,
-                    available_channels=all_channels,
+                fallback_candidates = (
+                    await self.capability_detector.get_fallback_channels(
+                        original_channel=failed_candidate.channel.id,
+                        request_data=request.data,
+                        available_channels=all_channels,
+                    )
                 )
 
                 if fallback_candidates:
-                    logger.info("FOUND FALLBACK: %s alternative channels for %s", len(fallback_candidates), failed_candidate.channel.name)
+                    logger.info(
+                        "FOUND FALLBACK: %s alternative channels for %s",
+                        len(fallback_candidates),
+                        failed_candidate.channel.name,
+                    )
 
                     for fallback_channel_config in fallback_candidates[:3]:
                         fallback_channel = Channel(
@@ -822,11 +1031,20 @@ class ScoringMixin:
 
         return capability_filtered
 
-    async def _pre_filter_channels(self, channels: list[ChannelCandidate], request: RoutingRequest, max_channels: int = 20) -> list[ChannelCandidate]:
+    async def _pre_filter_channels(
+        self,
+        channels: list[ChannelCandidate],
+        request: RoutingRequest,
+        max_channels: int = 20,
+    ) -> list[ChannelCandidate]:
         if len(channels) <= max_channels:
             return channels
 
-        logger.info("PRE-FILTER: Fast pre-filtering %s channels to top %s", len(channels), max_channels)
+        logger.info(
+            "PRE-FILTER: Fast pre-filtering %s channels to top %s",
+            len(channels),
+            max_channels,
+        )
 
         channel_scores = []
         for candidate in channels:
@@ -836,13 +1054,13 @@ class ScoringMixin:
             if self._is_free_channel(channel, candidate.matched_model):
                 score += 1000
 
-            if hasattr(channel, 'priority') and channel.priority:
+            if hasattr(channel, "priority") and channel.priority:
                 score += (10 - channel.priority) * 10
 
             if self._is_local_channel(channel):
                 score += 100
 
-            if getattr(channel, 'enabled', True):
+            if getattr(channel, "enabled", True):
                 score += 50
 
             score += random.uniform(0, 10)
@@ -854,29 +1072,45 @@ class ScoringMixin:
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug("PRE-FILTER RESULTS:")
             for i, (score, candidate) in enumerate(channel_scores[:max_channels]):
-                logger.debug("  #%s: %s (score: %.1f)", i + 1, candidate.channel.name, score)
+                logger.debug(
+                    "  #%s: %s (score: %.1f)", i + 1, candidate.channel.name, score
+                )
 
-        logger.info("PRE-FILTER COMPLETE: Selected %s/%s channels for detailed scoring", len(selected), len(channels))
+        logger.info(
+            "PRE-FILTER COMPLETE: Selected %s/%s channels for detailed scoring",
+            len(selected),
+            len(channels),
+        )
         return selected
 
     def _is_free_channel(self, channel: Channel, model_name: Optional[str]) -> bool:
-        if hasattr(channel, 'cost') and channel.cost == 0:
+        if hasattr(channel, "cost") and channel.cost == 0:
             return True
-        if model_name and 'free' in model_name.lower():
+        if model_name and "free" in model_name.lower():
             return True
-        if hasattr(channel, 'name') and channel.name and 'free' in channel.name.lower():
+        if hasattr(channel, "name") and channel.name and "free" in channel.name.lower():
             return True
         return False
 
     def _is_local_channel(self, channel: Channel) -> bool:
-        if hasattr(channel, 'base_url') and channel.base_url:
+        if hasattr(channel, "base_url") and channel.base_url:
             url = channel.base_url.lower()
-            return any(local_indicator in url for local_indicator in [
-                'localhost', '127.0.0.1', ':11434', ':1234', 'ollama', 'lmstudio'
-            ])
+            return any(
+                local_indicator in url
+                for local_indicator in [
+                    "localhost",
+                    "127.0.0.1",
+                    ":11434",
+                    ":1234",
+                    "ollama",
+                    "lmstudio",
+                ]
+            )
         return False
 
-    def _log_performance_metrics(self, channel_count: int, elapsed_ms: float, scoring_type: str, metrics=None):
+    def _log_performance_metrics(
+        self, channel_count: int, elapsed_ms: float, scoring_type: str, metrics=None
+    ):
         avg_time_per_channel = elapsed_ms / max(channel_count, 1)
 
         slow_threshold_ms = 1000
@@ -906,13 +1140,19 @@ class ScoringMixin:
 
         if metrics and scoring_type == "batch":
             if metrics.slow_threshold_exceeded:
-                logger.warning("BATCH SCORER ANALYSIS: %s", metrics.optimization_applied)
+                logger.warning(
+                    "BATCH SCORER ANALYSIS: %s", metrics.optimization_applied
+                )
 
             if metrics.cache_hit:
                 logger.info("💾 CACHE HIT: Scoring completed with cached results")
 
         if channel_count > 50 and elapsed_ms > 1500:
-            logger.info("💡 OPTIMIZATION TIP: Consider implementing channel pre-filtering for %s+ channels", channel_count)
+            logger.info(
+                "💡 OPTIMIZATION TIP: Consider implementing channel pre-filtering for %s+ channels",
+                channel_count,
+            )
         elif channel_count > 20 and elapsed_ms > 800:
-            logger.info("💡 OPTIMIZATION TIP: Performance could benefit from caching strategies")
-
+            logger.info(
+                "💡 OPTIMIZATION TIP: Performance could benefit from caching strategies"
+            )

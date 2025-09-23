@@ -2,10 +2,10 @@
 模型分析工具 - 提取参数数量、上下文长度等信息
 """
 
-import re
 import logging
-from typing import Dict, Optional, Tuple, Any, List
+import re
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +103,7 @@ class ModelAnalyzer:
         "llama-3.1-8b": 131072,  # 128k
         "gemma-3-270m": 8192,
         # 默认回退值
-        "default": 8192  # 8k 默认
+        "default": 8192,  # 8k 默认
     }
 
     def analyze_model(
@@ -146,11 +146,15 @@ class ModelAnalyzer:
         if not specs.context_length:
             if model_key in self.KNOWN_MODEL_CONTEXT:
                 specs.context_length = self.KNOWN_MODEL_CONTEXT[model_key]
-                logger.debug(f"Found known context length for {model_name}: {specs.context_length}")
+                logger.debug(
+                    f"Found known context length for {model_name}: {specs.context_length}"
+                )
             else:
                 # 使用默认值
                 specs.context_length = self.KNOWN_MODEL_CONTEXT["default"]
-                logger.debug(f"Using default context length for {model_name}: {specs.context_length}")
+                logger.debug(
+                    f"Using default context length for {model_name}: {specs.context_length}"
+                )
 
         # 3. 从模型名称中提取参数数量
         if not specs.parameter_count:

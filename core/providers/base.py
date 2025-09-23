@@ -6,7 +6,7 @@ Provider基础适配器
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import httpx
 
@@ -133,7 +133,9 @@ class BaseAdapter(ABC):
 
         # 如果都不可用，使用第一个并发出警告
         selected_url = candidate_urls[0]
-        logger.warning(f"Provider {self.provider_name} 所有URL都不可达，使用第一个: {selected_url}")
+        logger.warning(
+            f"Provider {self.provider_name} 所有URL都不可达，使用第一个: {selected_url}"
+        )
         return selected_url
 
     def _test_url_connectivity(self, url: str) -> bool:
@@ -159,7 +161,7 @@ class BaseAdapter(ABC):
 
             # 默认端口
             if not port:
-                port = 443 if parsed.scheme == 'https' else 80
+                port = 443 if parsed.scheme == "https" else 80
 
             # 处理特殊主机名
             if host == "host.docker.internal":
@@ -193,13 +195,14 @@ class BaseAdapter(ABC):
         try:
             # 检查 /.dockerenv 文件
             import os
-            if os.path.exists('/.dockerenv'):
+
+            if os.path.exists("/.dockerenv"):
                 return True
 
             # 检查 /proc/1/cgroup 中是否包含 docker
-            if os.path.exists('/proc/1/cgroup'):
-                with open('/proc/1/cgroup', 'r') as f:
-                    return 'docker' in f.read()
+            if os.path.exists("/proc/1/cgroup"):
+                with open("/proc/1/cgroup", "r") as f:
+                    return "docker" in f.read()
 
             return False
         except Exception:
@@ -366,7 +369,9 @@ class BaseAdapter(ABC):
             logger.warning(f"未知的认证类型: {auth_type}")
             return {"Authorization": f"Bearer {api_key}"}
 
-    def get_request_headers(self, channel: "Channel", request: ChatRequest) -> Dict[str, str]:
+    def get_request_headers(
+        self, channel: "Channel", request: ChatRequest
+    ) -> Dict[str, str]:
         """
         获取完整的请求头（包含认证和标准头）
 
@@ -380,7 +385,7 @@ class BaseAdapter(ABC):
         # 基础请求头
         headers = {
             "Content-Type": "application/json",
-            "User-Agent": "smart-ai-router/0.3.0"
+            "User-Agent": "smart-ai-router/0.3.0",
         }
 
         # 添加默认头
@@ -389,7 +394,7 @@ class BaseAdapter(ABC):
             logger.debug(f"添加默认头: {len(self.default_headers)} 个")
 
         # 添加认证头
-        api_key = getattr(channel, 'api_key', '')
+        api_key = getattr(channel, "api_key", "")
         if api_key:
             auth_headers = self.get_auth_headers(api_key)
             headers.update(auth_headers)
@@ -426,8 +431,12 @@ class BaseAdapter(ABC):
         else:
             return ProviderError(f"未知错误 ({response.status_code}): {error_msg}")
 
-    def calculate_cost(self, usage: Dict[str, int], model_info: ModelInfo, 
-                      currency_exchange: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def calculate_cost(
+        self,
+        usage: Dict[str, int],
+        model_info: ModelInfo,
+        currency_exchange: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         """
         计算请求成本，支持货币转换
 
@@ -440,20 +449,24 @@ class BaseAdapter(ABC):
             包含成本详情的字典
         """
         from core.utils.token_counter import TokenCounter
-        
+
         input_tokens = usage.get("prompt_tokens", 0)
         output_tokens = usage.get("completion_tokens", 0)
 
         # 构建定价字典
         pricing = {
             "input": model_info.input_cost_per_1k / 1000,  # 转换为每token成本
-            "output": model_info.output_cost_per_1k / 1000
+            "output": model_info.output_cost_per_1k / 1000,
         }
-        
-        # 使用TokenCounter进行成本计算，支持货币转换
-        return TokenCounter.calculate_cost(input_tokens, output_tokens, pricing, currency_exchange)
 
-    def calculate_cost_legacy(self, usage: Dict[str, int], model_info: ModelInfo) -> float:
+        # 使用TokenCounter进行成本计算，支持货币转换
+        return TokenCounter.calculate_cost(
+            input_tokens, output_tokens, pricing, currency_exchange
+        )
+
+    def calculate_cost_legacy(
+        self, usage: Dict[str, int], model_info: ModelInfo
+    ) -> float:
         """
         传统成本计算方法（保持向后兼容）
 

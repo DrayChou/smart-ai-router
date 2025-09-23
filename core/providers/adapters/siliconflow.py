@@ -7,9 +7,9 @@ SiliconFlow Provider Adapter - 统一格式版本
 import json
 import logging
 import sys
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 import httpx
 

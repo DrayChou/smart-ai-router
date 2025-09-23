@@ -1,4 +1,5 @@
 """Router service wrapper built on the modern JSONRouter."""
+
 from __future__ import annotations
 
 import logging

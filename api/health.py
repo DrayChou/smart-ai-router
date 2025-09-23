@@ -23,7 +23,7 @@ def create_health_router(config_loader: YAMLConfigLoader) -> APIRouter:
             "version": "0.3.0-minimal",
             "status": "running",
             "mode": "minimal",
-            "endpoints": 8
+            "endpoints": 8,
         }
 
     @router.get("/health")
@@ -40,7 +40,7 @@ def create_health_router(config_loader: YAMLConfigLoader) -> APIRouter:
                 "timestamp": int(time.time()),
                 "providers": provider_count,
                 "channels": channel_count,
-                "cache_status": "active"
+                "cache_status": "active",
             }
         except Exception as e:
             return {"status": "unhealthy", "error": str(e)}

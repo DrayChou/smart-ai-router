@@ -7,15 +7,16 @@
 import json
 import logging
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect, Query
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from core.yaml_config import YAMLConfigLoader
 from core.json_router import JSONRouter
 from core.utils.model_channel_blacklist import get_model_blacklist_manager
+from core.yaml_config import YAMLConfigLoader
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ active_connections: List[WebSocket] = []
 
 # 请求上下文存储（用于在请求期间传递渠道信息）
 import threading
+
 from core.utils.model_capabilities import get_model_capabilities_from_openrouter
 
 _request_context = threading.local()
@@ -38,11 +40,14 @@ class ModelSearchRequest(BaseModel):
 
     query: str
     max_results: Optional[int] = 50
-    strategy: Optional[str] = "cost_first"  # cost_first, quality_first, speed_first, balanced
+    strategy: Optional[str] = (
+        "cost_first"  # cost_first, quality_first, speed_first, balanced
+    )
 
 
 class ChannelTestRequest(BaseModel):
     """渠道测试请求"""
+
     model_config = {"protected_namespaces": ()}
 
     channel_id: str
@@ -93,7 +98,9 @@ def create_status_monitor_router(
             )
 
             # 估算总模型数（从API Key级缓存中获取）
-            channel_cache = config_loader.get_model_cache_by_channel_and_key(channel.id, channel.api_key)
+            channel_cache = config_loader.get_model_cache_by_channel_and_key(
+                channel.id, channel.api_key
+            )
             if channel_cache:
                 models = channel_cache.get("models", [])
                 total_models = len(models)
@@ -102,7 +109,6 @@ def create_status_monitor_router(
                 channel_cache = config_loader.get_model_cache_by_channel(channel.id)
                 models = channel_cache.get("models", [])
                 total_models = len(models)
-            
 
             channels_data.append(
                 {
@@ -139,7 +145,6 @@ def create_status_monitor_router(
         """获取指定渠道的模型列表"""
         channel_cache = config_loader.get_model_cache_by_channel(channel_id)
         models = channel_cache.get("models", [])
-        
 
         blacklist_manager = get_model_blacklist_manager()
         blacklisted_models = blacklist_manager.get_blacklisted_models_for_channel(
@@ -152,21 +157,28 @@ def create_status_monitor_router(
             if isinstance(model, str):
                 model_name = model
                 model_dict = {"name": model_name, "id": model_name}
-                
+
                 # 🔧 修复：为字符串格式的模型获取pricing信息
                 try:
                     from core.utils.cost_estimator import CostEstimator
+
                     estimator = CostEstimator()
                     model_pricing = estimator._get_model_pricing(channel_id, model_name)
-                    if model_pricing and 'input' in model_pricing and 'output' in model_pricing:
+                    if (
+                        model_pricing
+                        and "input" in model_pricing
+                        and "output" in model_pricing
+                    ):
                         # 根据单位正确设置价格
-                        pricing_unit = model_pricing.get('unit', 'per_token')
-                        if pricing_unit == 'per_million_tokens':
-                            model_dict["input_price"] = model_pricing['input']
-                            model_dict["output_price"] = model_pricing['output']
+                        pricing_unit = model_pricing.get("unit", "per_token")
+                        if pricing_unit == "per_million_tokens":
+                            model_dict["input_price"] = model_pricing["input"]
+                            model_dict["output_price"] = model_pricing["output"]
                         else:
-                            model_dict["input_price"] = model_pricing['input'] * 1000000
-                            model_dict["output_price"] = model_pricing['output'] * 1000000
+                            model_dict["input_price"] = model_pricing["input"] * 1000000
+                            model_dict["output_price"] = (
+                                model_pricing["output"] * 1000000
+                            )
                 except Exception as e:
                     logger.debug(f"Failed to get pricing for {model_name}: {e}")
                     model_dict["input_price"] = None
@@ -189,7 +201,7 @@ def create_status_monitor_router(
                 "pricing": {
                     "input": model_dict.get("input_price"),
                     "output": model_dict.get("output_price"),
-                    "unit": "per_million_tokens"  # 统一单位标识
+                    "unit": "per_million_tokens",  # 统一单位标识
                 },
             }
 
@@ -227,7 +239,9 @@ def create_status_monitor_router(
             return {"success": False, "error": str(e)}
 
     @api_router.post("/api/channels/{channel_id}/priority")
-    async def set_channel_priority(channel_id: str, priority: int = Query(100, ge=0, le=1000)):
+    async def set_channel_priority(
+        channel_id: str, priority: int = Query(100, ge=0, le=1000)
+    ):
         """调整渠道优先级（持久化到 YAML 并热加载）"""
         try:
             ok = config_loader.set_channel_priority(channel_id, priority)
@@ -283,74 +297,105 @@ def create_status_monitor_router(
                 )
 
                 # 🎯 使用OpenRouter数据库作为通用模型能力参考
-                capabilities, context_length = get_model_capabilities_from_openrouter(model_name)
+                capabilities, context_length = get_model_capabilities_from_openrouter(
+                    model_name
+                )
 
                 # 💰 使用路由器的成本估算逻辑（保证与路由一致）
                 try:
                     # 使用路由器的成本估算，这会正确应用汇率折扣
-                    estimated_cost = router._estimate_cost_for_channel(channel, routing_request)
-                    
+                    estimated_cost = router._estimate_cost_for_channel(
+                        channel, routing_request
+                    )
+
                     # 获取实际定价信息（如果可用）
                     from core.utils.cost_estimator import CostEstimator
+
                     estimator = CostEstimator()
                     model_pricing = estimator._get_model_pricing(channel.id, model_name)
-                    
+
                     # 检查汇率折扣信息
                     currency_discount_info = None
-                    if hasattr(channel, 'currency_exchange') and channel.currency_exchange:
+                    if (
+                        hasattr(channel, "currency_exchange")
+                        and channel.currency_exchange
+                    ):
                         exchange_config = channel.currency_exchange
-                        if hasattr(exchange_config, 'rate') and exchange_config.rate != 1.0:
-                            discount_percentage = round((1 - exchange_config.rate) * 100, 1)
+                        if (
+                            hasattr(exchange_config, "rate")
+                            and exchange_config.rate != 1.0
+                        ):
+                            discount_percentage = round(
+                                (1 - exchange_config.rate) * 100, 1
+                            )
                             currency_discount_info = f"{exchange_config.rate:.1f}x ({discount_percentage}% 折扣)"
-                    
-                    if model_pricing and 'input' in model_pricing and 'output' in model_pricing:
+
+                    if (
+                        model_pricing
+                        and "input" in model_pricing
+                        and "output" in model_pricing
+                    ):
                         # 获取原始价格数据
-                        input_price = model_pricing['input']
-                        output_price = model_pricing['output']
-                        pricing_unit = model_pricing.get('unit', 'per_token')  # 检查单位
-                        
+                        input_price = model_pricing["input"]
+                        output_price = model_pricing["output"]
+                        pricing_unit = model_pricing.get(
+                            "unit", "per_token"
+                        )  # 检查单位
+
                         # 应用汇率折扣（如果有）
-                        if hasattr(channel, 'currency_exchange') and channel.currency_exchange:
-                            rate = getattr(channel.currency_exchange, 'rate', 1.0)
+                        if (
+                            hasattr(channel, "currency_exchange")
+                            and channel.currency_exchange
+                        ):
+                            rate = getattr(channel.currency_exchange, "rate", 1.0)
                             if rate > 0 and rate != 1.0:
                                 input_price *= rate
                                 output_price *= rate
-                        
+
                         # 🔧 修复：根据实际单位进行正确转换
-                        if pricing_unit == 'per_million_tokens':
+                        if pricing_unit == "per_million_tokens":
                             # 数据已经是每百万token格式，直接使用
                             input_price_per_million = input_price
                             output_price_per_million = output_price
-                            logger.debug(f"💰 Using per_million_tokens data: {model_name} | input: ${input_price}/1M, output: ${output_price}/1M")
+                            logger.debug(
+                                f"💰 Using per_million_tokens data: {model_name} | input: ${input_price}/1M, output: ${output_price}/1M"
+                            )
                         else:
                             # 数据是每token格式，需要转换
                             input_price_per_million = input_price * 1000000
                             output_price_per_million = output_price * 1000000
-                            logger.debug(f"💰 Converting per_token data: {model_name} | input: ${input_price_per_million}/1M, output: ${output_price_per_million}/1M")
-                        
+                            logger.debug(
+                                f"💰 Converting per_token data: {model_name} | input: ${input_price_per_million}/1M, output: ${output_price_per_million}/1M"
+                            )
+
                         cost_info = {
                             "total": estimated_cost,  # 使用路由器估算的总成本
                             "input": input_price_per_million,  # 每百万token输入价格（含折扣）
                             "output": output_price_per_million,  # 每百万token输出价格（含折扣）
-                            "currency_discount": currency_discount_info
+                            "currency_discount": currency_discount_info,
                         }
-                        logger.info(f"💰 STATUS API: Using router cost estimation for {channel.id} | {model_name} | total: ${estimated_cost:.6f}")
+                        logger.info(
+                            f"💰 STATUS API: Using router cost estimation for {channel.id} | {model_name} | total: ${estimated_cost:.6f}"
+                        )
                     else:
                         # 没有精确定价时，基于总成本估算输入输出比例
                         cost_info = {
                             "total": estimated_cost,
-                            "input": (estimated_cost * 0.6) * 1000000,  # 转换为每百万token格式
+                            "input": (estimated_cost * 0.6)
+                            * 1000000,  # 转换为每百万token格式
                             "output": (estimated_cost * 0.4) * 1000000,
-                            "currency_discount": currency_discount_info
+                            "currency_discount": currency_discount_info,
                         }
                 except Exception as e:
-                    logger.warning(f"Cost estimation failed for {channel.id}, using fallback: {e}")
+                    logger.warning(
+                        f"Cost estimation failed for {channel.id}, using fallback: {e}"
+                    )
                     # 最终回退
                     cost_info = {
                         "total": 0.001,  # 默认示例成本
                         "input": 600.0,  # 默认每百万token输入价格
                         "output": 1200.0,  # 默认每百万token输出价格
-                        "currency_discount": None
+                        "currency_discount": None,
                     }
 
                 result = {
@@ -486,6 +531,7 @@ def log_request(
     # 通知WebSocket客户端 (后台任务方式避免阻塞)
     try:
         import asyncio
+
         # 使用 asyncio.ensure_future 来避免协程警告
         asyncio.ensure_future(broadcast_update("request_log", log_entry))
     except Exception:

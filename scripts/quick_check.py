@@ -4,22 +4,27 @@
 用于快速验证Smart AI Router的基本状态
 """
 
-import sys
 import json
-import requests
 import subprocess
+import sys
 from pathlib import Path
+
+import requests
+
 
 def check_config_file():
     """检查配置文件"""
     config_file = Path("config/router_config.yaml")
     if not config_file.exists():
         print("ERROR: 配置文件不存在: config/router_config.yaml")
-        print("   解决方案: cp config/router_config.yaml.template config/router_config.yaml")
+        print(
+            "   解决方案: cp config/router_config.yaml.template config/router_config.yaml"
+        )
         return False
-    
+
     print("OK: 配置文件存在")
     return True
+
 
 def check_service_running():
     """检查服务是否运行"""
@@ -41,13 +46,14 @@ def check_service_running():
         print(f"ERROR: 服务检查失败: {e}")
         return False
 
+
 def check_models_available():
     """检查模型是否可用"""
     try:
         response = requests.get("http://localhost:7601/v1/models", timeout=10)
         if response.status_code == 200:
             models_data = response.json()
-            models = models_data.get('data', [])
+            models = models_data.get("data", [])
             print(f"OK: 发现 {len(models)} 个可用模型")
             if models:
                 print(f"   示例模型: {', '.join([m['id'] for m in models[:3]])}")
@@ -59,17 +65,16 @@ def check_models_available():
         print(f"ERROR: 模型检查失败: {e}")
         return False
 
+
 def check_dependencies():
     """检查关键依赖"""
     dependencies = ["fastapi", "httpx", "yaml", "pydantic"]
     all_ok = True
-    
+
     for dep in dependencies:
         try:
             result = subprocess.run(
-                [sys.executable, "-c", f"import {dep}"],
-                capture_output=True,
-                timeout=5
+                [sys.executable, "-c", f"import {dep}"], capture_output=True, timeout=5
             )
             if result.returncode == 0:
                 print(f"OK: {dep} 已安装")
@@ -79,11 +84,12 @@ def check_dependencies():
         except Exception:
             print(f"ERROR: {dep} 检查失败")
             all_ok = False
-    
+
     if not all_ok:
         print("   解决方案: uv sync")
-    
+
     return all_ok
+
 
 def test_simple_request():
     """测试简单请求"""
@@ -93,11 +99,11 @@ def test_simple_request():
             json={
                 "model": "tag:free",
                 "messages": [{"role": "user", "content": "Hello"}],
-                "max_tokens": 5
+                "max_tokens": 5,
             },
-            timeout=30
+            timeout=30,
         )
-        
+
         if response.status_code == 200:
             print("OK: 基本请求测试通过")
             return True
@@ -117,11 +123,12 @@ def test_simple_request():
         print(f"ERROR: 请求测试失败: {e}")
         return False
 
+
 def main():
     """主检查流程"""
     print("Smart AI Router Quick Health Check")
     print("=" * 40)
-    
+
     checks = [
         ("配置文件", check_config_file),
         ("关键依赖", check_dependencies),
@@ -129,20 +136,20 @@ def main():
         ("模型列表", check_models_available),
         ("基本请求", test_simple_request),
     ]
-    
+
     passed = 0
     total = len(checks)
-    
+
     for check_name, check_func in checks:
         print(f"\n>> 检查 {check_name}...")
         if check_func():
             passed += 1
         else:
             print("   提示: 查看 docs/TROUBLESHOOTING.md 获取详细解决方案")
-    
+
     print("\n" + "=" * 40)
     print(f"检查结果: {passed}/{total} 项通过")
-    
+
     if passed == total:
         print("SUCCESS: 系统状态良好！")
         return True
@@ -153,6 +160,7 @@ def main():
         print("ERROR: 发现多个问题，需要检修")
         print("提示: 运行 'python scripts/diagnostic_tool.py' 进行详细诊断")
         return False
+
 
 if __name__ == "__main__":
     success = main()

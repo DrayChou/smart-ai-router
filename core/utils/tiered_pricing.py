@@ -6,9 +6,9 @@
 
 import json
 import logging
-from pathlib import Path
-from typing import Dict, Any, Optional, Tuple, List
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 

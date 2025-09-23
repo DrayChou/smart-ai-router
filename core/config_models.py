@@ -2,8 +2,10 @@
 """
 Pydantic models for configuration validation.
 """
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field
-from typing import List, Dict, Optional, Any
+
 
 class Provider(BaseModel):
     name: str
@@ -13,6 +15,7 @@ class Provider(BaseModel):
     auth_type: str = "bearer"
     rate_limit: int = 60
     capabilities: List[str] = []
+
 
 class Channel(BaseModel):
     model_config = {"protected_namespaces": ()}
@@ -28,30 +31,33 @@ class Channel(BaseModel):
     weight: float = 1.0
     daily_limit: int = 1000
     capabilities: List[str] = []
-    
+
     # Channel-level tags that apply to all models in this channel
     tags: List[str] = Field(default_factory=list)
-    
+
     # Configured models list for fallback when /models API fails
     configured_models: Optional[List[str]] = Field(default=None)
-    
+
     # Cost per token
     cost_per_token: Optional[Dict[str, float]] = Field(default_factory=dict)
-    
+
     # Model name aliases mapping: standard_name -> channel_specific_name
     # Example: {"deepseek-v3.1": "deepseek-chat", "doubao-1.5-pro-256k": "ep-20250203083646-2szv9"}
     model_aliases: Optional[Dict[str, str]] = Field(default=None)
-    
-    # performance and pricing are optional dictionaries  
+
+    # performance and pricing are optional dictionaries
     performance: Dict[str, float] = Field(default_factory=dict)
     pricing: Dict[str, Any] = Field(default_factory=dict)
-    
+
     # Currency exchange configuration for special pricing providers
     # Example: {"currency_exchange": {"from": "USD", "to": "CNY", "rate": 0.7, "description": "充值0.7人民币获得1美元"}}
     currency_exchange: Optional[Dict[str, Any]] = Field(default=None)
-    
+
     # Rate limiting configuration
-    min_request_interval: int = Field(default=0, description="Minimum seconds between requests (0 = no limit)")  # 最小请求间隔(秒)
+    min_request_interval: int = Field(
+        default=0, description="Minimum seconds between requests (0 = no limit)"
+    )  # 最小请求间隔(秒)
+
 
 class Routing(BaseModel):
     default_strategy: str = "balanced"
@@ -59,6 +65,7 @@ class Routing(BaseModel):
     max_retry_attempts: int = 3
     health_check_interval: int = 300
     error_cooldown_period: int = 60
+
 
 class TaskConfig(BaseModel):
     enabled: bool = True
@@ -68,6 +75,7 @@ class TaskConfig(BaseModel):
     max_concurrent_validations: Optional[int] = None
     max_concurrent_checks: Optional[int] = None
 
+
 class Tasks(BaseModel):
     model_config = {"protected_namespaces": ()}
 
@@ -75,6 +83,7 @@ class Tasks(BaseModel):
     # 🗑️ Removed pricing_discovery - was generating unused cache files
     health_check: TaskConfig = Field(default_factory=TaskConfig)
     api_key_validation: TaskConfig = Field(default_factory=TaskConfig)
+
 
 class Server(BaseModel):
     host: str = "0.0.0.0"
@@ -84,20 +93,25 @@ class Server(BaseModel):
     request_timeout: int = 300
     max_request_size: int = 10485760
 
+
 class AdminAuth(BaseModel):
     """管理API独立认证配置"""
+
     enabled: bool = True
     admin_token: Optional[str] = None
+
 
 class Auth(BaseModel):
     enabled: bool = False
     api_token: Optional[str] = None
     admin: AdminAuth = Field(default_factory=AdminAuth)
 
+
 class System(BaseModel):
     name: str = "Smart AI Router"
-    version: str = "0.3.0" # Bump version for this change
+    version: str = "0.3.0"  # Bump version for this change
     storage_mode: str = "yaml"
+
 
 class Config(BaseModel):
     system: System = Field(default_factory=System)

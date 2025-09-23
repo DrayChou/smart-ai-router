@@ -4,11 +4,12 @@ Scoring service extracted from JSONRouter.
 This centralizes scoring/sorting so JSONRouter delegates here. It calls back
 into the router instance for calculators and sorting to keep behavior identical.
 """
+
 from __future__ import annotations
 
-import time
 import logging
-from typing import Any, List, TYPE_CHECKING
+import time
+from typing import TYPE_CHECKING, Any, List
 
 if TYPE_CHECKING:
     from core.json_router import RoutingScore
@@ -37,7 +38,9 @@ class ScoringService:
             result = await self.score_individual(channels, request)
             elapsed_ms = (time.time() - start_time) * 1000
             # router keeps original perf logging
-            self._router._log_performance_metrics(channel_count, elapsed_ms, "individual")
+            self._router._log_performance_metrics(
+                channel_count, elapsed_ms, "individual"
+            )
             return result
 
         # Lazy import to avoid cycles
@@ -59,7 +62,9 @@ class ScoringService:
 
         scored_channels = []
         for candidate in channels:
-            scores = self._router._batch_scorer.get_score_for_channel(batch_result, candidate)
+            scores = self._router._batch_scorer.get_score_for_channel(
+                batch_result, candidate
+            )
 
             total_score = self._router._calculate_total_score(
                 strategy,
@@ -203,4 +208,3 @@ class ScoringService:
             )
 
         return scored_channels
-

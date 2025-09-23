@@ -4,13 +4,14 @@ OpenRouter API适配器 - 支持价格优先排序和OpenRouter特有功能
 """
 
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
+
 import httpx
 
-from .openai import OpenAIAdapter
-from ..base import ProviderError
 from ...config_models import Channel
 from ...models.chat_request import ChatRequest
+from ..base import ProviderError
+from .openai import OpenAIAdapter
 
 logger = logging.getLogger(__name__)
 

@@ -1,4 +1,5 @@
 """Candidate discovery orchestration."""
+
 from __future__ import annotations
 
 import logging
@@ -14,7 +15,9 @@ logger = logging.getLogger(__name__)
 class CandidateDiscoveryMixin(ParameterComparisonMixin, TagRoutingMixin):
     """Combines parameter and tag based routing to produce channel candidates."""
 
-    def _get_candidate_channels(self, request: RoutingRequest) -> list[ChannelCandidate]:
+    def _get_candidate_channels(
+        self, request: RoutingRequest
+    ) -> list[ChannelCandidate]:
         parameter_candidates = self._get_parameter_comparison_candidates(request)
         if parameter_candidates is not None:
             return parameter_candidates
@@ -30,11 +33,19 @@ class CandidateDiscoveryMixin(ParameterComparisonMixin, TagRoutingMixin):
             try:
                 discovered_info = self._get_discovered_info(channel)  # type: ignore[attr-defined]
             except AttributeError:
-                discovered_info = self.config_loader.get_model_cache_by_channel(channel.id)
+                discovered_info = self.config_loader.get_model_cache_by_channel(
+                    channel.id
+                )
 
-            models_data = discovered_info.get("models_data", {}) if isinstance(discovered_info, dict) else {}
+            models_data = (
+                discovered_info.get("models_data", {})
+                if isinstance(discovered_info, dict)
+                else {}
+            )
 
-            if isinstance(discovered_info, dict) and request.model in discovered_info.get("models", []):
+            if isinstance(
+                discovered_info, dict
+            ) and request.model in discovered_info.get("models", []):
                 real_model_id = request.model
                 if models_data and request.model in models_data:
                     model_info = models_data[request.model]
@@ -46,9 +57,13 @@ class CandidateDiscoveryMixin(ParameterComparisonMixin, TagRoutingMixin):
                     real_model_id,
                     channel.name,
                 )
-                physical_candidates.append(ChannelCandidate(channel=channel, matched_model=real_model_id))
+                physical_candidates.append(
+                    ChannelCandidate(channel=channel, matched_model=real_model_id)
+                )
 
-        complete_segment_candidates = self._get_candidate_channels_by_complete_segment([request.model.lower()])
+        complete_segment_candidates = self._get_candidate_channels_by_complete_segment(
+            [request.model.lower()]
+        )
         if complete_segment_candidates:
             logger.info(
                 "COMPLETE SEGMENT MATCHING: Found %s candidate channels using complete segment match",
@@ -58,7 +73,8 @@ class CandidateDiscoveryMixin(ParameterComparisonMixin, TagRoutingMixin):
         all_candidates = physical_candidates.copy()
         for segment_candidate in complete_segment_candidates:
             if not any(
-                c.channel.id == segment_candidate.channel.id and c.matched_model == segment_candidate.matched_model
+                c.channel.id == segment_candidate.channel.id
+                and c.matched_model == segment_candidate.matched_model
                 for c in all_candidates
             ):
                 all_candidates.append(segment_candidate)
@@ -83,7 +99,9 @@ class CandidateDiscoveryMixin(ParameterComparisonMixin, TagRoutingMixin):
         )
         return []
 
-    def _lookup_configured_channels(self, request: RoutingRequest) -> Optional[list[ChannelCandidate]]:
+    def _lookup_configured_channels(
+        self, request: RoutingRequest
+    ) -> Optional[list[ChannelCandidate]]:
         config_channels = self.config_loader.get_channels_by_model(request.model)
         if not config_channels:
             return None
@@ -100,11 +118,16 @@ class CandidateDiscoveryMixin(ParameterComparisonMixin, TagRoutingMixin):
                 discovered_info = self._get_discovered_info(ch)  # type: ignore[attr-defined]
             except AttributeError:
                 discovered_info = self.config_loader.get_model_cache_by_channel(ch.id)
-            models_data = discovered_info.get("models_data", {}) if isinstance(discovered_info, dict) else {}
+            models_data = (
+                discovered_info.get("models_data", {})
+                if isinstance(discovered_info, dict)
+                else {}
+            )
             if models_data and request.model in models_data:
                 model_info = models_data[request.model]
                 real_model_id = model_info.get("id", request.model)
 
-            config_candidates.append(ChannelCandidate(channel=ch, matched_model=real_model_id))
+            config_candidates.append(
+                ChannelCandidate(channel=ch, matched_model=real_model_id)
+            )
         return config_candidates
-

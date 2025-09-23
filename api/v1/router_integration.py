@@ -1,4 +1,5 @@
 """Routing API integration built on the consolidated JSONRouter."""
+
 from __future__ import annotations
 
 import logging
@@ -123,16 +124,22 @@ async def get_cache_stats() -> Dict[str, Any]:
 
 
 @router.post("/admin/cache/clear")
-async def clear_cache(namespace: Optional[str] = None, background_tasks: Optional[BackgroundTasks] = None) -> Dict[str, Any]:
+async def clear_cache(
+    namespace: Optional[str] = None, background_tasks: Optional[BackgroundTasks] = None
+) -> Dict[str, Any]:
     cache_service = get_cache_service()
-    target_namespace = namespace or 'default'
+    target_namespace = namespace or "default"
     await cache_service.clear_namespace(target_namespace)
     if namespace:
         message = f"Cleared cache namespace: {namespace}"
     else:
         message = "Cleared default cache namespace"
 
-    return {"status": "success", "message": message, "timestamp": datetime.now().isoformat()}
+    return {
+        "status": "success",
+        "message": message,
+        "timestamp": datetime.now().isoformat(),
+    }
 
 
 @router.get("/admin/routing/strategies")
@@ -183,7 +190,10 @@ async def test_routing(request_data: Dict[str, Any]) -> Dict[str, Any]:
     ]
 
     return {
-        "request": {"model": routing_request.model, "strategy": routing_request.strategy},
+        "request": {
+            "model": routing_request.model,
+            "strategy": routing_request.strategy,
+        },
         "results": formatted,
         "result_count": len(formatted),
         "timestamp": datetime.now().isoformat(),
