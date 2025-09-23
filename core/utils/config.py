@@ -2,13 +2,13 @@
 
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional, Union
 
 import yaml
 from dotenv import load_dotenv
 
 
-def load_config(config_path: str = None) -> dict[str, Any]:
+def load_config(config_path: Optional[Union[str, Path]] = None) -> dict[str, Any]:
     """
     加载配置文件
 
@@ -45,7 +45,7 @@ def load_config(config_path: str = None) -> dict[str, Any]:
     # 环境变量替换
     config = _replace_env_vars(config)
 
-    return config
+    return config  # type: ignore[no-any-return]
 
 
 def _replace_env_vars(obj: Any) -> Any:

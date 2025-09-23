@@ -31,7 +31,7 @@ class Colors:
 class LocalCIChecker:
     """本地CI检查器"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.project_root = Path(__file__).parent.parent
         self.failed_checks = []
         self.passed_checks = []
@@ -156,7 +156,7 @@ except Exception as e:
 
         return self.run_command(test_import_cmd, "核心模块导入测试")
 
-    def print_summary(self):
+    def print_summary(self) -> None:
         """打印检查结果摘要"""
         print(f"\n{Colors.BOLD}[SUMMARY] 本地CI检查结果摘要{Colors.RESET}")
         print("=" * 50)
@@ -166,22 +166,22 @@ except Exception as e:
                 f"{Colors.GREEN}[PASS] 通过的检查 ({len(self.passed_checks)}项):{Colors.RESET}"
             )
             for check in self.passed_checks:
-                print(f"  • {check}")
+                print(f"  - {check}")
 
         if self.failed_checks:
             print(
                 f"\n{Colors.RED}[FAIL] 失败的检查 ({len(self.failed_checks)}项):{Colors.RESET}"
             )
             for check in self.failed_checks:
-                print(f"  • {check}")
+                print(f"  - {check}")
 
             print(f"\n{Colors.YELLOW}[TIPS] 修复建议:{Colors.RESET}")
             if any("Black" in check for check in self.failed_checks):
-                print("  • 运行: uv run black . 自动修复格式问题")
+                print("  - 运行: uv run black . 自动修复格式问题")
             if any("isort" in check for check in self.failed_checks):
-                print("  • 运行: uv run isort . 自动修复导入排序")
+                print("  - 运行: uv run isort . 自动修复导入排序")
             if any("Ruff" in check for check in self.failed_checks):
-                print("  • 运行: uv run ruff check . --fix 自动修复部分问题")
+                print("  - 运行: uv run ruff check . --fix 自动修复部分问题")
         else:
             print(
                 f"\n{Colors.GREEN}[SUCCESS] 所有检查通过！可以安全推送到GitHub{Colors.RESET}"
@@ -216,7 +216,7 @@ except Exception as e:
         return len(self.failed_checks) == 0
 
 
-def main():
+def main() -> None:
     """主函数"""
     checker = LocalCIChecker()
 

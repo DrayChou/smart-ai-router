@@ -47,6 +47,9 @@ dependencies = [
     "beautifulsoup4>=4.12.0",
     "psutil>=7.0.0",
     "jinja2>=3.1.6",
+    "types-requests>=2.32.4.20250913",
+    "ruff>=0.12.8",
+    "types-aiofiles>=24.1.0.20250822",
 ]
 
 [project.optional-dependencies]

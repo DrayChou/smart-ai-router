@@ -58,7 +58,7 @@ class ConfigurationException(BaseRouterException):
         error_code: ErrorCode,
         message: Optional[str] = None,
         config_path: Optional[str] = None,
-        **kwargs,
+        **kwargs: Any,
     ):
         details = kwargs.get("details", {})
         if config_path:

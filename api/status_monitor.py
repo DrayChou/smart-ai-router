@@ -13,7 +13,6 @@ from fastapi import APIRouter, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
-from starlette.websockets import WebSocketState
 
 from core.json_router import JSONRouter
 from core.utils.model_capabilities import get_model_capabilities_from_openrouter

@@ -9,6 +9,7 @@ can be reused without pulling router internals.
 from __future__ import annotations
 
 import re
+from typing import Any
 
 
 def extract_complete_segments(model_name: str) -> list[str]:
@@ -118,7 +119,7 @@ def extract_tags_from_model_name(model_name: str) -> list[str]:
     return all_tags
 
 
-def extract_tags_with_aliases(model_name: str, channel) -> list[str]:
+def extract_tags_with_aliases(model_name: str, channel: Any) -> list[str]:
     """Extract tags with channel alias enrichment.
 
     If channel defines model_aliases mapping from standard names to

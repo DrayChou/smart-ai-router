@@ -176,7 +176,7 @@ class UnifiedPricingFile:
             "models": {k: v.to_dict() for k, v in self.models.items()},
         }
 
-    def save_to_file(self, file_path: Path):
+    def save_to_file(self, file_path: Path) -> None:
         """保存到JSON文件"""
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(self.to_dict(), f, indent=2, ensure_ascii=False)

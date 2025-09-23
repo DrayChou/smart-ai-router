@@ -5,7 +5,7 @@
 import json
 import re
 from collections import Counter, defaultdict
-from collections.abc import Iterator
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -44,7 +44,7 @@ class LogAnalyzer:
 
     def __init__(self, log_file: Union[str, Path]):
         self.log_file = Path(log_file)
-        self.cache = {}
+        self.cache: dict[str, tuple[datetime, LogStats]] = {}
         self.cache_timeout = 300  # 5分钟缓存
 
     async def search_logs(self, query: LogQuery) -> list[dict[str, Any]]:
@@ -75,11 +75,11 @@ class LogAnalyzer:
                 return cached_data
 
         total_entries = 0
-        level_counts = Counter()
-        logger_counts = Counter()
-        error_patterns = defaultdict(int)
+        level_counts: Counter[str] = Counter()
+        logger_counts: Counter[str] = Counter()
+        error_patterns: defaultdict[str, int] = defaultdict(int)
         request_durations = []
-        request_status_codes = Counter()
+        request_status_codes: Counter[int] = Counter()
         first_entry_time = None
         last_entry_time = None
 
@@ -219,10 +219,10 @@ class LogAnalyzer:
             import csv
 
             if entries:
-                fieldnames = set()
+                fieldnames_set: set[str] = set()
                 for entry in entries:
-                    fieldnames.update(entry.keys())
-                fieldnames = list(fieldnames)
+                    fieldnames_set.update(entry.keys())
+                fieldnames = list(fieldnames_set)
 
                 with open(output_path, "w", newline="", encoding="utf-8") as f:
                     writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -233,7 +233,7 @@ class LogAnalyzer:
 
         return len(entries)
 
-    async def _read_log_entries(self) -> Iterator[dict[str, Any]]:
+    async def _read_log_entries(self) -> AsyncGenerator[dict[str, Any], None]:
         """异步读取日志条目"""
         try:
             import aiofiles
@@ -362,7 +362,7 @@ class LogDashboard:
 
     def __init__(self, log_analyzer: LogAnalyzer):
         self.analyzer = log_analyzer
-        self.alert_rules = []
+        self.alert_rules: list[dict[str, Any]] = []
 
     async def check_alerts(self) -> list[dict[str, Any]]:
         """检查日志警报"""
