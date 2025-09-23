@@ -215,7 +215,11 @@ class TagRoutingMixin:
                 continue
 
             channel = self.config_loader.get_channel_by_id(channel_id)
-            if not channel or not channel.enabled:
+            if not channel:
+                logger.info(f"🚫 TAG MATCHING DEBUG: Channel {channel_id} not found in config")
+                continue
+            if not channel.enabled:
+                logger.info(f"🚫 TAG MATCHING DEBUG: Channel {channel_id} ({channel.name}) is disabled")
                 continue
 
             models = discovery_data.get("models", [])
@@ -226,7 +230,8 @@ class TagRoutingMixin:
                     continue
 
                 model_tags = self._extract_tags_with_aliases(model_name, channel)
-                combined_tags = set(tag.lower() for tag in model_tags)
+                channel_tags = getattr(channel, 'tags', []) or []
+                combined_tags = set([tag.lower() for tag in channel_tags] + [tag.lower() for tag in model_tags])
 
                 if all(tag in combined_tags for tag in normalized_positive) and not any(
                     tag in combined_tags for tag in normalized_negative
@@ -268,7 +273,11 @@ class TagRoutingMixin:
                 continue
 
             channel = self.config_loader.get_channel_by_id(channel_id)
-            if not channel or not channel.enabled:
+            if not channel:
+                logger.info(f"🚫 TAG MATCHING DEBUG: Channel {channel_id} not found in config")
+                continue
+            if not channel.enabled:
+                logger.info(f"🚫 TAG MATCHING DEBUG: Channel {channel_id} ({channel.name}) is disabled")
                 continue
 
             models = discovery_data.get("models", [])

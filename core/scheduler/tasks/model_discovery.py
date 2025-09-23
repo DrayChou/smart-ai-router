@@ -181,11 +181,131 @@ class ModelDiscoveryTask:
             logger.warning(f"从配置获取模型回退失败: {e}")
             return []
 
+    def _select_available_base_url(self, channel: dict[str, Any]) -> str:
+        """
+        选择可用的 base_url（与 BaseAdapter 相同的逻辑）
+
+        支持配置格式：
+        1. base_url: "http://host.docker.internal:11435"  # 单个URL
+        2. base_url: ["http://host.docker.internal:11435", "http://localhost:11435"]  # 多个URL
+        3. fallback_urls: ["http://localhost:11435"]  # 额外的fallback URLs
+
+        Args:
+            channel: 渠道配置
+
+        Returns:
+            第一个可用的 base_url
+        """
+        import socket
+        from urllib.parse import urlparse
+
+        # 获取所有候选 URLs
+        candidate_urls = []
+
+        # 主要 base_url
+        base_url = channel.get("base_url", "")
+        if isinstance(base_url, list):
+            candidate_urls.extend(base_url)
+        elif base_url:
+            candidate_urls.append(base_url)
+
+        # fallback URLs
+        fallback_urls = channel.get("fallback_urls", [])
+        if isinstance(fallback_urls, list):
+            candidate_urls.extend(fallback_urls)
+        elif fallback_urls:
+            candidate_urls.append(fallback_urls)
+
+        # 如果没有配置任何URL，返回空字符串
+        if not candidate_urls:
+            logger.warning(f"渠道 {channel.get('id')} 没有配置 base_url")
+            return ""
+
+        # 测试每个URL的连通性
+        for url in candidate_urls:
+            if self._test_url_connectivity(url):
+                logger.info(f"渠道 {channel.get('id')} 选择可用 URL: {url}")
+                return url
+
+        # 如果都不可用，使用第一个并发出警告
+        selected_url = candidate_urls[0]
+        logger.warning(f"渠道 {channel.get('id')} 所有URL都不可达，使用第一个: {selected_url}")
+        return selected_url
+
+    def _test_url_connectivity(self, url: str) -> bool:
+        """
+        测试URL连通性
+
+        Args:
+            url: 要测试的URL
+
+        Returns:
+            是否可连通
+        """
+        import socket
+        from urllib.parse import urlparse
+
+        try:
+            parsed = urlparse(url)
+            host = parsed.hostname
+            port = parsed.port
+
+            if not host:
+                return False
+
+            # 默认端口
+            if not port:
+                port = 443 if parsed.scheme == 'https' else 80
+
+            # 处理特殊主机名
+            if host == "host.docker.internal":
+                # 在非Docker环境下，host.docker.internal不可用
+                # 检查是否在Docker容器中运行
+                if not self._is_running_in_docker():
+                    logger.debug(f"非Docker环境，跳过 {url}")
+                    return False
+
+            # Socket连通性测试
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(2)  # 2秒超时
+
+            try:
+                result = sock.connect_ex((host, port))
+                return result == 0
+            finally:
+                sock.close()
+
+        except Exception as e:
+            logger.debug(f"URL连通性测试失败 {url}: {e}")
+            return False
+
+    def _is_running_in_docker(self) -> bool:
+        """
+        检查是否在Docker容器中运行
+
+        Returns:
+            是否在Docker中运行
+        """
+        try:
+            # 检查 /.dockerenv 文件
+            import os
+            if os.path.exists('/.dockerenv'):
+                return True
+
+            # 检查 /proc/1/cgroup 中是否包含 docker
+            if os.path.exists('/proc/1/cgroup'):
+                with open('/proc/1/cgroup', 'r') as f:
+                    return 'docker' in f.read()
+
+            return False
+        except Exception:
+            return False
+
     async def _fetch_models_from_channel(self, channel: dict[str, Any]) -> Optional[dict[str, Any]]:
         """从单个渠道获取模型列表"""
         channel_id = channel.get('id')
         provider = channel.get('provider')
-        base_url = channel.get('base_url')
+        base_url = self._select_available_base_url(channel)  # 使用环境自适应URL
         api_key = channel.get('api_key')
 
         # 调试日志：检查渠道配置

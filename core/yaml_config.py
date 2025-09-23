@@ -15,6 +15,7 @@ from .config_models import Config, Channel, Provider
 from .auth import generate_secure_token as generate_random_token
 from .utils.api_key_cache import get_api_key_cache_manager
 from .utils.async_file_ops import get_async_file_manager
+from .config.async_loader import load_config_async, get_async_config_loader
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,131 @@ class YAMLConfigLoader:
         self._load_model_cache_from_disk()
         
         logger.info(f"Config loaded: {len(self.config.providers)} providers, {len(self.config.channels)} channels")
+
+    @classmethod
+    async def create_async(cls, config_path: Optional[str] = None) -> 'YAMLConfigLoader':
+        """
+        异步创建配置加载器实例
+
+        这是 Phase 1 优化的核心方法，使用异步配置加载器
+        替代同步的 __init__ 方法以减少 2-4 秒的启动延迟
+        """
+        start_time = asyncio.get_event_loop().time()
+
+        # 创建实例但跳过同步初始化
+        instance = cls.__new__(cls)
+
+        # 设置基本属性
+        instance.config_path = config_path or instance._get_default_path("router_config.yaml")
+        instance.runtime_state = RuntimeState()
+        instance.model_cache = {}
+        instance.api_key_cache_manager = get_api_key_cache_manager()
+        instance._migration_completed = False
+        instance._migration_in_progress = False
+
+        try:
+            # 🚀 使用异步配置加载器替代同步加载
+            logger.info("开始异步配置加载...")
+            instance.config = await load_config_async(instance.config_path)
+
+            # 创建渠道映射
+            instance.channels_map = {ch.id: ch for ch in instance.config.channels}
+
+            # 🚀 异步加载模型缓存（如果有的话）
+            await instance._load_model_cache_async()
+
+            elapsed = asyncio.get_event_loop().time() - start_time
+            logger.info(f"异步配置加载完成: {len(instance.config.providers)} providers, "
+                       f"{len(instance.config.channels)} channels, 耗时: {elapsed:.2f}s")
+
+            return instance
+
+        except Exception as e:
+            logger.error(f"异步配置加载失败，回退到同步模式: {e}")
+            # 如果异步加载失败，回退到同步加载
+            return cls(config_path)
+
+    async def _load_model_cache_async(self):
+        """异步加载模型缓存"""
+        try:
+            cache_file = Path(__file__).parent.parent / "cache" / "discovered_models.json"
+            if not cache_file.exists():
+                logger.debug("模型缓存文件不存在，跳过加载")
+                return
+
+            # 使用异步文件管理器
+            file_manager = get_async_file_manager()
+            raw_cache = await file_manager.read_json(cache_file, {})
+
+            if raw_cache:
+                # 检查是否需要迁移缓存格式
+                if self._needs_cache_migration(raw_cache) and not self._migration_completed and not self._migration_in_progress:
+                    logger.info("检测到传统缓存格式，使用现有缓存并安排后台迁移")
+                    self.model_cache = raw_cache  # 临时使用原始缓存
+
+                    # 标记迁移正在进行
+                    self._migration_in_progress = True
+
+                    # 🚀 启动后台迁移任务（不阻塞启动）
+                    asyncio.create_task(self._async_cache_migration(raw_cache))
+                else:
+                    self.model_cache = raw_cache
+
+                logger.debug(f"异步加载模型缓存成功: {len(self.model_cache)} 条记录")
+            else:
+                logger.debug("模型缓存为空")
+
+        except Exception as e:
+            logger.error(f"异步加载模型缓存失败: {e}")
+            # 不抛出异常，允许系统继续运行
+
+    async def _async_cache_migration(self, raw_cache: Dict[str, Dict]):
+        """异步缓存迁移任务"""
+        try:
+            logger.info("开始后台缓存迁移...")
+
+            # 在线程池中执行迁移逻辑
+            loop = asyncio.get_event_loop()
+            migrated_cache = await loop.run_in_executor(
+                None,
+                self._perform_cache_migration,
+                raw_cache
+            )
+
+            # 更新缓存
+            self.model_cache = migrated_cache
+            self._migration_completed = True
+            self._migration_in_progress = False
+
+            # 异步保存迁移后的缓存
+            cache_file = Path(__file__).parent.parent / "cache" / "discovered_models.json"
+            file_manager = get_async_file_manager()
+            await file_manager.write_json(cache_file, migrated_cache)
+
+            logger.info("后台缓存迁移完成")
+
+        except Exception as e:
+            logger.error(f"后台缓存迁移失败: {e}")
+            self._migration_in_progress = False
+
+    def _perform_cache_migration(self, raw_cache: Dict[str, Dict]) -> Dict[str, Dict]:
+        """执行缓存迁移逻辑（CPU密集型，在线程池中运行）"""
+        # 这里放置原有的缓存迁移逻辑
+        migrated_cache = {}
+
+        for provider_id, provider_data in raw_cache.items():
+            if isinstance(provider_data, dict) and 'models' in provider_data:
+                # 新格式，直接使用
+                migrated_cache[provider_id] = provider_data
+            else:
+                # 旧格式，需要迁移
+                migrated_cache[provider_id] = {
+                    'models': provider_data if isinstance(provider_data, list) else [],
+                    'last_discovery': datetime.now().isoformat(),
+                    'total_models': len(provider_data) if isinstance(provider_data, list) else 0
+                }
+
+        return migrated_cache
 
     def _get_default_path(self, filename: str) -> str:
         """获取配置文件的默认路径"""
@@ -567,18 +693,22 @@ class YAMLConfigLoader:
         self.runtime_state.health_scores[channel_id] = new_health
         
         # 更新统计信息
-        if success and latency is not None:
-            if channel_id not in self.runtime_state.channel_stats:
-                self.runtime_state.channel_stats[channel_id] = {
-                    "request_count": 0,
-                    "total_latency": 0.0,
-                    "avg_latency_ms": 0.0
-                }
-            
-            stats = self.runtime_state.channel_stats[channel_id]
-            stats["total_latency"] = stats.get("total_latency", 0.0) + latency
-            stats["request_count"] = stats.get("request_count", 0) + 1
-            stats["avg_latency_ms"] = (stats["total_latency"] * 1000) / stats["request_count"]
+        if channel_id not in self.runtime_state.channel_stats:
+            self.runtime_state.channel_stats[channel_id] = {
+                "request_count": 0,
+                "success_count": 0,
+                "total_latency": 0.0,
+                "avg_latency_ms": 0.0
+            }
+
+        stats = self.runtime_state.channel_stats[channel_id]
+        stats["request_count"] = stats.get("request_count", 0) + 1
+
+        if success:
+            stats["success_count"] = stats.get("success_count", 0) + 1
+            if latency is not None:
+                stats["total_latency"] = stats.get("total_latency", 0.0) + latency
+                stats["avg_latency_ms"] = (stats["total_latency"] * 1000) / stats["success_count"]
         
         if new_health < 0.3:
             logger.warning(f"Channel {channel_id} health score is low: {new_health:.3f}")

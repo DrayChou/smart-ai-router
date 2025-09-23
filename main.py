@@ -169,10 +169,134 @@ async def lifespan(app: FastAPI):
 
 
 def create_minimal_app() -> FastAPI:
-    """创建精简版FastAPI应用 - 仅保留8个核心接口"""
+    """创建精简版FastAPI应用 - 仅保留8个核心接口（同步版本，兼容性保留）"""
 
     # 初始化配置和路由器
     config_loader: YAMLConfigLoader = get_yaml_config_loader()
+    router: JSONRouter = JSONRouter(config_loader)
+    server_config: Dict[str, Any] = config_loader.get_server_config()
+
+    # 注册异步配置加载器（如果支持）
+    try:
+        from core.config.async_loader import get_async_config_loader
+        logger.info("异步配置加载器已注册，后续可使用 create_minimal_app_async()")
+    except ImportError:
+        logger.debug("异步配置加载器不可用，使用同步模式")
+
+    # 设置日志系统
+    log_config = {
+        "level": "INFO",
+        "format": "json",
+        "max_file_size": 50 * 1024 * 1024,
+        "backup_count": 5,
+        "batch_size": 100,
+        "flush_interval": 5.0,
+    }
+    smart_logger = setup_logging(log_config, "logs/smart-ai-router-minimal.log")
+
+    # 启用智能日志系统
+    try:
+        enable_smart_logs = server_config.get("enable_smart_logging", True)
+        if enable_smart_logs:
+            enable_smart_logging(
+                enable_sensitive_cleaning=True,
+                enable_content_truncation=True,
+                max_content_length=800,
+            )
+            logger.info("[MINIMAL] Smart logging enabled: sensitive cleaning, content truncation")
+        else:
+            logger.info("[MINIMAL] Smart logging disabled by configuration")
+    except Exception as e:
+        logger.warning(f"[MINIMAL] Failed to enable smart logging: {e}")
+
+    # 创建FastAPI应用
+    app = FastAPI(
+        title="Smart AI Router - Minimal",
+        description="Lightweight AI router with only 8 core endpoints for security",
+        version="0.3.0-minimal",
+        docs_url="/docs",
+        redoc_url="/redoc",
+        lifespan=lifespan,
+    )
+
+    # 添加中间件
+    app.add_middleware(ExceptionHandlerMiddleware)
+    app.add_middleware(LoggingMiddleware)
+    app.add_middleware(RequestContextMiddleware)
+    app.add_middleware(AuditMiddleware)
+    app.add_middleware(SecurityAuditMiddleware)
+
+    # 添加认证中间件（如果启用）
+    if server_config.get("auth", {}).get("enabled", False):
+        app.add_middleware(AuthenticationMiddleware, config_loader=config_loader)
+        logger.info("[AUTH] Authentication middleware enabled")
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=server_config.get("cors_origins", ["*"]),
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # 创建聊天处理器
+    chat_handler = ChatCompletionHandler(config_loader, router)
+
+    # 注册API路由模块
+    health_router = create_health_router(config_loader)
+    app.include_router(health_router)
+
+    models_router = create_models_router(config_loader)
+    app.include_router(models_router)
+
+    chat_router = create_chat_router(chat_handler)
+    app.include_router(chat_router)
+
+    admin_router = create_admin_router(config_loader)
+    app.include_router(admin_router)
+
+    usage_stats_router = create_usage_stats_router(config_loader)
+    app.include_router(usage_stats_router)
+
+    token_estimation_router = create_token_estimation_router(config_loader)
+    app.include_router(token_estimation_router)
+
+    anthropic_router = create_anthropic_router(config_loader, router, chat_handler)
+    app.include_router(anthropic_router)
+
+    chatgpt_router = create_chatgpt_router(config_loader, router, chat_handler)
+    app.include_router(chatgpt_router)
+
+    gemini_router = create_gemini_router(config_loader, router, chat_handler)
+    app.include_router(gemini_router)
+
+    app.include_router(admin_blacklist_router)
+
+    status_monitor_router = create_status_monitor_router(config_loader, router)
+    app.include_router(status_monitor_router)
+
+    logger.info("[MINIMAL] Smart AI Router initialized with 8+ core endpoints")
+    return app
+
+
+async def create_minimal_app_async() -> FastAPI:
+    """
+    创建精简版FastAPI应用 - 异步版本
+
+    🚀 Phase 1 优化：使用异步配置加载器
+    预期效果：启动时间减少 70-80%
+    """
+    import time
+    start_time = time.time()
+
+    # 🚀 使用异步配置加载器
+    logger.info("开始异步应用初始化...")
+    config_loader: YAMLConfigLoader = await YAMLConfigLoader.create_async()
+
+    config_load_time = time.time() - start_time
+    logger.info(f"异步配置加载完成: {config_load_time:.2f}s")
+
+    # 初始化路由器
     router: JSONRouter = JSONRouter(config_loader)
     server_config: Dict[str, Any] = config_loader.get_server_config()
 
@@ -283,8 +407,9 @@ def create_minimal_app() -> FastAPI:
     status_monitor_router = create_status_monitor_router(config_loader, router)
     app.include_router(status_monitor_router)
 
+    total_init_time = time.time() - start_time
     logger.info(
-        "[MINIMAL] Smart AI Router initialized with 8+ core endpoints including blacklist management and status monitor"
+        f"[MINIMAL] Smart AI Router async initialization complete: {total_init_time:.2f}s (config: {config_load_time:.2f}s)"
     )
     return app
 

@@ -57,9 +57,11 @@ class AnthropicAdapter(BaseAdapter):
 
         # 转换请求格式
         payload = self.transform_request(request)
-        
+
         # 记录请求信息
-        logger.info(f"Anthropic API请求 - 模型: {request.model}, 消息数: {len(request.messages)}")
+        logger.info(
+            f"Anthropic API请求 - 模型: {request.model}, 消息数: {len(request.messages)}"
+        )
 
         try:
             response = await self.client.post(
@@ -67,11 +69,15 @@ class AnthropicAdapter(BaseAdapter):
             )
 
             if not response.is_success:
-                logger.error(f"Anthropic API错误响应: {response.status_code} - {response.text}")
+                logger.error(
+                    f"Anthropic API错误响应: {response.status_code} - {response.text}"
+                )
                 raise await self.handle_error(response)
 
             data = response.json()
-            logger.info(f"Anthropic API成功响应 - 模型: {data.get('model')}, 消耗token: {data.get('usage', {}).get('total_tokens', 0)}")
+            logger.info(
+                f"Anthropic API成功响应 - 模型: {data.get('model')}, 消耗token: {data.get('usage', {}).get('total_tokens', 0)}"
+            )
             return self.transform_response(data)
 
         except httpx.HTTPError as e:
@@ -91,7 +97,7 @@ class AnthropicAdapter(BaseAdapter):
         # 转换请求格式，确保stream=True
         payload = self.transform_request(request)
         payload["stream"] = True
-        
+
         logger.info(f"Anthropic流式API请求 - 模型: {request.model}")
 
         try:
@@ -100,7 +106,9 @@ class AnthropicAdapter(BaseAdapter):
             ) as response:
 
                 if not response.is_success:
-                    logger.error(f"Anthropic流式API错误响应: {response.status_code} - {response.text}")
+                    logger.error(
+                        f"Anthropic流式API错误响应: {response.status_code} - {response.text}"
+                    )
                     raise await self.handle_error(response)
 
                 async for chunk in response.aiter_lines():

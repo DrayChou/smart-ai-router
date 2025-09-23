@@ -200,15 +200,10 @@ class OpenAIAdapter(BaseAdapter):
         return messages
 
     def _is_chat_model(self, model_id: str) -> bool:
-        """判断是否是聊天模型"""
-        chat_model_patterns = [
-            "gpt-3.5",
-            "gpt-4",
-            "gpt-4o",
-            "chatgpt",
-            # 可以添加更多模式
-        ]
-        return any(pattern in model_id.lower() for pattern in chat_model_patterns)
+        """判断是否是聊天模型 - 基于API发现而非硬编码"""
+        # 移除硬编码限制，所有从API返回的模型都应被视为可用
+        # OpenAI兼容API只返回它支持的模型，所以不需要客户端过滤
+        return True
 
     def _get_model_capabilities(self, model_id: str) -> List[str]:
         """根据模型ID推断能力"""

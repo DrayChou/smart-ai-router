@@ -27,7 +27,7 @@ class OpenRouterAdapter(OpenAIAdapter):
     def __init__(self, provider_name: str, config: Dict[str, Any]):
         config = dict(config or {})
         base_url = config.get("base_url") or "https://openrouter.ai/api"
-        config["base_url"] = base_url.rstrip('/')
+        config["base_url"] = base_url.rstrip("/")
         super().__init__(provider_name, config)
 
     @staticmethod
@@ -76,13 +76,15 @@ class OpenRouterAdapter(OpenAIAdapter):
                 extra_body["route"] = request.extra_params.pop("openrouter_route")
 
         # 如果有extra_body内容，作为独立字段添加到请求中
-        # OpenRouter API期望的格式：{"model": "...", "messages": [...], "provider": {...}}  
+        # OpenRouter API期望的格式：{"model": "...", "messages": [...], "provider": {...}}
         # 但这些额外参数不是标准OpenAI字段，需要通过某种方式传递
         if extra_body:
             # 直接将extra_body的内容合并到payload的根级别
             # 这样 {"provider": {"sort": "price"}} 就直接在请求的根级别
             payload.update(extra_body)
-            logger.debug(f"🔧 OPENROUTER: Added OpenRouter-specific params: {list(extra_body.keys())}")
+            logger.debug(
+                f"🔧 OPENROUTER: Added OpenRouter-specific params: {list(extra_body.keys())}"
+            )
 
         return payload
 

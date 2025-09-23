@@ -33,14 +33,10 @@ class GroqAdapter(OpenAIAdapter):
         logger.info(f"初始化Groq适配器，速率限制: {self.rate_limit_rpm}/min")
 
     def _is_chat_model(self, model_id: str) -> bool:
-        """判断是否是Groq支持的聊天模型"""
-        groq_chat_models = [
-            "llama",
-            "mixtral",
-            "gemma",
-            "whisper",  # Groq主要支持的模型系列
-        ]
-        return any(pattern in model_id.lower() for pattern in groq_chat_models)
+        """判断是否是Groq支持的聊天模型 - 基于API发现而非硬编码"""
+        # 移除硬编码限制，所有从API返回的模型都应被视为可用
+        # Groq API只返回它支持的模型，所以不需要客户端过滤
+        return True
 
     def _get_model_capabilities(self, model_id: str) -> List[str]:
         """Groq模型能力映射"""

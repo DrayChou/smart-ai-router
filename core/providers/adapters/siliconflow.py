@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class SiliconFlowModelPricing:
     """SiliconFlow模型定价信息"""
+
     model_name: str
     display_name: str
     input_price: float  # USD per token
@@ -43,7 +44,7 @@ class SiliconFlowAdapter(BaseAdapter):
         super().__init__(provider_name, config)
         self.base_url = "https://api.siliconflow.cn"
         self._cached_pricing: Optional[Dict[str, SiliconFlowModelPricing]] = None
-        
+
         # 只使用统一格式文件
         self.unified_pricing_path = Path("config/pricing/siliconflow_unified.json")
 
@@ -77,7 +78,9 @@ class SiliconFlowAdapter(BaseAdapter):
         try:
             pricing_data = await self._load_unified_pricing()
             json_models = list(pricing_data.keys())
-            logger.info(f"SiliconFlow: 从统一格式配置文件获取 {len(json_models)} 个模型")
+            logger.info(
+                f"SiliconFlow: 从统一格式配置文件获取 {len(json_models)} 个模型"
+            )
             return json_models
         except Exception as e:
             logger.error(f"从统一格式配置文件加载模型列表失败: {e}")
@@ -91,42 +94,46 @@ class SiliconFlowAdapter(BaseAdapter):
         try:
             if not self.unified_pricing_path.exists():
                 logger.error(f"统一格式定价文件不存在: {self.unified_pricing_path}")
-                raise FileNotFoundError(f"统一格式定价文件不存在: {self.unified_pricing_path}")
-            
+                raise FileNotFoundError(
+                    f"统一格式定价文件不存在: {self.unified_pricing_path}"
+                )
+
             # 导入统一格式加载器
             project_root = Path(__file__).parent.parent.parent.parent
             sys.path.insert(0, str(project_root))
             from core.pricing.unified_format import UnifiedPricingFile
-            
+
             unified_data = UnifiedPricingFile.load_from_file(self.unified_pricing_path)
             logger.info(f"加载统一格式定价数据: {unified_data.description}")
-            
+
             pricing_data = {}
             for model_id, model_data in unified_data.models.items():
                 # 提取价格信息 (已经是USD per token)
                 input_price = model_data.pricing.prompt if model_data.pricing else 0.0
-                output_price = model_data.pricing.completion if model_data.pricing else 0.0
-                
+                output_price = (
+                    model_data.pricing.completion if model_data.pricing else 0.0
+                )
+
                 # 构建显示名称
                 display_name = model_data.name or model_id
                 if display_name == model_id and "/" in model_id:
                     display_name = model_id.split("/")[-1]
-                
+
                 # 构建描述
                 description = model_data.description or "SiliconFlow模型"
                 if input_price == 0 and output_price == 0:
                     description += " (免费)"
-                
+
                 # 添加能力和上下文信息
                 if model_data.capabilities:
                     capability_desc = ", ".join(model_data.capabilities[:3])
                     if len(model_data.capabilities) > 3:
                         capability_desc += f" 等{len(model_data.capabilities)}项能力"
                     description += f" - 支持: {capability_desc}"
-                
+
                 if model_data.context_length and model_data.context_length > 8192:
                     description += f" - 上下文: {model_data.context_length:,} tokens"
-                
+
                 pricing_data[model_id] = SiliconFlowModelPricing(
                     model_name=model_id,
                     display_name=display_name,
@@ -134,13 +141,13 @@ class SiliconFlowAdapter(BaseAdapter):
                     output_price=output_price,
                     context_length=model_data.context_length,
                     description=description,
-                    capabilities=model_data.capabilities
+                    capabilities=model_data.capabilities,
                 )
-            
+
             self._cached_pricing = pricing_data
             logger.info(f"统一格式加载完成: {len(pricing_data)} 个模型")
             return pricing_data
-            
+
         except Exception as e:
             logger.error(f"加载统一格式定价数据失败: {e}")
             raise
@@ -149,11 +156,11 @@ class SiliconFlowAdapter(BaseAdapter):
         """获取特定模型的定价信息"""
         try:
             pricing_data = await self._load_unified_pricing()
-            
+
             model_pricing = pricing_data.get(model_name)
             if not model_pricing:
                 return None
-                
+
             return {
                 "model_name": model_pricing.model_name,
                 "display_name": model_pricing.display_name,
@@ -162,9 +169,11 @@ class SiliconFlowAdapter(BaseAdapter):
                 "context_length": model_pricing.context_length,
                 "description": model_pricing.description,
                 "capabilities": model_pricing.capabilities or [],
-                "is_free": (model_pricing.input_price == 0 and model_pricing.output_price == 0)
+                "is_free": (
+                    model_pricing.input_price == 0 and model_pricing.output_price == 0
+                ),
             }
-            
+
         except Exception as e:
             logger.error(f"获取模型定价失败 ({model_name}): {e}")
             return None
@@ -174,50 +183,60 @@ class SiliconFlowAdapter(BaseAdapter):
         try:
             models = await self.discover_models(api_key, timeout)
             pricing_data = await self._load_unified_pricing()
-            
+
             model_infos = []
             for model_id in models:
                 model_pricing = pricing_data.get(model_id)
                 if model_pricing:
-                    model_infos.append(ModelInfo(
-                        id=model_id,
-                        name=model_pricing.display_name,
-                        description=model_pricing.description,
-                        context_length=model_pricing.context_length,
-                        input_price=model_pricing.input_price,
-                        output_price=model_pricing.output_price
-                    ))
+                    model_infos.append(
+                        ModelInfo(
+                            id=model_id,
+                            name=model_pricing.display_name,
+                            description=model_pricing.description,
+                            context_length=model_pricing.context_length,
+                            input_price=model_pricing.input_price,
+                            output_price=model_pricing.output_price,
+                        )
+                    )
                 else:
                     # 基本信息，无定价数据
-                    model_infos.append(ModelInfo(
-                        id=model_id,
-                        name=model_id.split("/")[-1] if "/" in model_id else model_id,
-                        description=f"SiliconFlow模型 {model_id}",
-                        context_length=8192,
-                        input_price=0.0,
-                        output_price=0.0
-                    ))
-            
+                    model_infos.append(
+                        ModelInfo(
+                            id=model_id,
+                            name=(
+                                model_id.split("/")[-1] if "/" in model_id else model_id
+                            ),
+                            description=f"SiliconFlow模型 {model_id}",
+                            context_length=8192,
+                            input_price=0.0,
+                            output_price=0.0,
+                        )
+                    )
+
             return model_infos
-            
+
         except Exception as e:
             logger.error(f"列出模型失败: {e}")
             return []
 
-    async def chat_completions(self, request: ChatRequest, api_key: str) -> ChatResponse:
+    async def chat_completions(
+        self, request: ChatRequest, api_key: str
+    ) -> ChatResponse:
         """聊天补全 - 通过SiliconFlow API"""
         headers = {
             "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
-        
+
         # 构建请求数据
         request_data = {
             "model": request.model,
-            "messages": [{"role": msg.role, "content": msg.content} for msg in request.messages],
-            "stream": False
+            "messages": [
+                {"role": msg.role, "content": msg.content} for msg in request.messages
+            ],
+            "stream": False,
         }
-        
+
         # 添加可选参数
         if request.temperature is not None:
             request_data["temperature"] = request.temperature
@@ -225,43 +244,48 @@ class SiliconFlowAdapter(BaseAdapter):
             request_data["max_tokens"] = request.max_tokens
         if request.top_p is not None:
             request_data["top_p"] = request.top_p
-        
+
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 f"{self.base_url}/v1/chat/completions",
                 json=request_data,
-                headers=headers
+                headers=headers,
             )
             response.raise_for_status()
             result = response.json()
-            
+
             return ChatResponse(
                 id=result.get("id", ""),
                 model=result.get("model", request.model),
-                choices=[{
-                    "message": {
-                        "role": choice["message"]["role"],
-                        "content": choice["message"]["content"]
-                    },
-                    "finish_reason": choice.get("finish_reason")
-                } for choice in result.get("choices", [])],
-                usage=result.get("usage", {})
+                choices=[
+                    {
+                        "message": {
+                            "role": choice["message"]["role"],
+                            "content": choice["message"]["content"],
+                        },
+                        "finish_reason": choice.get("finish_reason"),
+                    }
+                    for choice in result.get("choices", [])
+                ],
+                usage=result.get("usage", {}),
             )
 
     async def chat_completions_stream(self, request: ChatRequest, api_key: str):
         """流式聊天补全 - 通过SiliconFlow API"""
         headers = {
             "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
-        
+
         # 构建请求数据
         request_data = {
             "model": request.model,
-            "messages": [{"role": msg.role, "content": msg.content} for msg in request.messages],
-            "stream": True
+            "messages": [
+                {"role": msg.role, "content": msg.content} for msg in request.messages
+            ],
+            "stream": True,
         }
-        
+
         # 添加可选参数
         if request.temperature is not None:
             request_data["temperature"] = request.temperature
@@ -269,16 +293,16 @@ class SiliconFlowAdapter(BaseAdapter):
             request_data["max_tokens"] = request.max_tokens
         if request.top_p is not None:
             request_data["top_p"] = request.top_p
-        
+
         async with httpx.AsyncClient(timeout=30.0) as client:
             async with client.stream(
                 "POST",
                 f"{self.base_url}/v1/chat/completions",
                 json=request_data,
-                headers=headers
+                headers=headers,
             ) as response:
                 response.raise_for_status()
-                
+
                 async for chunk in response.aiter_text():
                     if chunk.strip():
                         # 处理Server-Sent Events格式

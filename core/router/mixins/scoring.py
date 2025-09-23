@@ -434,8 +434,12 @@ class ScoringMixin:
             runtime_state = getattr(self.config_loader, 'runtime_state', None)
             if runtime_state and hasattr(runtime_state, 'channel_stats'):
                 stats = runtime_state.channel_stats.get(channel.id)
-                if stats and stats.total_requests >= 5:
-                    success_rate = stats.success_rate
+                if stats and isinstance(stats, dict):
+                    # 修复：stats 是字典，需要使用字典访问方式
+                    request_count = stats.get('request_count', 0)
+                    success_count = stats.get('success_count', request_count)  # 如果没有 success_count，假设全部成功
+                    if request_count >= 5:
+                        success_rate = success_count / request_count
 
         if success_rate is None:
             return 0.5

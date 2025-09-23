@@ -808,17 +808,16 @@ class ChatCompletionHandler:
             logger.warning(f"🚫 MODEL BLACKLISTED: Model '{model_name}' blacklisted on channel '{channel.name}' due to HTTP {error.response.status_code}")
             self._invalidate_model_cache(channel.id, model_name, "model-specific error")
         
-        # 对于429错误，实施智能退避
+        # 对于429错误，不再等待，直接切换到下一个渠道
         if error.response.status_code == 429:
             wait_time = self._extract_rate_limit_wait_time(error_text)
             if wait_time:
-                backoff_time = min(wait_time, 60)  # 最大等待60秒
-                logger.warning(f"SMART RATE LIMIT: {model_name}@{channel.name} suggests waiting {wait_time}s, applying {backoff_time}s backoff")
+                logger.warning(f"SMART RATE LIMIT: {model_name}@{channel.name} suggests waiting {wait_time}s, but switching to next channel instead")
             else:
-                backoff_time = min(2 ** (attempt_num - 1), 16)  # 指数退避，最大16秒
-                logger.warning(f"RATE LIMIT: {model_name}@{channel.name} rate limited, applying {backoff_time}s backoff")
-            
-            await asyncio.sleep(backoff_time)
+                logger.warning(f"RATE LIMIT: {model_name}@{channel.name} rate limited, switching to next channel immediately")
+
+            # 不再等待，立即切换到下一个渠道
+            # await asyncio.sleep(backoff_time)  # 移除等待逻辑
         
         if attempt_num < len(total_candidates):
             logger.info(f"FAILOVER: Trying next channel (#{attempt_num + 1})")
