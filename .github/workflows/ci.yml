@@ -38,7 +38,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        uv sync --dev
+        uv sync --extra dev
 
     - name: Run black (formatting check)
       run: |
@@ -85,7 +85,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        uv sync --dev
+        uv sync --extra dev
 
     - name: Create test config
       run: |
@@ -125,7 +125,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        uv sync --dev
+        uv sync --extra dev
 
     - name: Run bandit (security linting)
       run: |
