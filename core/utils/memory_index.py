@@ -312,7 +312,7 @@ class MemoryModelIndex:
             free_models_count = len(self._tag_to_models.get("free", set()))
             multi_provider_free = 0
 
-            for model_name, provider_infos in global_model_pricing.items():
+            for _model_name, provider_infos in global_model_pricing.items():
                 if len(provider_infos) > 1:  # 多Provider
                     has_free = any(
                         info.get("is_free", False) for info in provider_infos

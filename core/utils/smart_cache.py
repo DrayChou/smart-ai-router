@@ -451,7 +451,7 @@ class SmartCache:
             # 简单估算内存使用
             try:
                 stats["memory_usage_estimate"] += len(str(entry.data))
-            except:
+            except (AttributeError, TypeError):
                 pass
 
         # 计算平均值

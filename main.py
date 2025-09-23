@@ -179,9 +179,9 @@ def create_minimal_app() -> FastAPI:
 
     # 注册异步配置加载器（如果支持）
     try:
-        from core.config.async_loader import get_async_config_loader
-
-        logger.info("异步配置加载器已注册，后续可使用 create_minimal_app_async()")
+        import importlib.util
+        if importlib.util.find_spec("core.config.async_loader"):
+            logger.info("异步配置加载器已注册，后续可使用 create_minimal_app_async()")
     except ImportError:
         logger.debug("异步配置加载器不可用，使用同步模式")
 

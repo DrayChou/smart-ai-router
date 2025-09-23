@@ -6,6 +6,7 @@ Provider基础适配器
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
+import json
 from typing import TYPE_CHECKING, Any, Optional
 
 import httpx
@@ -415,7 +416,7 @@ class BaseAdapter(ABC):
         try:
             error_data = response.json()
             error_msg = error_data.get("error", {}).get("message", str(error_data))
-        except:
+        except (ValueError, json.JSONDecodeError):
             error_msg = response.text
 
         if response.status_code == 401:

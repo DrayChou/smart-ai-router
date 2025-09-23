@@ -4,6 +4,7 @@ FastAPI exception middleware for unified error handling
 
 import logging
 import time
+from datetime import datetime
 from typing import Any
 
 from fastapi import HTTPException, Request

@@ -120,7 +120,7 @@ def create_gemini_router(
             authorization: Optional[str] = Header(None, alias="Authorization"),
             x_goog_api_key: Optional[str] = Header(None, alias="x-goog-api-key"),
         ):
-            f"""Gemini Generate Content API - {version.upper()}版本"""
+            """Gemini Generate Content API"""
 
             # 验证认证 - 支持多种方式
             api_key = None
@@ -185,7 +185,7 @@ def create_gemini_router(
             authorization: Optional[str] = Header(None, alias="Authorization"),
             x_goog_api_key: Optional[str] = Header(None, alias="x-goog-api-key"),
         ):
-            f"""Gemini Stream Generate Content API - {version.upper()}版本"""
+            """Gemini Stream Generate Content API"""
 
             # 验证认证 - 支持多种方式
             api_key = None

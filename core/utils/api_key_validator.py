@@ -530,7 +530,7 @@ class APIKeyValidator:
             provider_stats[provider]["avg_health"] += status.health_score
 
         # 计算平均健康分数
-        for provider, stats in provider_stats.items():
+        for _provider, stats in provider_stats.items():
             stats["avg_health"] = stats["avg_health"] / stats["total"]
             stats["success_rate"] = stats["valid"] / stats["total"]
 

@@ -188,7 +188,7 @@ class BatchScorer:
                             "parameter_count": analyzed_specs.parameter_count,
                             "context_length": analyzed_specs.context_length,
                         }
-                    except:
+                    except (AttributeError, ValueError):
                         model_specs[key] = {"parameter_count": 0, "context_length": 0}
 
         except Exception as e:
@@ -236,7 +236,7 @@ class BatchScorer:
                                 "parameter_count": analyzed_specs.parameter_count,
                                 "context_length": analyzed_specs.context_length,
                             }
-                        except:
+                        except (AttributeError, ValueError):
                             model_specs[key] = {
                                 "parameter_count": 0,
                                 "context_length": 0,

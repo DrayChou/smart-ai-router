@@ -5,16 +5,19 @@
 
 import json
 import logging
+import threading
 from datetime import datetime
 from typing import Any, Optional
 
 from fastapi import APIRouter, Query, Request, WebSocket, WebSocketDisconnect
+from starlette.websockets import WebSocketState
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from core.json_router import JSONRouter
 from core.utils.model_channel_blacklist import get_model_blacklist_manager
+from core.utils.model_capabilities import get_model_capabilities_from_openrouter
 from core.yaml_config import YAMLConfigLoader
 
 logger = logging.getLogger(__name__)
@@ -27,10 +30,6 @@ MAX_LOGS = 1000
 active_connections: list[WebSocket] = []
 
 # 请求上下文存储（用于在请求期间传递渠道信息）
-import threading
-
-from core.utils.model_capabilities import get_model_capabilities_from_openrouter
-
 _request_context = threading.local()
 
 
@@ -552,7 +551,7 @@ async def broadcast_update(event_type: str, data: Any):
     for connection in active_connections:
         try:
             await connection.send_text(json.dumps(message))
-        except (ConnectionResetError, ConnectionClosedError, Exception):
+        except (ConnectionResetError, Exception):
             disconnected.append(connection)
 
     for connection in disconnected:

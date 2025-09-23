@@ -295,7 +295,7 @@ class TaskManager:
                     total_size += file_path.stat().st_size
 
             return total_size
-        except:
+        except (OSError, PermissionError):
             return 0
 
     async def start(self):
