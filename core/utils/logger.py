@@ -19,13 +19,16 @@ try:
     STRUCTLOG_AVAILABLE = True
 except ImportError:
     STRUCTLOG_AVAILABLE = False
+
     # Create a dummy type for type annotations when structlog is not available
     class _DummyBoundLogger:
         pass
 
-    structlog = type('structlog', (), {
-        'stdlib': type('stdlib', (), {'BoundLogger': _DummyBoundLogger})()
-    })()
+    structlog = type(
+        "structlog",
+        (),
+        {"stdlib": type("stdlib", (), {"BoundLogger": _DummyBoundLogger})()},
+    )()
 
 try:
     from pythonjsonlogger import jsonlogger
