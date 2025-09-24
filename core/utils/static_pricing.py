@@ -10,7 +10,7 @@ import logging
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from .tiered_pricing import get_pricing_calculator
 
@@ -261,7 +261,7 @@ class UnifiedStaticPricingLoader:
 
         输出: 统一转换为 USD/1K tokens 用于内部计算
         """
-        # 🎯 单位标准化映射
+        # [TARGET] 单位标准化映射
         unit_multipliers = {
             # 基础单位
             "per_token": 1000.0,  # 0.000001 -> 1.0
@@ -279,7 +279,7 @@ class UnifiedStaticPricingLoader:
             config_unit.lower(), 1000.0
         )  # 默认按per_token处理
 
-        # 🚀 智能识别: 如果数值过小，可能是per_token单位但标注错误
+        # [BOOST] 智能识别: 如果数值过小，可能是per_token单位但标注错误
         if config_unit.lower() in [
             "per_million_tokens",
             "per_1m_tokens",
@@ -340,11 +340,11 @@ class UnifiedStaticPricingLoader:
         siliconflow_data = self._load_channel_pricing(
             "siliconflow", self.pricing_dir / "siliconflow_unified.json"
         )
-        return siliconflow_data.get("models", {})
+        return cast(dict[str, Any], siliconflow_data.get("models", {}))
 
     def list_base_pricing_models(self) -> dict[str, Any]:
         """列出所有基础定价模型"""
-        return self.base_pricing_data.get("models", {})
+        return cast(dict[str, Any], self.base_pricing_data.get("models", {}))
 
     def list_doubao_models(self) -> list:
         """列出所有豆包模型"""

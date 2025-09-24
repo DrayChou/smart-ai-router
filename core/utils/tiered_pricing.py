@@ -8,7 +8,7 @@ import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ class PricingResult:
 class TieredPricingCalculator:
     """阶梯定价计算器"""
 
-    def __init__(self, pricing_config_path: str = None):
+    def __init__(self, pricing_config_path: Optional[str] = None):
         """初始化定价计算器"""
         if pricing_config_path is None:
             pricing_config_path = "cache/doubao_pricing_accurate.json"
@@ -44,7 +44,7 @@ class TieredPricingCalculator:
                 return {"models": {}}
 
             with open(self.config_path, encoding="utf-8") as f:
-                return json.load(f)
+                return cast(dict[str, Any], json.load(f))
         except Exception as e:
             logger.error(f"加载定价配置失败: {e}")
             return {"models": {}}
@@ -223,7 +223,10 @@ class TieredPricingCalculator:
 
     def get_model_info(self, model_name: str) -> Optional[dict[str, Any]]:
         """获取模型基本信息"""
-        return self.pricing_data.get("models", {}).get(model_name)
+        return cast(
+            Optional[dict[str, Any]],
+            self.pricing_data.get("models", {}).get(model_name),
+        )
 
     def list_supported_models(self) -> list[str]:
         """获取支持的模型列表"""

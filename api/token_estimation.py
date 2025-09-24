@@ -249,14 +249,16 @@ def create_token_estimation_router(config_loader) -> APIRouter:
                         "providers": [],
                     }
 
-                model_scores[model_name]["providers"].append(
-                    {
-                        "provider": channel.provider,
-                        "channel_id": channel.id,
-                        "input_price": getattr(channel, "input_price", 0.0),
-                        "output_price": getattr(channel, "output_price", 0.0),
-                    }
-                )
+                providers_list = model_scores[model_name]["providers"]
+                if isinstance(providers_list, list):
+                    providers_list.append(
+                        {
+                            "provider": channel.provider,
+                            "channel_id": channel.id,
+                            "input_price": getattr(channel, "input_price", 0.0),
+                            "output_price": getattr(channel, "output_price", 0.0),
+                        }
+                    )
 
             # 按质量评分排序
             sorted_models = dict(

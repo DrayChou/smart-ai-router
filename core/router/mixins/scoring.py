@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 import random
-from typing import Any
+import re
+from typing import Any, cast
 
 from core.config_models import Channel
 from core.router.types import ChannelCandidate, RoutingRequest, RoutingScore
@@ -14,6 +15,25 @@ logger = logging.getLogger(__name__)
 
 class ScoringMixin:
     """Provides scoring and filtering helpers for the router."""
+
+    def __init__(self):
+        self.config = None
+        self.blacklist_manager = None
+        self.config_loader = None
+        self._scoring_service = None
+        self.capability_mapper = None
+        self.capability_detector = None
+
+    def _extract_tags_from_model_name(self, model_name: str) -> list[str]:
+        """Extract tags from model name."""
+        if not model_name:
+            return []
+
+        separators = r"[/:@\-_,]"
+        parts = re.split(separators, model_name.lower())
+        return [
+            part.strip() for part in parts if part.strip() and len(part.strip()) > 1
+        ]
 
     def _filter_channels(
         self, channels: list[ChannelCandidate], request: RoutingRequest
@@ -160,7 +180,9 @@ class ScoringMixin:
     ) -> list[RoutingScore]:
         """计算渠道评分 - 委托到 ScoringService，保持行为不变。"""
         if getattr(self, "_scoring_service", None) is not None:
-            return await self._scoring_service.score(channels, request)
+            return cast(
+                list[RoutingScore], await self._scoring_service.score(channels, request)
+            )
         return await self._score_channels_individual(channels, request)
 
     async def _score_channels_individual(
@@ -168,7 +190,7 @@ class ScoringMixin:
     ) -> list[RoutingScore]:
         """单个渠道评分方式（用于小数量渠道）"""
         logger.info(
-            "📊 SCORING: Using individual scoring for %s channels", len(channels)
+            "[STATS] SCORING: Using individual scoring for %s channels", len(channels)
         )
 
         scored_channels: list[RoutingScore] = []
@@ -206,7 +228,7 @@ class ScoringMixin:
             model_display = candidate.matched_model or channel.model_name
             if logger.isEnabledFor(logging.DEBUG):
                 logger.debug(
-                    "📊 SCORE: '%s' -> '%s' = %.3f (Q:%.2f)",
+                    "[STATS] SCORE: '%s' -> '%s' = %.3f (Q:%.2f)",
                     channel.name,
                     model_display,
                     total_score,
@@ -235,7 +257,10 @@ class ScoringMixin:
         scored_channels = self._hierarchical_sort(scored_channels)
 
         if getattr(self, "_scoring_service", None) is not None:
-            return await self._scoring_service.score_individual(channels, request)
+            return cast(
+                list[RoutingScore],
+                await self._scoring_service.score_individual(channels, request),
+            )
         return scored_channels
 
     def _get_routing_strategy(self, request: RoutingRequest) -> list[dict[str, Any]]:
@@ -257,7 +282,7 @@ class ScoringMixin:
         else:
             custom_strategies = {}
         if strategy_name in custom_strategies:
-            return custom_strategies[strategy_name]
+            return cast(list[dict[str, Any]], custom_strategies[strategy_name])
 
         predefined_strategies = {
             "cost_first": [
@@ -316,12 +341,14 @@ class ScoringMixin:
             from core.utils.cost_estimator import CostEstimator
 
             estimator = CostEstimator()
-            logger.info("  ✅ CostEstimator created successfully")
+            logger.info("  [PASS] CostEstimator created successfully")
 
             input_tokens = self._estimate_tokens(request.messages)
             max_output_tokens = request.max_tokens or 1000
             logger.info(
-                "  📊 Tokens: input=%s, max_output=%s", input_tokens, max_output_tokens
+                "  [STATS] Tokens: input=%s, max_output=%s",
+                input_tokens,
+                max_output_tokens,
             )
 
             cost_result = estimator.estimate_cost(
@@ -335,7 +362,7 @@ class ScoringMixin:
             if cost_result and cost_result.total_cost > 0:
                 total_cost = cost_result.total_cost
                 logger.info(
-                    "  ✅ COST SCORE: Using dynamic pricing for %s: $%.6f",
+                    "  [PASS] COST SCORE: Using dynamic pricing for %s: $%.6f",
                     request.model,
                     total_cost,
                 )
@@ -343,13 +370,13 @@ class ScoringMixin:
                 cost_estimate = self._estimate_cost_for_channel(channel, request)
                 total_cost = max(0.0001, cost_estimate)
                 logger.info(
-                    "  ⚠️ COST SCORE: Fallback to channel pricing for %s: $%.6f",
+                    "  [WARNING] COST SCORE: Fallback to channel pricing for %s: $%.6f",
                     request.model,
                     total_cost,
                 )
         except Exception as e:
             logger.warning(
-                "  ⚠️ COST SCORE: Cost estimator failed, fallback applied: %s", e
+                "  [WARNING] COST SCORE: Cost estimator failed, fallback applied: %s", e
             )
             cost_estimate = self._estimate_cost_for_channel(channel, request)
             total_cost = max(0.0001, cost_estimate)
@@ -369,7 +396,7 @@ class ScoringMixin:
             total_cost,
             cost_score,
         )
-        return cost_score
+        return float(cost_score)
 
     def _calculate_fallback_cost(
         self, channel: Channel, input_tokens: int, max_output_tokens: int
@@ -385,9 +412,10 @@ class ScoringMixin:
         if pricing:
             input_cost_per_1k = pricing.get("input_cost_per_1k", 0.0)
             output_cost_per_1k = pricing.get("output_cost_per_1k", 0.0)
-            return (input_tokens / 1000) * input_cost_per_1k + (
-                max_output_tokens / 1000
-            ) * output_cost_per_1k
+            return float(
+                (input_tokens / 1000) * input_cost_per_1k
+                + (max_output_tokens / 1000) * output_cost_per_1k
+            )
 
         return 0.0
 
@@ -506,7 +534,7 @@ class ScoringMixin:
 
             models_data = cache_data.get("models_data", {})
             if model_name in models_data:
-                return models_data[model_name]
+                return models_data[model_name]  # type: ignore[no-any-return]
 
         return None
 
@@ -771,7 +799,7 @@ class ScoringMixin:
                     score = 1.0 - score
                 total_score += score * rule.get("weight", 0.0)
 
-        return total_score / total_weight
+        return float(total_score / total_weight)
 
     def _hierarchical_sort(
         self, scored_channels: list[RoutingScore]
@@ -879,7 +907,7 @@ class ScoringMixin:
                 output_tokens=max_output_tokens,
             )
             if cost_result and cost_result.total_cost > 0:
-                return cost_result.total_cost
+                return float(cost_result.total_cost)
         except Exception as e:
             logger.debug("Enhanced cost estimation failed for %s: %s", channel.id, e)
 
@@ -903,7 +931,7 @@ class ScoringMixin:
                 total_cost = (
                     input_tokens * input_cost + estimated_output_tokens * output_cost
                 )
-                return total_cost
+                return float(total_cost)
 
         free_score = self._calculate_free_score(channel, request.model)
         if free_score >= 0.9:
@@ -955,7 +983,7 @@ class ScoringMixin:
                     if capabilities.is_local:
                         fallback_channels.append((candidate, capabilities))
                         logger.debug(
-                            "⚠️ LOCAL LIMITATION: %s lacks required capabilities",
+                            "[WARNING] LOCAL LIMITATION: %s lacks required capabilities",
                             channel.name,
                         )
                     else:
@@ -1124,7 +1152,7 @@ class ScoringMixin:
             )
         elif elapsed_ms > slow_threshold_ms:
             logger.warning(
-                "⚠️ SLOW SCORING: %s channels took %.1fms (avg: %.1fms/channel)",
+                "[WARNING] SLOW SCORING: %s channels took %.1fms (avg: %.1fms/channel)",
                 channel_count,
                 elapsed_ms,
                 avg_time_per_channel,
@@ -1148,10 +1176,10 @@ class ScoringMixin:
 
         if channel_count > 50 and elapsed_ms > 1500:
             logger.info(
-                "💡 OPTIMIZATION TIP: Consider implementing channel pre-filtering for %s+ channels",
+                "[TIP] OPTIMIZATION TIP: Consider implementing channel pre-filtering for %s+ channels",
                 channel_count,
             )
         elif channel_count > 20 and elapsed_ms > 800:
             logger.info(
-                "💡 OPTIMIZATION TIP: Performance could benefit from caching strategies"
+                "[TIP] OPTIMIZATION TIP: Performance could benefit from caching strategies"
             )

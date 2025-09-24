@@ -5,7 +5,7 @@
 """
 
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 from .logger import get_logger  # 现有的日志系统
 from .smart_logging import SmartLogFilter, get_smart_logger
@@ -17,12 +17,12 @@ class SmartLoggingIntegration:
     _instance = None
     _initialized = False
 
-    def __new__(cls):
+    def __new__(cls) -> "SmartLoggingIntegration":
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self):
+    def __init__(self) -> None:
         if not self._initialized:
             self.enabled = False
             self.smart_filter = None
@@ -124,7 +124,7 @@ class SmartLoggingIntegration:
             return get_logger(name)
 
     def log_with_context(
-        self, logger: logging.Logger, level: int, message: str, **context
+        self, logger: logging.Logger, level: int, message: str, **context: Any
     ) -> None:
         """
         带上下文的日志记录
@@ -151,7 +151,7 @@ class SmartLoggingIntegration:
 _integration = SmartLoggingIntegration()
 
 
-def enable_smart_logging(**kwargs) -> None:
+def enable_smart_logging(**kwargs: Any) -> None:
     """启用智能日志功能的便捷函数"""
     _integration.enable_smart_logging(**kwargs)
 
@@ -161,7 +161,7 @@ def disable_smart_logging() -> None:
     _integration.disable_smart_logging()
 
 
-def get_enhanced_logger(name: str = None) -> logging.Logger:
+def get_enhanced_logger(name: Optional[str] = None) -> logging.Logger:
     """
     获取增强日志器的便捷函数
 
@@ -191,7 +191,7 @@ def log_api_request(
     url: str,
     headers: Optional[dict] = None,
     body: Optional[str] = None,
-    **context,
+    **context: Any,
 ) -> None:
     """
     记录API请求的便捷函数
@@ -223,7 +223,7 @@ def log_api_response(
     status_code: int,
     response_time: float,
     body: Optional[str] = None,
-    **context,
+    **context: Any,
 ) -> None:
     """
     记录API响应的便捷函数
@@ -252,10 +252,10 @@ def log_channel_operation(
     logger: logging.Logger,
     operation: str,
     channel_id: str,
-    model: str = None,
+    model: Optional[str] = None,
     success: bool = True,
-    error: str = None,
-    **context,
+    error: Optional[str] = None,
+    **context: Any,
 ) -> None:
     """
     记录渠道操作的便捷函数
@@ -297,8 +297,8 @@ def log_cost_info(
     cost: float,
     model: str,
     channel_id: str,
-    tokens: dict[str, int] = None,
-    **context,
+    tokens: Optional[dict[str, int]] = None,
+    **context: Any,
 ) -> None:
     """
     记录成本信息的便捷函数

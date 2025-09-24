@@ -76,14 +76,14 @@ class UsageTracker:
         filename = f"usage_{target_date.strftime('%Y%m%d')}.jsonl"
         return self.logs_dir / filename
 
-    def _check_date_rotation(self):
+    def _check_date_rotation(self) -> None:
         """检查是否需要日志轮换"""
         today = date.today()
         if today != self._current_date:
             self._current_date = today
             self._current_file_path = self._get_daily_log_file()
 
-    def record_usage(self, record: UsageRecord):
+    def record_usage(self, record: UsageRecord) -> None:
         """记录使用情况（同步）"""
         try:
             with self._write_lock:
@@ -104,7 +104,7 @@ class UsageTracker:
         except Exception as e:
             logger.error(f"记录使用情况失败: {e}")
 
-    async def record_usage_async(self, record: UsageRecord):
+    async def record_usage_async(self, record: UsageRecord) -> None:
         """记录使用情况（异步）"""
         # 在线程池中执行同步操作
         loop = asyncio.get_event_loop()
@@ -233,7 +233,7 @@ class UsageTracker:
             "avg_cost_per_1k_tokens": 0.0,
         }
 
-    def _update_stats(self, stats: dict[str, Any], record: dict[str, Any]):
+    def _update_stats(self, stats: dict[str, Any], record: dict[str, Any]) -> None:
         """更新统计数据"""
         stats["total_requests"] += 1
         stats["total_cost"] += record.get("total_cost", 0.0)
@@ -270,7 +270,9 @@ class UsageTracker:
         stats["models"][model]["cost"] += record.get("total_cost", 0.0)
         stats["models"][model]["tokens"] += record.get("total_tokens", 0)
 
-    def _merge_stats(self, target_stats: dict[str, Any], source_stats: dict[str, Any]):
+    def _merge_stats(
+        self, target_stats: dict[str, Any], source_stats: dict[str, Any]
+    ) -> None:
         """合并统计数据"""
         target_stats["total_requests"] += source_stats["total_requests"]
         target_stats["total_cost"] += source_stats["total_cost"]
@@ -303,7 +305,7 @@ class UsageTracker:
                 target_stats["total_cost"] / target_stats["total_tokens"]
             ) * 1000
 
-    def archive_old_logs(self, days_to_keep: int = 30):
+    def archive_old_logs(self, days_to_keep: int = 30) -> None:
         """归档旧日志文件"""
         try:
             from datetime import timedelta

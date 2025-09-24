@@ -67,10 +67,10 @@ def generate_refactor_summary():
             "file_size_reduction": "删除了~500行死代码",
         },
         "testing_results": {
-            "doubao_pricing": "✅ 通过 (Input=0.001120, Output=0.011200 USD/1K tokens)",
-            "openrouter_pricing": "✅ 通过 (Input=0.000150, Output=0.000600 USD/1K tokens)",
-            "unit_conversion": "✅ per_million_tokens → USD/1K tokens 转换正确",
-            "backward_compatibility": "✅ 所有现有功能正常",
+            "doubao_pricing": "[PASS] 通过 (Input=0.001120, Output=0.011200 USD/1K tokens)",
+            "openrouter_pricing": "[PASS] 通过 (Input=0.000150, Output=0.000600 USD/1K tokens)",
+            "unit_conversion": "[PASS] per_million_tokens → USD/1K tokens 转换正确",
+            "backward_compatibility": "[PASS] 所有现有功能正常",
         },
         "future_maintenance": {
             "update_process": "使用脚本从OpenRouter API生成配置文件",

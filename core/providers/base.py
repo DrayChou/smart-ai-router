@@ -7,7 +7,7 @@ import json
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 import httpx
 
@@ -128,14 +128,14 @@ class BaseAdapter(ABC):
         for url in candidate_urls:
             if self._test_url_connectivity(url):
                 logger.info(f"Provider {self.provider_name} 选择可用 URL: {url}")
-                return url
+                return cast(str, url)
 
         # 如果都不可用，使用第一个并发出警告
         selected_url = candidate_urls[0]
         logger.warning(
             f"Provider {self.provider_name} 所有URL都不可达，使用第一个: {selected_url}"
         )
-        return selected_url
+        return cast(str, selected_url)
 
     def _test_url_connectivity(self, url: str) -> bool:
         """
@@ -477,7 +477,7 @@ class BaseAdapter(ABC):
             成本（美元）
         """
         result = self.calculate_cost(usage, model_info)
-        return result["actual_cost"]
+        return cast(float, result["actual_cost"])
 
 
 # 自定义异常类

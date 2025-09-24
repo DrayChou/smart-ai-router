@@ -5,7 +5,7 @@
 import json
 import time
 import uuid
-from typing import Callable, Optional
+from typing import Callable, Optional, cast
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -48,7 +48,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 
         # 跳过某些路径
         if request.url.path in self.skip_paths:
-            return await call_next(request)
+            return cast(Response, await call_next(request))
 
         # 设置日志上下文
         if self.logger:
@@ -75,7 +75,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             # 添加请求ID到响应头
             response.headers["X-Request-ID"] = request_id
 
-            return response
+            return cast(Response, response)
 
         except Exception as e:
             # 记录异常
@@ -296,7 +296,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             # 添加请求ID到响应头
             response.headers["X-Request-ID"] = request_id
 
-            return response
+            return cast(Response, response)
 
         finally:
             # 清除日志上下文

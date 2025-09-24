@@ -48,5 +48,5 @@ class VirtualModelGroup(Base):
         "ModelGroupChannel", back_populates="model_group"
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<VirtualModelGroup(name='{self.name}')>"

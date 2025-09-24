@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     pass
@@ -31,7 +31,7 @@ class ScoringService:
         channel_count = len(channels)
 
         logger.info(
-            f"📊 SCORING: Evaluating {channel_count} candidate channels for model '{request.model}'"
+            f"[STATS] SCORING: Evaluating {channel_count} candidate channels for model '{request.model}'"
         )
 
         if channel_count < 5:
@@ -54,10 +54,12 @@ class ScoringService:
         )
 
         strategy = self._router._get_routing_strategy(request)
-        logger.info(f"📊 SCORING: Using routing strategy with {len(strategy)} rules")
+        logger.info(
+            f"[STATS] SCORING: Using routing strategy with {len(strategy)} rules"
+        )
         for rule in strategy:
             logger.debug(
-                f"📊 SCORING: Strategy rule: {rule['field']} (weight: {rule['weight']}, order: {rule['order']})"
+                f"[STATS] SCORING: Strategy rule: {rule['field']} (weight: {rule['weight']}, order: {rule['order']})"
             )
 
         scored_channels = []
@@ -81,7 +83,7 @@ class ScoringService:
             model_display = candidate.matched_model or candidate.channel.model_name
             if logger.isEnabledFor(logging.DEBUG):
                 logger.debug(
-                    f"📊 SCORE: '{candidate.channel.name}' -> '{model_display}' = {total_score:.3f} (Q:{scores['quality_score']:.2f})"
+                    f"[STATS] SCORE: '{candidate.channel.name}' -> '{model_display}' = {total_score:.3f} (Q:{scores['quality_score']:.2f})"
                 )
 
             # Import at runtime to avoid circular imports
@@ -123,12 +125,12 @@ class ScoringService:
                 f"🏆   #{i+1}: '{scored.channel.name}' (Score: {scored.total_score:.3f})"
             )
 
-        return scored_channels
+        return cast(list[Any], scored_channels)
 
     async def score_individual(self, channels: list[Any], request: Any) -> list[Any]:
         """Individual scoring for small sets."""
         logger.info(
-            f"📊 SCORING: Using individual scoring for {len(channels)} channels"
+            f"[STATS] SCORING: Using individual scoring for {len(channels)} channels"
         )
         strategy = self._router._get_routing_strategy(request)
 
@@ -173,7 +175,7 @@ class ScoringService:
             model_display = candidate.matched_model or channel.model_name
             if logger.isEnabledFor(logging.DEBUG):
                 logger.debug(
-                    f"📊 SCORE: '{channel.name}' -> '{model_display}' = {total_score:.3f} (Q:{quality_score:.2f})"
+                    f"[STATS] SCORE: '{channel.name}' -> '{model_display}' = {total_score:.3f} (Q:{quality_score:.2f})"
                 )
 
             scored_channels.append(
@@ -207,4 +209,4 @@ class ScoringService:
                 f"🏆   #{i+1}: '{scored.channel.name}' (Score: {scored.total_score:.3f})"
             )
 
-        return scored_channels
+        return cast(list[Any], scored_channels)

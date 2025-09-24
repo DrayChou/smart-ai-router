@@ -9,7 +9,7 @@ import logging
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, cast
 
 import aiofiles
 import yaml
@@ -61,7 +61,7 @@ class AsyncConfigFailoverManager:
     """配置加载容错管理器"""
 
     def __init__(self, timeout_seconds: int = 10):
-        self._fallback_configs = {}
+        self._fallback_configs: dict[str, dict[str, Any]] = {}
         self._timeout_seconds = timeout_seconds
 
     async def load_with_timeout_and_fallback(
@@ -74,7 +74,7 @@ class AsyncConfigFailoverManager:
                 primary_loader_coro, timeout=self._timeout_seconds
             )
             logger.info("配置主要加载路径成功")
-            return config
+            return cast(dict[str, Any], config)
 
         except asyncio.TimeoutError:
             logger.warning(f"配置加载超时 ({self._timeout_seconds}s)，使用回退配置")
@@ -193,7 +193,7 @@ class AsyncYAMLConfigLoader:
             file_key = f"{file_path}_{file_type}"
             if file_key in self._config_cache:
                 logger.debug(f"配置缓存命中: {file_type}")
-                return self._config_cache[file_key]
+                return cast(dict[str, Any], self._config_cache[file_key])
 
             # 异步读取文件内容
             async with aiofiles.open(file_path, encoding="utf-8") as f:
@@ -255,9 +255,13 @@ class AsyncYAMLConfigLoader:
                             f"providers 配置格式不正确，期望字典但得到: {type(providers_data)}"
                         )
                 elif config_type == "pricing" and config_data:
-                    merged_config.setdefault("pricing", {}).update(config_data)
+                    pricing_dict = merged_config.setdefault("pricing", {})
+                    if isinstance(pricing_dict, dict):
+                        pricing_dict.update(config_data)
                 elif config_type == "routing" and config_data:
-                    merged_config.setdefault("routing", {}).update(config_data)
+                    routing_dict = merged_config.setdefault("routing", {})
+                    if isinstance(routing_dict, dict):
+                        routing_dict.update(config_data)
 
         logger.debug(f"配置合并完成: {len(merged_config)} 个顶级配置项")
         return merged_config
@@ -334,7 +338,9 @@ class AsyncConfigPerformanceProfiler:
             config = await loader.async_load_config(config_path)
 
             total_time = time.time() - start_time
-            self._metrics["total_load_time"].append(total_time)
+            total_load_time_list = self._metrics["total_load_time"]
+            if isinstance(total_load_time_list, list):
+                total_load_time_list.append(total_time)
 
             logger.info(f"配置加载性能: {total_time:.3f}s")
             return config
@@ -388,4 +394,4 @@ async def load_config_async(config_path: Union[str, Path]) -> Config:
     loader = get_async_config_loader()
     profiler = get_config_performance_profiler()
 
-    return await profiler.profile_config_loading(loader, config_path)
+    return cast(Config, await profiler.profile_config_loading(loader, config_path))

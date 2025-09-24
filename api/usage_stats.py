@@ -27,7 +27,7 @@ def create_usage_stats_router(config_loader: YAMLConfigLoader) -> APIRouter:
             None, description="目标日期 (YYYY-MM-DD格式)，默认为今天"
         ),
         auth: bool = Depends(get_admin_auth_dependency),
-    ):
+    ) -> JSONResponse:
         """获取每日使用统计"""
         try:
             if target_date:
@@ -53,7 +53,7 @@ def create_usage_stats_router(config_loader: YAMLConfigLoader) -> APIRouter:
             None, description="目标日期 (YYYY-MM-DD格式)，默认为今天所在周"
         ),
         auth: bool = Depends(get_admin_auth_dependency),
-    ):
+    ) -> JSONResponse:
         """获取本周使用统计"""
         try:
             if target_date:
@@ -78,7 +78,7 @@ def create_usage_stats_router(config_loader: YAMLConfigLoader) -> APIRouter:
         year: Optional[int] = Query(None, description="年份，默认为当前年"),
         month: Optional[int] = Query(None, description="月份 (1-12)，默认为当前月"),
         auth: bool = Depends(get_admin_auth_dependency),
-    ):
+    ) -> JSONResponse:
         """获取月度使用统计"""
         try:
             stats = tracker.get_monthly_stats(year, month)
@@ -90,7 +90,9 @@ def create_usage_stats_router(config_loader: YAMLConfigLoader) -> APIRouter:
             ) from e
 
     @router.get("/summary")
-    async def get_usage_summary(auth: bool = Depends(get_admin_auth_dependency)):
+    async def get_usage_summary(
+        auth: bool = Depends(get_admin_auth_dependency),
+    ) -> JSONResponse:
         """获取使用情况汇总"""
         try:
             today = date.today()
@@ -147,7 +149,7 @@ def create_usage_stats_router(config_loader: YAMLConfigLoader) -> APIRouter:
             None, description="目标日期 (YYYY-MM-DD格式)"
         ),
         auth: bool = Depends(get_admin_auth_dependency),
-    ):
+    ) -> JSONResponse:
         """获取使用最多的模型排行"""
         try:
             if target_date:
@@ -214,7 +216,7 @@ def create_usage_stats_router(config_loader: YAMLConfigLoader) -> APIRouter:
             None, description="目标日期 (YYYY-MM-DD格式)"
         ),
         auth: bool = Depends(get_admin_auth_dependency),
-    ):
+    ) -> JSONResponse:
         """获取使用最多的渠道排行"""
         try:
             if target_date:
@@ -283,7 +285,7 @@ def create_usage_stats_router(config_loader: YAMLConfigLoader) -> APIRouter:
             None, description="目标日期 (YYYY-MM-DD格式)"
         ),
         auth: bool = Depends(get_admin_auth_dependency),
-    ):
+    ) -> JSONResponse:
         """获取成本分解分析"""
         try:
             if target_date:
@@ -344,7 +346,7 @@ def create_usage_stats_router(config_loader: YAMLConfigLoader) -> APIRouter:
     async def get_channel_alerts(
         hours: int = Query(24, ge=1, le=168, description="查询最近多少小时的告警"),
         auth: bool = Depends(get_admin_auth_dependency),
-    ):
+    ) -> JSONResponse:
         """获取渠道告警信息"""
         try:
             alerts = monitor.get_recent_alerts(hours)
@@ -389,7 +391,9 @@ def create_usage_stats_router(config_loader: YAMLConfigLoader) -> APIRouter:
             ) from e
 
     @router.get("/channel-status")
-    async def get_channel_status(auth: bool = Depends(get_admin_auth_dependency)):
+    async def get_channel_status(
+        auth: bool = Depends(get_admin_auth_dependency),
+    ) -> JSONResponse:
         """获取渠道状态概览"""
         try:
             status = monitor.get_channel_status()
@@ -403,7 +407,7 @@ def create_usage_stats_router(config_loader: YAMLConfigLoader) -> APIRouter:
     @router.post("/clear-alerts/{channel_id}")
     async def clear_channel_alerts(
         channel_id: str, auth: bool = Depends(get_admin_auth_dependency)
-    ):
+    ) -> JSONResponse:
         """清除指定渠道的告警状态"""
         try:
             monitor.clear_channel_notifications(channel_id)
@@ -420,7 +424,9 @@ def create_usage_stats_router(config_loader: YAMLConfigLoader) -> APIRouter:
             ) from e
 
     @router.post("/clear-all-alerts")
-    async def clear_all_alerts(auth: bool = Depends(get_admin_auth_dependency)):
+    async def clear_all_alerts(
+        auth: bool = Depends(get_admin_auth_dependency),
+    ) -> JSONResponse:
         """清除所有渠道的告警状态"""
         try:
             monitor.clear_all_notifications()

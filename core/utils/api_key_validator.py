@@ -468,7 +468,7 @@ class APIKeyValidator:
         logger.info(f"有效率: {valid_keys/total_keys*100:.1f}%")
 
         # 按错误类型统计
-        error_types = {}
+        error_types: dict[str, int] = {}
         for result in self.validation_results.values():
             if not result.is_valid and result.error_type:
                 error_types[result.error_type] = (

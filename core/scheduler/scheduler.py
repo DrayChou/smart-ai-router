@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class TaskScheduler:
     """任务调度器"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.tasks: dict[str, dict] = {}
         self.running = False
         self._loop_task = None
@@ -26,8 +26,8 @@ class TaskScheduler:
         func: Callable,
         interval_seconds: int,
         run_immediately: bool = False,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         """添加定时任务
 
         Args:
@@ -59,25 +59,25 @@ class TaskScheduler:
             f"已添加任务 '{name}', 间隔 {interval_seconds}s, 立即执行: {run_immediately}"
         )
 
-    def remove_task(self, name: str):
+    def remove_task(self, name: str) -> None:
         """移除任务"""
         if name in self.tasks:
             del self.tasks[name]
             logger.info(f"已移除任务 '{name}'")
 
-    def enable_task(self, name: str):
+    def enable_task(self, name: str) -> None:
         """启用任务"""
         if name in self.tasks:
             self.tasks[name]["enabled"] = True
             logger.info(f"已启用任务 '{name}'")
 
-    def disable_task(self, name: str):
+    def disable_task(self, name: str) -> None:
         """禁用任务"""
         if name in self.tasks:
             self.tasks[name]["enabled"] = False
             logger.info(f"已禁用任务 '{name}'")
 
-    async def _run_task(self, name: str, task_info: dict):
+    async def _run_task(self, name: str, task_info: dict[str, Any]) -> Any:
         """执行单个任务"""
         func = task_info["func"]
         kwargs = task_info["kwargs"]
@@ -126,7 +126,7 @@ class TaskScheduler:
 
             raise
 
-    async def _scheduler_loop(self):
+    async def _scheduler_loop(self) -> None:
         """调度器主循环"""
         logger.info("任务调度器启动")
 
@@ -164,7 +164,7 @@ class TaskScheduler:
                 logger.error(f"调度器循环异常: {e}")
                 await asyncio.sleep(5)  # 异常时等待5秒
 
-    async def start(self):
+    async def start(self) -> None:
         """启动调度器"""
         if self.running:
             logger.warning("调度器已在运行")
@@ -174,7 +174,7 @@ class TaskScheduler:
         self._loop_task = asyncio.create_task(self._scheduler_loop())
         logger.info("任务调度器已启动")
 
-    async def stop(self):
+    async def stop(self) -> None:
         """停止调度器"""
         if not self.running:
             return
@@ -239,20 +239,20 @@ def add_task(
     func: Callable,
     interval_seconds: int,
     run_immediately: bool = False,
-    **kwargs,
-):
+    **kwargs: Any,
+) -> None:
     """添加任务的便捷函数"""
     scheduler = get_scheduler()
     scheduler.add_task(name, func, interval_seconds, run_immediately, **kwargs)
 
 
-async def start_scheduler():
+async def start_scheduler() -> None:
     """启动调度器的便捷函数"""
     scheduler = get_scheduler()
     await scheduler.start()
 
 
-async def stop_scheduler():
+async def stop_scheduler() -> None:
     """停止调度器的便捷函数"""
     scheduler = get_scheduler()
     await scheduler.stop()

@@ -18,7 +18,7 @@ class RequestIntervalManager:
     此管理器确保每个渠道在发起新请求前等待足够的时间间隔。
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # 存储每个渠道的最后请求时间
         self._last_request_times: dict[str, float] = {}
         # 线程锁确保并发安全
@@ -81,7 +81,7 @@ class RequestIntervalManager:
 
         return wait_time <= 0
 
-    def record_request(self, channel_id: str):
+    def record_request(self, channel_id: str) -> None:
         """
         记录请求时间（用于同步调用场景）
 
@@ -111,7 +111,7 @@ class RequestIntervalManager:
 
         return wait_time
 
-    def clear_channel_history(self, channel_id: str):
+    def clear_channel_history(self, channel_id: str) -> None:
         """
         清除指定渠道的请求历史（用于重置或错误恢复）
 

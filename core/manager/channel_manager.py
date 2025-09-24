@@ -176,7 +176,7 @@ class ChannelManager:
 
             channels = result.all()
 
-            status_count = {}
+            status_count: dict[str, int] = {}
             health_scores = []
 
             for status, health_score in channels:

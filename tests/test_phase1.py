@@ -333,7 +333,7 @@ async def test_database_integration():
         )
         await session.execute(text(f"DELETE FROM providers WHERE id = {provider_id}"))
 
-        logger.info("✅ 集成测试通过")
+        logger.info("[PASS] 集成测试通过")
 
 
 if __name__ == "__main__":
@@ -347,26 +347,26 @@ if __name__ == "__main__":
         try:
             # 数据库测试
             await db_tests.test_database_connection()
-            logger.info("✅ 数据库连接测试通过")
+            logger.info("[PASS] 数据库连接测试通过")
 
             await db_tests.test_database_tables_exist()
-            logger.info("✅ 数据库表结构测试通过")
+            logger.info("[PASS] 数据库表结构测试通过")
 
             await db_tests.test_providers_table_structure()
-            logger.info("✅ Providers表测试通过")
+            logger.info("[PASS] Providers表测试通过")
 
             await db_tests.test_virtual_model_groups_json_fields()
-            logger.info("✅ JSON字段测试通过")
+            logger.info("[PASS] JSON字段测试通过")
 
             await db_tests.test_foreign_key_constraints()
-            logger.info("✅ 外键约束测试通过")
+            logger.info("[PASS] 外键约束测试通过")
 
             # 配置测试
             config_tests.test_env_file_exists()
-            logger.info("✅ 环境配置测试通过")
+            logger.info("[PASS] 环境配置测试通过")
 
             config_tests.test_alembic_configuration()
-            logger.info("✅ Alembic配置测试通过")
+            logger.info("[PASS] Alembic配置测试通过")
 
             # 集成测试
             await test_database_integration()
@@ -375,7 +375,7 @@ if __name__ == "__main__":
             return True
 
         except Exception as e:
-            logger.error(f"❌ 测试失败: {e}")
+            logger.error(f"[FAIL] 测试失败: {e}")
             return False
 
     success = asyncio.run(run_tests())

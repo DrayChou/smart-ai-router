@@ -51,12 +51,13 @@ class ModelRecommendation:
     estimated_time: float  # 预计响应时间(秒)
     quality_score: float  # 质量评分 (0-1)
     reason: str  # 推荐理由
+    combined_score: float = 0.0  # 综合评分 (用于排序)
 
 
 class TokenEstimator:
     """Token预估器"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         # 初始化tiktoken编码器
         self.encoders = {}
         if TIKTOKEN_AVAILABLE:
@@ -261,7 +262,7 @@ class TokenEstimator:
 class ModelOptimizer:
     """模型优化器"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         # 模型能力评分（0-1，越高越好）
         self.model_quality_scores = {
             # GPT系列

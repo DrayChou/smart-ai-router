@@ -416,44 +416,8 @@ async def stream_gemini_response(
 
     try:
         # 使用chat_handler的流式处理
-        async for chunk in chat_handler.handle_stream_request(request):
-            # 处理不同类型的chunk
-            if isinstance(chunk, str):
-                # 如果是字符串，尝试解析为JSON
-                try:
-                    chunk_data = json.loads(chunk)
-                    if chunk_data.get("type") == "error":
-                        # 错误消息
-                        yield f"data: {json.dumps(chunk_data)}\n\n"
-                        return
-                except (json.JSONDecodeError, ValueError):
-                    # 如果不是JSON，当作普通处理
-                    continue
-            else:
-                # 如果是字典，处理流式响应
-                if chunk.get("choices"):
-                    for choice in chunk["choices"]:
-                        message = choice.get("message", {})
-                        content = message.get("content", "")
-
-                        # 创建Gemini流式响应
-                        stream_chunk = {
-                            "candidates": [
-                                {
-                                    "index": choice.get("index", 0),
-                                    "content": {
-                                        "parts": [{"text": content}],
-                                        "role": "model",
-                                    },
-                                    "finish_reason": choice.get(
-                                        "finish_reason", "STOP"
-                                    ),
-                                }
-                            ]
-                        }
-
-                        yield f"data: {json.dumps(stream_chunk)}\n\n"
-
+        response = await chat_handler.handle_stream_request(request)
+        return response
     except Exception as e:
         logger.error(f"Stream error: {e}")
         error_chunk = {

@@ -17,7 +17,7 @@ from .scheduler import (
 )
 from .tasks.model_discovery import get_model_discovery_task, run_model_discovery
 
-# 🗑️ Removed pricing_discovery - was generating unused cache files
+# [DELETE] Removed pricing_discovery - was generating unused cache files
 from .tasks.service_health_check import run_health_check_task
 
 logger = logging.getLogger(__name__)
@@ -26,12 +26,12 @@ logger = logging.getLogger(__name__)
 class TaskManager:
     """任务管理器"""
 
-    def __init__(self, config_loader=None):
+    def __init__(self, config_loader: Any = None) -> None:
         self.config_loader = config_loader
         self.scheduler = get_scheduler()
         self.is_initialized = False
 
-    def initialize_tasks(self, config: dict[str, Any]):
+    def initialize_tasks(self, config: dict[str, Any]) -> None:
         """初始化所有定时任务"""
         if self.is_initialized:
             logger.warning("任务已初始化，跳过")
@@ -40,7 +40,7 @@ class TaskManager:
         # 从配置中获取任务设置
         task_config = config.get("tasks", {})
 
-        # 1. 模型发现任务 - 🚀 修复：正确读取配置文件的 run_on_startup 设置
+        # 1. 模型发现任务 - [BOOST] 修复：正确读取配置文件的 run_on_startup 设置
         model_discovery_config = task_config.get("model_discovery", {})
         if model_discovery_config.get("enabled", True):
             interval = (
@@ -48,7 +48,7 @@ class TaskManager:
             )  # 转换为秒
             run_immediately = model_discovery_config.get(
                 "run_on_startup", True
-            )  # 🚀 修复：恢复配置文件控制
+            )  # [BOOST] 修复：恢复配置文件控制
 
             add_task(
                 name="model_discovery",
@@ -58,16 +58,16 @@ class TaskManager:
             )
             logger.info(f"已添加模型发现任务，间隔 {interval/3600}h")
 
-        # 🗑️ Removed pricing discovery task - was generating unused cache files
+        # [DELETE] Removed pricing discovery task - was generating unused cache files
 
         # 2. API密钥验证任务
-        # 2. API密钥验证任务 - 🚀 修复：正确读取配置文件的 run_on_startup 设置
+        # 2. API密钥验证任务 - [BOOST] 修复：正确读取配置文件的 run_on_startup 设置
         api_key_config = task_config.get("api_key_validation", {})
         if api_key_config.get("enabled", True):
             interval = api_key_config.get("interval_hours", 6) * 3600  # 转换为秒
             run_immediately = api_key_config.get(
                 "run_on_startup", True
-            )  # 🚀 修复：恢复配置文件控制
+            )  # [BOOST] 修复：恢复配置文件控制
 
             add_task(
                 name="api_key_validation",
@@ -126,7 +126,7 @@ class TaskManager:
         self.is_initialized = True
         logger.info("所有后台任务初始化完成")
 
-    async def _run_model_discovery_task(self):
+    async def _run_model_discovery_task(self) -> dict[str, Any]:
         """运行模型发现任务"""
         logger.info("开始执行模型发现任务")
 
@@ -155,9 +155,9 @@ class TaskManager:
             logger.error(f"模型发现任务异常: {e}", exc_info=True)
             return {"success": False, "error": str(e)}
 
-    # 🗑️ Removed _run_pricing_discovery_task - was generating unused cache files
+    # [DELETE] Removed _run_pricing_discovery_task - was generating unused cache files
 
-    async def _run_api_key_validation_task(self):
+    async def _run_api_key_validation_task(self) -> dict[str, Any]:
         """运行API密钥验证任务"""
         logger.info("开始执行API密钥验证任务")
 
@@ -182,7 +182,7 @@ class TaskManager:
             logger.error(f"API密钥验证任务异常: {e}", exc_info=True)
             return {"success": False, "error": str(e)}
 
-    async def _run_health_check_task(self):
+    async def _run_health_check_task(self) -> dict[str, Any]:
         """运行健康检查任务"""
         logger.info("开始执行健康检查任务")
 
@@ -210,7 +210,7 @@ class TaskManager:
             logger.error(f"健康检查任务异常: {e}", exc_info=True)
             return {"success": False, "error": str(e)}
 
-    async def _run_cache_cleanup_task(self):
+    async def _run_cache_cleanup_task(self) -> dict[str, Any]:
         """运行缓存清理任务"""
         logger.info("开始执行缓存清理任务")
 
@@ -247,7 +247,7 @@ class TaskManager:
             logger.error(f"缓存清理任务异常: {e}")
             return {"success": False, "error": str(e)}
 
-    async def _run_stats_report_task(self):
+    async def _run_stats_report_task(self) -> dict[str, Any]:
         """运行统计报告任务"""
         logger.info("开始执行统计报告任务")
 
@@ -298,12 +298,12 @@ class TaskManager:
         except (OSError, PermissionError):
             return 0
 
-    async def start(self):
+    async def start(self) -> None:
         """启动任务管理器"""
         logger.info("启动任务管理器")
         await start_scheduler()
 
-    async def stop(self):
+    async def stop(self) -> None:
         """停止任务管理器"""
         logger.info("停止任务管理器")
         await stop_scheduler()
@@ -316,7 +316,7 @@ class TaskManager:
             "scheduler_status": get_task_status(),
         }
 
-    def set_config_loader(self, config_loader):
+    def set_config_loader(self, config_loader: Any) -> None:
         """设置配置加载器"""
         self.config_loader = config_loader
         logger.info("配置加载器已设置")
@@ -335,7 +335,9 @@ def get_task_manager() -> TaskManager:
 
 
 # 便捷函数
-async def initialize_background_tasks(config: dict[str, Any], config_loader=None):
+async def initialize_background_tasks(
+    config: dict[str, Any], config_loader: Any = None
+) -> TaskManager:
     """初始化后台任务的便捷函数"""
     manager = get_task_manager()
     if config_loader:
@@ -345,7 +347,7 @@ async def initialize_background_tasks(config: dict[str, Any], config_loader=None
     return manager
 
 
-async def stop_background_tasks():
+async def stop_background_tasks() -> None:
     """停止后台任务的便捷函数"""
     manager = get_task_manager()
     await manager.stop()

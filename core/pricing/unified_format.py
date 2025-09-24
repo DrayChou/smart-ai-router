@@ -112,7 +112,7 @@ class UnifiedModelData:
 
     def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
-        result = {}
+        result: dict[str, Any] = {}
         for field_name, field_value in self.__dict__.items():
             if field_value is None:
                 continue
@@ -269,7 +269,7 @@ if __name__ == "__main__":
         data_source=DataSource.OPENROUTER,
     )
 
-    print("✅ 统一格式测试成功")
+    print("[PASS] 统一格式测试成功")
     print(f"模型: {model.name}")
     print(f"参数: {model.parameter_count/1e9:.1f}B")
     print(f"能力: {model.capabilities}")

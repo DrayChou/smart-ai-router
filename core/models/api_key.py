@@ -3,6 +3,8 @@ API Key data models
 API密钥数据模型
 """
 
+from decimal import Decimal
+
 from sqlalchemy import (
     DECIMAL,
     JSON,
@@ -12,7 +14,7 @@ from sqlalchemy import (
     Integer,
     String,
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, relationship
 from sqlalchemy.sql import func
 
 from .base import Base
@@ -34,9 +36,15 @@ class APIKey(Base):
     usage_count = Column(Integer, default=0)
 
     # 配额管理
-    daily_quota = Column(DECIMAL(10, 2))  # 每日配额 ($)
-    monthly_quota = Column(DECIMAL(10, 2))  # 月度配额 ($)
-    remaining_quota = Column(DECIMAL(10, 2))  # 剩余配额
+    daily_quota: Mapped[Decimal] = Column(
+        DECIMAL(10, 2), default=Decimal("0")
+    )  # 每日配额 ($)
+    monthly_quota: Mapped[Decimal] = Column(
+        DECIMAL(10, 2), default=Decimal("0")
+    )  # 月度配额 ($)
+    remaining_quota: Mapped[Decimal] = Column(
+        DECIMAL(10, 2), default=Decimal("0")
+    )  # 剩余配额
     quota_reset_at = Column(DateTime)  # 配额重置时间
 
     created_at = Column(DateTime, default=func.now())
@@ -46,7 +54,7 @@ class APIKey(Base):
     channel = relationship("Channel", back_populates="api_keys")
     request_logs = relationship("RequestLog", back_populates="api_key")
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<APIKey(name='{self.key_name}', channel_id={self.channel_id})>"
 
 
@@ -61,15 +69,19 @@ class RouterAPIKey(Base):
 
     # 权限配置
     allowed_model_groups = Column(JSON)  # 允许访问的模型组
-    daily_budget = Column(DECIMAL(10, 2))  # 每日预算限制
-    monthly_budget = Column(DECIMAL(10, 2))  # 月度预算限制
+    daily_budget: Mapped[Decimal] = Column(
+        DECIMAL(10, 2), default=Decimal("0")
+    )  # 每日预算限制
+    monthly_budget: Mapped[Decimal] = Column(
+        DECIMAL(10, 2), default=Decimal("0")
+    )  # 月度预算限制
     rate_limit = Column(String(20))  # 速率限制 "100/hour"
     role = Column(String(20), default="user")  # admin, user
 
     # 使用统计
     last_used_at = Column(DateTime)
     request_count = Column(Integer, default=0)
-    total_cost = Column(DECIMAL(10, 4), default=0)
+    total_cost: Mapped[Decimal] = Column(DECIMAL(10, 4), default=Decimal("0"))
 
     status = Column(String(20), default="active")
     created_at = Column(DateTime, default=func.now())
@@ -78,5 +90,5 @@ class RouterAPIKey(Base):
     # 关系
     request_logs = relationship("RequestLog", back_populates="client_api_key")
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<RouterAPIKey(name='{self.key_name}', role='{self.role}')>"

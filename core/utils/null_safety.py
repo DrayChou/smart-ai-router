@@ -58,7 +58,9 @@ def safe_getattr(obj: Any, attr: str, default: Any = None) -> Any:
         return default
 
 
-def safe_call(func: Optional[Callable], *args, default: Any = None, **kwargs) -> Any:
+def safe_call(
+    func: Optional[Callable], *args: Any, default: Any = None, **kwargs: Any
+) -> Any:
     """
     安全调用函数
 
@@ -81,7 +83,7 @@ def safe_call(func: Optional[Callable], *args, default: Any = None, **kwargs) ->
         return default
 
 
-def safe_chain(*accessors, default: Any = None) -> Any:
+def safe_chain(*accessors: Callable, default: Any = None) -> Any:
     """
     安全的链式访问
 
@@ -319,7 +321,7 @@ class SafeProxy:
         except (KeyError, IndexError, TypeError):
             return SafeProxy(None)
 
-    def __call__(self, *args, **kwargs) -> "SafeProxy":
+    def __call__(self, *args: Any, **kwargs: Any) -> "SafeProxy":
         """安全调用"""
         if self._obj is None or not callable(self._obj):
             return SafeProxy(None)

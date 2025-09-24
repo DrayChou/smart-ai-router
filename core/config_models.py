@@ -80,7 +80,7 @@ class Tasks(BaseModel):
     model_config = {"protected_namespaces": ()}
 
     model_discovery: TaskConfig = Field(default_factory=TaskConfig)
-    # 🗑️ Removed pricing_discovery - was generating unused cache files
+    # [DELETE] Removed pricing_discovery - was generating unused cache files
     health_check: TaskConfig = Field(default_factory=TaskConfig)
     api_key_validation: TaskConfig = Field(default_factory=TaskConfig)
 

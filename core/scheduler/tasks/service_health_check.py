@@ -12,7 +12,7 @@ import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 import httpx
 
@@ -207,8 +207,8 @@ class ServiceHealthChecker:
                     if isinstance(cached_result["timestamp"], str)
                     else cached_result["timestamp"]
                 )
-                return HealthCheckResult(**cached_result)
-            return cached_result
+                return cast(HealthCheckResult, HealthCheckResult(**cached_result))
+            return cast(HealthCheckResult, cached_result)
 
         start_time = time.time()
 
@@ -312,8 +312,8 @@ class ServiceHealthChecker:
                     if isinstance(cached_result["timestamp"], str)
                     else cached_result["timestamp"]
                 )
-                return HealthCheckResult(**cached_result)
-            return cached_result
+                return cast(HealthCheckResult, HealthCheckResult(**cached_result))
+            return cast(HealthCheckResult, cached_result)
 
         # 检查base_url是否有效
         if not base_url:
@@ -520,7 +520,9 @@ class ServiceHealthChecker:
             if result.success:
                 stats["healthy"] += 1
                 if result.latency_ms is not None:
-                    stats["latencies"].append(result.latency_ms)
+                    latencies_list = stats["latencies"]
+                    if isinstance(latencies_list, list):
+                        latencies_list.append(result.latency_ms)
                     if result.latency_ms < stats["min_latency"]:
                         stats["min_latency"] = result.latency_ms
                         stats["fastest_channel"] = result.channel_id

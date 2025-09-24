@@ -89,7 +89,9 @@ class HealthReportResponse(BaseModel):
 
 
 @router.get("/stats", response_model=BlacklistStatsResponse)
-async def get_blacklist_stats(admin_token: str = Depends(verify_admin_token)):
+async def get_blacklist_stats(
+    admin_token: str = Depends(verify_admin_token),
+) -> BlacklistStatsResponse:
     """获取黑名单统计信息"""
     blacklist_manager = get_model_blacklist_manager()
     stats = blacklist_manager.get_blacklist_stats()
@@ -103,7 +105,7 @@ async def get_blacklist_entries(
     model_name: Optional[str] = None,
     error_type: Optional[str] = None,
     admin_token: str = Depends(verify_admin_token),
-):
+) -> list[BlacklistEntryResponse]:
     """获取黑名单条目列表，支持过滤"""
     blacklist_manager = get_model_blacklist_manager()
 
@@ -141,7 +143,7 @@ async def get_blacklist_entries(
 @router.post("/manage")
 async def manage_blacklist_entry(
     request: BlacklistManagementRequest, admin_token: str = Depends(verify_admin_token)
-):
+) -> dict[str, str]:
     """管理黑名单条目（移除、延长、设为永久）"""
     blacklist_manager = get_model_blacklist_manager()
 
@@ -203,7 +205,9 @@ async def manage_blacklist_entry(
 
 
 @router.post("/cleanup")
-async def cleanup_expired_entries(admin_token: str = Depends(verify_admin_token)):
+async def cleanup_expired_entries(
+    admin_token: str = Depends(verify_admin_token),
+) -> dict[str, Any]:
     """清理过期的黑名单条目"""
     blacklist_manager = get_model_blacklist_manager()
     cleaned_count = blacklist_manager.cleanup_expired_entries()
@@ -215,7 +219,9 @@ async def cleanup_expired_entries(admin_token: str = Depends(verify_admin_token)
 
 
 @router.get("/recovery/stats", response_model=RecoveryStatsResponse)
-async def get_recovery_stats(admin_token: str = Depends(verify_admin_token)):
+async def get_recovery_stats(
+    admin_token: str = Depends(verify_admin_token),
+) -> RecoveryStatsResponse:
     """获取恢复服务统计信息"""
     recovery_manager = get_blacklist_recovery_manager()
     stats = recovery_manager.get_recovery_stats()
@@ -224,7 +230,9 @@ async def get_recovery_stats(admin_token: str = Depends(verify_admin_token)):
 
 
 @router.post("/recovery/trigger")
-async def trigger_recovery_check(admin_token: str = Depends(verify_admin_token)):
+async def trigger_recovery_check(
+    admin_token: str = Depends(verify_admin_token),
+) -> dict[str, str]:
     """手动触发一次恢复检查"""
     recovery_manager = get_blacklist_recovery_manager()
 
@@ -240,7 +248,7 @@ async def trigger_recovery_check(admin_token: str = Depends(verify_admin_token))
 @router.post("/recovery/service/{action}")
 async def manage_recovery_service(
     action: str, admin_token: str = Depends(verify_admin_token)
-):
+) -> dict[str, str]:
     """管理恢复服务（启动/停止）"""
     recovery_manager = get_blacklist_recovery_manager()
 
@@ -257,7 +265,9 @@ async def manage_recovery_service(
 
 
 @router.get("/health-report", response_model=HealthReportResponse)
-async def get_health_report(admin_token: str = Depends(verify_admin_token)):
+async def get_health_report(
+    admin_token: str = Depends(verify_admin_token),
+) -> HealthReportResponse:
     """获取详细的健康报告"""
     from core.yaml_config import get_yaml_config_loader
 
@@ -265,7 +275,7 @@ async def get_health_report(admin_token: str = Depends(verify_admin_token)):
     blacklist_manager = get_model_blacklist_manager()
 
     # 获取所有渠道
-    all_channels = config_loader.get_all_channels()
+    all_channels = config_loader.get_enabled_channels()
 
     # 统计信息
     total_channels = len(all_channels)
@@ -330,7 +340,9 @@ async def get_health_report(admin_token: str = Depends(verify_admin_token)):
 
 
 @router.get("/error-types")
-async def get_error_types(admin_token: str = Depends(verify_admin_token)):
+async def get_error_types(
+    admin_token: str = Depends(verify_admin_token),
+) -> dict[str, Any]:
     """获取支持的错误类型列表"""
     error_types = [error_type.value for error_type in ErrorType]
 
@@ -352,7 +364,7 @@ async def get_error_types(admin_token: str = Depends(verify_admin_token)):
 @router.get("/channels/{channel_id}/models")
 async def get_channel_model_status(
     channel_id: str, admin_token: str = Depends(verify_admin_token)
-):
+) -> dict[str, Any]:
     """获取特定渠道的所有模型状态"""
     blacklist_manager = get_model_blacklist_manager()
 

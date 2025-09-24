@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 本地CI检查脚本 - 在推送前本地运行与GitHub CI相同的检查
 Local CI verification script - run the same checks as GitHub CI before pushing
@@ -202,10 +201,10 @@ except Exception as e:
             return False
 
         # 运行代码质量检查
-        quality_passed = self.run_code_quality_checks()
+        self.run_code_quality_checks()
 
         # 运行基础测试
-        tests_passed = self.run_basic_tests()
+        self.run_basic_tests()
 
         # 打印摘要
         self.print_summary()

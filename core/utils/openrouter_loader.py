@@ -26,7 +26,7 @@ class OpenRouterDataLoader:
         if self._models_cache is not None:
             return self._models_cache
 
-        models = {}
+        models: dict[str, Any] = {}
 
         if not self.openrouter_file.exists():
             logger.warning(f"OpenRouter数据文件不存在: {self.openrouter_file}")
@@ -48,7 +48,7 @@ class OpenRouterDataLoader:
                     logger.warning(f"解析模型失败 {model_id}: {e}")
                     continue
 
-            logger.info(f"✅ 成功加载 {len(models)} 个模型")
+            logger.info(f"[PASS] 成功加载 {len(models)} 个模型")
 
         except Exception as e:
             logger.error(f"加载OpenRouter数据失败: {e}")

@@ -232,7 +232,8 @@ class SiliconFlowAdapter(BaseAdapter):
         request_data = {
             "model": request.model,
             "messages": [
-                {"role": msg.role, "content": msg.content} for msg in request.messages
+                {"role": msg.get("role", "user"), "content": msg.get("content", "")}
+                for msg in request.messages
             ],
             "stream": False,
         }
@@ -242,8 +243,9 @@ class SiliconFlowAdapter(BaseAdapter):
             request_data["temperature"] = request.temperature
         if request.max_tokens is not None:
             request_data["max_tokens"] = request.max_tokens
-        if request.top_p is not None:
-            request_data["top_p"] = request.top_p
+        # Add top_p from extra_params if available
+        if request.extra_params and "top_p" in request.extra_params:
+            request_data["top_p"] = request.extra_params["top_p"]
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
@@ -281,7 +283,8 @@ class SiliconFlowAdapter(BaseAdapter):
         request_data = {
             "model": request.model,
             "messages": [
-                {"role": msg.role, "content": msg.content} for msg in request.messages
+                {"role": msg.get("role", "user"), "content": msg.get("content", "")}
+                for msg in request.messages
             ],
             "stream": True,
         }
@@ -291,8 +294,9 @@ class SiliconFlowAdapter(BaseAdapter):
             request_data["temperature"] = request.temperature
         if request.max_tokens is not None:
             request_data["max_tokens"] = request.max_tokens
-        if request.top_p is not None:
-            request_data["top_p"] = request.top_p
+        # Add top_p from extra_params if available
+        if request.extra_params and "top_p" in request.extra_params:
+            request_data["top_p"] = request.extra_params["top_p"]
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             async with client.stream(

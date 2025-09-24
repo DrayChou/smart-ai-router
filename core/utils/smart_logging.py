@@ -9,7 +9,7 @@ import logging
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 
 class SmartLogFilter(logging.Filter):
@@ -45,7 +45,7 @@ class SmartLogFilter(logging.Filter):
         # 编译正则表达式以提高性能
         self._compile_patterns()
 
-    def _compile_patterns(self):
+    def _compile_patterns(self) -> None:
         """编译常用的正则表达式模式"""
         # Base64图像数据模式
         self.base64_image_pattern = re.compile(
@@ -163,7 +163,7 @@ class SmartLogFilter(logging.Filter):
         if "Traceback" not in message:
             return message
 
-        def simplify_traceback(match):
+        def simplify_traceback(match: Any) -> str:
             full_traceback = match.group(0)
             lines = full_traceback.split("\n")
 
@@ -395,7 +395,7 @@ def setup_smart_logging(
 
 
 def create_context_logger(
-    base_logger: logging.Logger, **context
+    base_logger: logging.Logger, **context: Any
 ) -> logging.LoggerAdapter:
     """
     创建带上下文信息的日志适配器
@@ -409,7 +409,7 @@ def create_context_logger(
     """
 
     class ContextAdapter(logging.LoggerAdapter):
-        def process(self, msg, kwargs):
+        def process(self, msg: str, kwargs: dict) -> tuple[str, dict]:
             # 将上下文信息添加到日志记录中
             for key, value in self.extra.items():
                 if "extra" not in kwargs:
@@ -420,7 +420,7 @@ def create_context_logger(
     return ContextAdapter(base_logger, context)
 
 
-def get_smart_logger(name: str = None) -> logging.Logger:
+def get_smart_logger(name: Optional[str] = None) -> logging.Logger:
     """
     获取智能日志器的便捷函数
 
@@ -445,7 +445,7 @@ def get_smart_logger(name: str = None) -> logging.Logger:
 
 
 # 便捷的全局函数
-def log_with_context(level: int, message: str, **context):
+def log_with_context(level: int, message: str, **context: Any) -> None:
     """
     带上下文的日志记录便捷函数
 
@@ -462,16 +462,16 @@ def log_with_context(level: int, message: str, **context):
 
 
 # 便捷函数别名
-def log_info(message: str, **context):
+def log_info(message: str, **context: Any) -> None:
     """INFO级别日志的便捷函数"""
     log_with_context(logging.INFO, message, **context)
 
 
-def log_error(message: str, **context):
+def log_error(message: str, **context: Any) -> None:
     """ERROR级别日志的便捷函数"""
     log_with_context(logging.ERROR, message, **context)
 
 
-def log_debug(message: str, **context):
+def log_debug(message: str, **context: Any) -> None:
     """DEBUG级别日志的便捷函数"""
     log_with_context(logging.DEBUG, message, **context)

@@ -3,6 +3,8 @@ Channel data model
 Channel数据模型
 """
 
+from decimal import Decimal
+
 from sqlalchemy import (
     DECIMAL,
     JSON,
@@ -13,7 +15,7 @@ from sqlalchemy import (
     Integer,
     String,
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, relationship
 from sqlalchemy.sql import func
 
 from .base import Base
@@ -30,11 +32,17 @@ class Channel(Base):
     model_name = Column(String(50), nullable=False)  # gpt-4o, claude-3-5-sonnet等
     endpoint = Column(String(300))  # 完整API端点
     priority = Column(Integer, default=1)  # 优先级 (1=最高)
-    weight = Column(DECIMAL(3, 2), default=1.0)  # 负载均衡权重
+    weight: Mapped[Decimal] = Column(
+        DECIMAL(3, 2), default=Decimal("1.0")
+    )  # 负载均衡权重
 
     # 成本配置 (可动态更新)
-    input_cost_per_1k = Column(DECIMAL(10, 4))  # 输入成本 $/1K tokens
-    output_cost_per_1k = Column(DECIMAL(10, 4))  # 输出成本 $/1K tokens
+    input_cost_per_1k: Mapped[Decimal] = Column(
+        DECIMAL(10, 4), default=Decimal("0")
+    )  # 输入成本 $/1K tokens
+    output_cost_per_1k: Mapped[Decimal] = Column(
+        DECIMAL(10, 4), default=Decimal("0")
+    )  # 输出成本 $/1K tokens
 
     # 每日限额管理
     daily_request_limit = Column(Integer, default=1000)  # 每日请求限额
@@ -49,7 +57,9 @@ class Channel(Base):
     status = Column(
         String(20), default="active"
     )  # active, disabled, cooling, quota_exceeded
-    health_score = Column(DECIMAL(3, 2), default=1.0)  # 0.0-1.0 健康度
+    health_score: Mapped[Decimal] = Column(
+        DECIMAL(3, 2), default=Decimal("1.0")
+    )  # 0.0-1.0 健康度
     last_success_at = Column(DateTime)
     last_error_at = Column(DateTime)
     cooldown_until = Column(DateTime)  # 冷却结束时间
@@ -68,5 +78,5 @@ class Channel(Base):
     request_logs = relationship("RequestLog", back_populates="channel")
     channel_stats = relationship("ChannelStats", back_populates="channel")
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Channel(name='{self.name}', model='{self.model_name}')>"

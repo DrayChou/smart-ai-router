@@ -76,7 +76,7 @@ async def get_log_statistics(
     end_time: Optional[datetime] = Query(None, description="结束时间"),
     analyzer: LogAnalyzer = Depends(get_log_analyzer),
     _: bool = Depends(get_admin_auth_dependency),
-):
+) -> LogStatsResponse:
     """
     获取日志统计信息
 
@@ -106,7 +106,7 @@ async def search_logs(
     request: LogSearchRequest,
     analyzer: LogAnalyzer = Depends(get_log_analyzer),
     _: bool = Depends(get_admin_auth_dependency),
-):
+) -> dict[str, Any]:
     """
     搜索日志条目
 
@@ -148,7 +148,7 @@ async def get_recent_errors(
     limit: int = Query(100, ge=1, le=1000, description="返回条目数限制"),
     analyzer: LogAnalyzer = Depends(get_log_analyzer),
     _: bool = Depends(get_admin_auth_dependency),
-):
+) -> dict[str, Any]:
     """
     获取最近的错误日志
 
@@ -177,7 +177,7 @@ async def get_slow_requests(
     limit: int = Query(50, ge=1, le=500, description="返回条目数限制"),
     analyzer: LogAnalyzer = Depends(get_log_analyzer),
     _: bool = Depends(get_admin_auth_dependency),
-):
+) -> dict[str, Any]:
     """
     获取慢请求日志
 
@@ -210,7 +210,7 @@ async def get_request_timeline(
     request_id: str,
     analyzer: LogAnalyzer = Depends(get_log_analyzer),
     _: bool = Depends(get_admin_auth_dependency),
-):
+) -> dict[str, Any]:
     """
     获取特定请求的完整时间线
 
@@ -245,7 +245,7 @@ async def export_logs(
     request: LogExportRequest,
     analyzer: LogAnalyzer = Depends(get_log_analyzer),
     _: bool = Depends(get_admin_auth_dependency),
-):
+) -> dict[str, Any]:
     """
     导出日志到文件
 
@@ -286,7 +286,7 @@ async def export_logs(
 async def check_log_alerts(
     dashboard: LogDashboard = Depends(get_log_dashboard),
     _: bool = Depends(get_admin_auth_dependency),
-):
+) -> AlertCheckResponse:
     """
     检查日志警报
 
@@ -309,7 +309,7 @@ async def generate_log_report(
     end_time: datetime = Query(..., description="报告结束时间"),
     dashboard: LogDashboard = Depends(get_log_dashboard),
     _: bool = Depends(get_admin_auth_dependency),
-):
+) -> dict[str, Any]:
     """
     生成日志报告
 
@@ -342,7 +342,7 @@ async def generate_log_report(
 async def cleanup_old_logs(
     days: int = Query(30, ge=7, le=365, description="保留天数"),
     _: bool = Depends(get_admin_auth_dependency),
-):
+) -> dict[str, Any]:
     """
     清理旧日志文件
 
@@ -381,7 +381,7 @@ async def cleanup_old_logs(
 async def get_logging_health(
     analyzer: LogAnalyzer = Depends(get_log_analyzer),
     _: bool = Depends(get_admin_auth_dependency),
-):
+) -> dict[str, Any]:
     """
     获取日志系统健康状态
 

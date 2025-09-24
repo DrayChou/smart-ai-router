@@ -65,14 +65,14 @@ logger = logging.getLogger(__name__)
 async def _startup_refresh_minimal(config_loader):
     """精简版启动刷新"""
     try:
-        # 🚀 FIXED: 不清除已加载的模型缓存，避免导致路由失败
+        # [BOOST] FIXED: 不清除已加载的模型缓存，避免导致路由失败
         # 只清除路由器的内部缓存（标签缓存等），保留模型数据
         if len(config_loader.model_cache) > 0:
             logger.info(
                 f"[MINIMAL] Model cache already loaded with {len(config_loader.model_cache)} entries, skipping clear"
             )
 
-            # 🚀 性能优化：预构建内存索引（避免请求时重建）
+            # [BOOST] 性能优化：预构建内存索引（避免请求时重建）
             from core.scheduler.tasks.model_discovery import get_merged_config
             from core.utils.memory_index import (
                 get_memory_index,
@@ -93,7 +93,7 @@ async def _startup_refresh_minimal(config_loader):
                 )
 
                 logger.info(
-                    f"🚀 PREBUILT MEMORY INDEX: {stats.total_models} models, {stats.total_tags} tags ready for routing"
+                    f"[BOOST] PREBUILT MEMORY INDEX: {stats.total_models} models, {stats.total_tags} tags ready for routing"
                 )
             except Exception as e:
                 logger.warning(f"[MINIMAL] Memory index prebuild failed: {e}")
@@ -288,14 +288,14 @@ async def create_minimal_app_async() -> FastAPI:
     """
     创建精简版FastAPI应用 - 异步版本
 
-    🚀 Phase 1 优化：使用异步配置加载器
+    [BOOST] Phase 1 优化：使用异步配置加载器
     预期效果：启动时间减少 70-80%
     """
     import time
 
     start_time = time.time()
 
-    # 🚀 使用异步配置加载器
+    # [BOOST] 使用异步配置加载器
     logger.info("开始异步应用初始化...")
     config_loader: YAMLConfigLoader = await YAMLConfigLoader.create_async()
 
@@ -317,7 +317,7 @@ async def create_minimal_app_async() -> FastAPI:
     }
     setup_logging(log_config, "logs/smart-ai-router-minimal.log")
 
-    # 🚀 启用智能日志系统 (AIRouter功能集成)
+    # [BOOST] 启用智能日志系统 (AIRouter功能集成)
     try:
         # 检查配置中是否启用智能日志（默认启用）
         enable_smart_logs = server_config.get("enable_smart_logging", True)

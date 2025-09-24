@@ -5,7 +5,7 @@
 
 import json
 import logging
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -40,11 +40,13 @@ class ModelMetadata:
 
     # 多模态能力 (OpenRouter标准)
     modality: Optional[str] = None  # "text+image->text"
-    input_modalities: list[str] = None  # ["text", "image"]
-    output_modalities: list[str] = None  # ["text"]
+    input_modalities: list[str] = field(default_factory=list)  # ["text", "image"]
+    output_modalities: list[str] = field(default_factory=list)  # ["text"]
 
     # API能力支持
-    supported_parameters: list[str] = None  # ["tools", "function_calling"]
+    supported_parameters: list[str] = field(
+        default_factory=list
+    )  # ["tools", "function_calling"]
     supports_streaming: bool = True
     supports_function_calling: bool = False
     supports_vision: bool = False
@@ -65,23 +67,15 @@ class ModelMetadata:
     # 元数据
     created_timestamp: Optional[int] = None
     is_deprecated: bool = False
-    tags: set[str] = None  # 自动从model_id提取的标签
+    tags: set[str] = field(default_factory=set)  # 自动从model_id提取的标签
 
     # 数据来源追踪
     data_source: DataSource = DataSource.OPENROUTER
     confidence: float = 0.8
     last_updated: Optional[datetime] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """后处理初始化"""
-        if self.input_modalities is None:
-            self.input_modalities = []
-        if self.output_modalities is None:
-            self.output_modalities = []
-        if self.supported_parameters is None:
-            self.supported_parameters = []
-        if self.tags is None:
-            self.tags = set()
         if self.last_updated is None:
             self.last_updated = datetime.now()
 
@@ -91,7 +85,7 @@ class ModelMetadata:
         # 自动生成标签
         self._generate_tags()
 
-    def _infer_capabilities_from_modality(self):
+    def _infer_capabilities_from_modality(self) -> None:
         """从modality字段推断基本能力"""
         if self.modality:
             # 解析输入输出模态
@@ -113,7 +107,7 @@ class ModelMetadata:
             ):
                 self.supports_function_calling = True
 
-    def _generate_tags(self):
+    def _generate_tags(self) -> None:
         """从模型ID自动生成标签"""
         if not self.model_id:
             return
@@ -174,7 +168,7 @@ class UnifiedModelRegistry:
         # 加载数据
         self._load_all_data()
 
-    def _load_all_data(self):
+    def _load_all_data(self) -> None:
         """加载所有配置数据"""
         logger.info("正在加载统一模型注册表数据...")
 
@@ -410,7 +404,7 @@ class UnifiedModelRegistry:
             logger.error(f"加载渠道覆盖配置失败: {e}")
             return 0
 
-    def _build_tags_index(self):
+    def _build_tags_index(self) -> None:
         """构建标签索引"""
         self._tags_index.clear()
 
@@ -443,7 +437,7 @@ class UnifiedModelRegistry:
 
         return metadata
 
-    def _apply_provider_overrides(self, metadata: ModelMetadata, provider: str):
+    def _apply_provider_overrides(self, metadata: ModelMetadata, provider: str) -> None:
         """应用提供商覆盖"""
         provider_config = self._provider_overrides.get(provider, {})
         if not provider_config:
@@ -478,7 +472,9 @@ class UnifiedModelRegistry:
         if "supports_vision_override" in provider_config:
             metadata.supports_vision = provider_config["supports_vision_override"]
 
-    def _apply_channel_overrides(self, metadata: ModelMetadata, channel_id: str):
+    def _apply_channel_overrides(
+        self, metadata: ModelMetadata, channel_id: str
+    ) -> None:
         """应用渠道特定覆盖"""
         channel_config = self._channel_overrides.get(channel_id, {})
         if not channel_config:
@@ -527,7 +523,7 @@ class UnifiedModelRegistry:
         """获取支持视觉的模型"""
         return [m for m in self._models.values() if m.supports_vision]
 
-    def reload_data(self):
+    def reload_data(self) -> None:
         """重新加载所有数据"""
         logger.info("重新加载统一模型注册表...")
         self._models.clear()
@@ -568,7 +564,7 @@ def get_unified_model_registry() -> UnifiedModelRegistry:
     return _unified_registry
 
 
-def reload_unified_registry():
+def reload_unified_registry() -> None:
     """重新加载统一注册表（用于配置更新后）"""
     global _unified_registry
     if _unified_registry:

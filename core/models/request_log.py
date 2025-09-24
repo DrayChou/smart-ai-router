@@ -3,6 +3,8 @@ Request log data model
 请求日志数据模型
 """
 
+from decimal import Decimal
+
 from sqlalchemy import (
     DECIMAL,
     JSON,
@@ -14,7 +16,7 @@ from sqlalchemy import (
     String,
     Text,
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, relationship
 from sqlalchemy.sql import func
 
 from .base import Base
@@ -40,12 +42,20 @@ class RequestLog(Base):
     response_size = Column(Integer)  # 响应体大小
 
     # 成本和性能
-    estimated_cost = Column(DECIMAL(10, 4))  # 预估成本
-    actual_cost = Column(DECIMAL(10, 4))  # 实际成本
-    effective_cost = Column(DECIMAL(10, 4))  # 考虑倍率后的有效成本
+    estimated_cost: Mapped[Decimal] = Column(
+        DECIMAL(10, 4), default=Decimal("0")
+    )  # 预估成本
+    actual_cost: Mapped[Decimal] = Column(
+        DECIMAL(10, 4), default=Decimal("0")
+    )  # 实际成本
+    effective_cost: Mapped[Decimal] = Column(
+        DECIMAL(10, 4), default=Decimal("0")
+    )  # 考虑倍率后的有效成本
     latency_ms = Column(Integer)  # 响应延迟(毫秒)
     ttft_ms = Column(Integer)  # Time to First Token (毫秒)
-    throughput_tps = Column(DECIMAL(6, 2))  # 吞吐量 tokens/second
+    throughput_tps: Mapped[Decimal] = Column(
+        DECIMAL(6, 2), default=Decimal("0")
+    )  # 吞吐量 tokens/second
 
     # 路由决策信息
     routing_strategy_used = Column(JSON)  # 使用的路由策略
@@ -70,5 +80,5 @@ class RequestLog(Base):
     api_key = relationship("APIKey", back_populates="request_logs")
     client_api_key = relationship("RouterAPIKey", back_populates="request_logs")
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<RequestLog(id='{self.request_id}', status='{self.status}')>"

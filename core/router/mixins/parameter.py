@@ -13,6 +13,10 @@ logger = logging.getLogger(__name__)
 class ParameterComparisonMixin:
     """Provides helpers for parameter-size driven routing queries."""
 
+    def __init__(self):
+        self.parameter_comparator = None
+        self.config_loader = None
+
     def _get_parameter_comparison_candidates(
         self, request: RoutingRequest
     ) -> list[ChannelCandidate] | None:

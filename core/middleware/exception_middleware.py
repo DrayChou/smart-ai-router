@@ -28,6 +28,31 @@ logger = logging.getLogger(__name__)
 class ExceptionHandlerMiddleware(BaseHTTPMiddleware):
     """统一异常处理中间件"""
 
+    def _generate_request_id(self) -> str:
+        """生成请求ID"""
+        import uuid
+
+        return str(uuid.uuid4())[:8]
+
+    def _get_status_code_for_exception(self, exc: SmartRouterException) -> int:
+        """获取异常的状态码"""
+        return getattr(exc, "status_code", 500)
+
+    def _create_error_response(
+        self, exc: SmartRouterException, request: Request, duration_ms: float
+    ) -> dict:
+        """创建错误响应"""
+        return {
+            "error": {
+                "type": "smart_router_error",
+                "message": str(exc),
+                "category": "system",
+                "severity": "medium",
+                "request_id": getattr(request.state, "request_id", None),
+                "duration_ms": duration_ms,
+            }
+        }
+
     async def dispatch(self, request: Request, call_next):
         start_time = time.time()
 

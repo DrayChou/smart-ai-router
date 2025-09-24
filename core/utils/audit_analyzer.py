@@ -7,7 +7,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from core.utils.log_analyzer import LogAnalyzer, LogQuery
 
@@ -63,7 +63,7 @@ class AuditAnalyzer:
 
     def __init__(self, log_analyzer: LogAnalyzer):
         self.log_analyzer = log_analyzer
-        self.cache = {}
+        self.cache: dict[str, Any] = {}
         self.cache_timeout = 300  # 5分钟缓存
 
     async def get_audit_events(
@@ -122,17 +122,17 @@ class AuditAnalyzer:
         if cache_key in self.cache:
             cached_time, cached_data = self.cache[cache_key]
             if (datetime.now() - cached_time).seconds < self.cache_timeout:
-                return cached_data
+                return cast(AuditSummary, cached_data)
 
         # 获取审计事件
         events = await self.get_audit_events(start_time, end_time, limit=10000)
 
         # 统计分析
-        event_type_counts = Counter()
-        level_counts = Counter()
-        outcome_counts = Counter()
-        user_activity = defaultdict(int)
-        ip_activity = defaultdict(int)
+        event_type_counts: Counter[str] = Counter()
+        level_counts: Counter[str] = Counter()
+        outcome_counts: Counter[str] = Counter()
+        user_activity: defaultdict[str, int] = defaultdict(int)
+        ip_activity: defaultdict[str, int] = defaultdict(int)
         security_events = 0
         failed_operations = 0
 
@@ -211,8 +211,12 @@ class AuditAnalyzer:
         rate_limit_violations = 0
         suspicious_activities = 0
         security_violations = []
-        ip_threats = defaultdict(lambda: {"count": 0, "severity": "low", "events": []})
-        user_risks = defaultdict(lambda: {"count": 0, "risk_score": 0, "events": []})
+        ip_threats: dict[str, dict[str, Any]] = defaultdict(
+            lambda: {"count": 0, "severity": "low", "events": []}
+        )
+        user_risks: dict[str, dict[str, Any]] = defaultdict(
+            lambda: {"count": 0, "risk_score": 0, "events": []}
+        )
 
         for event in events:
             event_type = event.get("event_type", "")
@@ -320,11 +324,11 @@ class AuditAnalyzer:
             )
 
         # 分析用户活动
-        action_counts = Counter()
-        resource_counts = Counter()
+        action_counts: Counter[str] = Counter()
+        resource_counts: Counter[str] = Counter()
         success_count = 0
         security_events = 0
-        activity_hours = defaultdict(int)
+        activity_hours: defaultdict[int, int] = defaultdict(int)
         timestamps = []
 
         for event in events:

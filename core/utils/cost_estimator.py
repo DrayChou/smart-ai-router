@@ -7,7 +7,7 @@ import logging
 import re
 import time
 from dataclasses import dataclass
-from typing import Any, NamedTuple, Optional
+from typing import Any, NamedTuple, Optional, cast
 
 from ..yaml_config import get_yaml_config_loader
 from .token_counter import TokenCounter
@@ -76,13 +76,13 @@ class ModelCostProfile(NamedTuple):
 class CostEstimator:
     """请求前成本估算器"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.config_loader = get_yaml_config_loader()
-        self._model_profiles_cache = {}
+        self._model_profiles_cache: dict[str, dict[str, Any]] = {}
         self._last_cache_update = 0
         self._cache_ttl = 300  # 5分钟缓存
-        # 🚀 添加成本估算缓存
-        self._cost_preview_cache = {}
+        # [BOOST] 添加成本估算缓存
+        self._cost_preview_cache: dict[str, dict[str, Any]] = {}
         self._preview_cache_ttl = 60  # 1分钟缓存
 
     def _get_model_pricing(
@@ -95,7 +95,7 @@ class CostEstimator:
             if not channel:
                 return None
 
-            # 🚀 优先获取 OpenRouter 基准定价
+            # [BOOST] 优先获取 OpenRouter 基准定价
             openrouter_pricing = self._get_openrouter_base_pricing(model_name)
             logger.info(f"💰 PRICING DEBUG: {channel_id} | {model_name}")
             logger.info(f"  OpenRouter baseline: {openrouter_pricing}")
@@ -127,10 +127,10 @@ class CostEstimator:
                 # 🔧 修复：严格按照定价优先级，不允许硬编码回退
                 if channel_specific_pricing:
                     base_pricing = channel_specific_pricing
-                    logger.info("  ✅ Using channel-specific pricing")
+                    logger.info("  [PASS] Using channel-specific pricing")
                 elif openrouter_pricing:
                     base_pricing = openrouter_pricing
-                    logger.info("  ✅ Using OpenRouter baseline pricing")
+                    logger.info("  [PASS] Using OpenRouter baseline pricing")
                 else:
                     # 最后尝试回退策略（只检查免费模型）
                     fallback_pricing = self._get_pricing_from_fallback(
@@ -139,18 +139,20 @@ class CostEstimator:
                     if fallback_pricing:
                         base_pricing = fallback_pricing
                         logger.info(
-                            "  ✅ Using fallback pricing (free model detection)"
+                            "  [PASS] Using fallback pricing (free model detection)"
                         )
                     else:
                         base_pricing = None
-                        logger.warning("  ❌ No valid pricing source found")
+                        logger.warning("  [FAIL] No valid pricing source found")
             logger.info(f"  Base pricing: {base_pricing}")
 
             if not base_pricing:
-                logger.info(f"  ❌ No pricing found for {model_name} in {channel_id}")
+                logger.info(
+                    f"  [FAIL] No pricing found for {model_name} in {channel_id}"
+                )
                 return None
 
-            # 🚀 应用渠道的货币汇率折扣
+            # [BOOST] 应用渠道的货币汇率折扣
             final_pricing = self._apply_currency_exchange_discount(
                 channel, base_pricing
             )
@@ -168,19 +170,20 @@ class CostEstimator:
             return None
 
     def _get_pricing_from_siliconflow(
-        self, channel, model_name: str
+        self, channel: Any, model_name: str
     ) -> Optional[dict[str, float]]:
         """从SiliconFlow获取定价"""
         try:
             if "siliconflow" not in channel.provider.lower():
                 return None
 
-            # 🚀 改为使用新的静态定价加载器
+            # [BOOST] 改为使用新的静态定价加载器
             from .static_pricing import get_static_pricing_loader
 
             loader = get_static_pricing_loader()
 
-            result = loader.get_siliconflow_pricing(model_name)
+            # Try to get siliconflow pricing through the main pricing method
+            result = loader.get_model_pricing(channel.id, model_name)
             if result:
                 return {
                     "input": result.input_price
@@ -205,13 +208,13 @@ class CostEstimator:
             ):
                 return None
 
-            # 🚀 改为使用新的静态定价加载器（统一接口）
+            # [BOOST] 改为使用新的静态定价加载器（统一接口）
             from .static_pricing import get_static_pricing_loader
 
             loader = get_static_pricing_loader()
 
             # 使用固定的输入输出token数量进行估算（实际使用时会根据真实值重新计算）
-            result = loader.get_doubao_pricing(
+            result = loader._query_doubao_pricing(
                 model_name, 10000, 2000
             )  # 默认10k输入，2k输出
             if result:
@@ -303,7 +306,7 @@ class CostEstimator:
             or openrouter_pricing.get("output", 0) > 0
         ):
             logger.info(
-                f"✅ FALLBACK: Using OpenRouter baseline for {model_name}: {openrouter_pricing}"
+                f"[PASS] FALLBACK: Using OpenRouter baseline for {model_name}: {openrouter_pricing}"
             )
             return openrouter_pricing
 
@@ -311,12 +314,12 @@ class CostEstimator:
         model_lower = model_name.lower()
         free_keywords = ["free", "免费", ":free"]
         if any(keyword in model_lower for keyword in free_keywords):
-            logger.info(f"✅ FALLBACK: Detected free model {model_name}")
+            logger.info(f"[PASS] FALLBACK: Detected free model {model_name}")
             return {"input": 0.0, "output": 0.0}
 
         # 3. 如果OpenRouter也没有数据，返回None表示无法定价
         logger.warning(
-            f"❌ FALLBACK: No pricing available for {model_name} - neither channel-specific nor OpenRouter baseline"
+            f"[FAIL] FALLBACK: No pricing available for {model_name} - neither channel-specific nor OpenRouter baseline"
         )
         return None
 
@@ -325,7 +328,7 @@ class CostEstimator:
     ) -> Optional[dict[str, float]]:
         """获取OpenRouter基准定价（作为其他渠道的参考价格）"""
         try:
-            # 🚀 直接使用全局model_pricing.json中已经转换的价格数据
+            # [BOOST] 直接使用全局model_pricing.json中已经转换的价格数据
             import json
             from pathlib import Path
 
@@ -509,7 +512,7 @@ class CostEstimator:
         if not pricing:
             # 🔧 修复：如果无法获取定价，返回无效估算而不是硬编码价格
             logger.warning(
-                f"❌ COST ESTIMATION: No pricing available for {model_name} in {channel_id}"
+                f"[FAIL] COST ESTIMATION: No pricing available for {model_name} in {channel_id}"
             )
             pricing = {"input": 0.0, "output": 0.0}  # 无法定价，标记为0
             confidence_level = "none"
@@ -684,7 +687,7 @@ class CostEstimator:
 
         start_time = time.time()
 
-        # 🚀 检查缓存
+        # [BOOST] 检查缓存
         cache_key = self._get_preview_cache_key(
             messages, candidate_channels, max_tokens
         )
@@ -697,11 +700,11 @@ class CostEstimator:
                 logger.info(
                     f"💰 COST CACHE: Cache hit for preview ({len(candidate_channels)} channels) in {cache_hit_time}ms"
                 )
-                # 🚀 修复：正确显示缓存命中时间，但保留原始计算时间用于统计
+                # [BOOST] 修复：正确显示缓存命中时间，但保留原始计算时间用于统计
                 cached_result_copy = cached_result.copy()
                 cached_result_copy["calculation_time_ms"] = cache_hit_time
                 cached_result_copy["cache_hit"] = True
-                return cached_result_copy
+                return cast(dict[str, Any], cached_result_copy)
 
         # 1. 估算所有候选渠道的成本
         estimates = self.compare_channel_costs(messages, candidate_channels, max_tokens)
@@ -740,7 +743,7 @@ class CostEstimator:
             "recommendation": recommendation,
         }
 
-        # 🚀 缓存结果
+        # [BOOST] 缓存结果
         self._cost_preview_cache[cache_key] = (current_time, preview)
 
         # 清理过期缓存（简单策略：每10次调用清理一次）

@@ -7,8 +7,9 @@ import json
 import logging
 import time
 import uuid
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, cast
 
 import httpx
 from fastapi import HTTPException
@@ -43,7 +44,7 @@ logger = logging.getLogger(__name__)
 
 
 # Status logging is now handled at the API level
-def status_log_request(*args, **kwargs):
+def status_log_request(*args: Any, **kwargs: Any) -> None:
     """Placeholder - status logging handled at API level"""
     pass
 
@@ -71,6 +72,7 @@ class ChatCompletionRequest(BaseModel):
     tool_choice: Optional[Union[str, dict[str, Any]]] = None
     system: Optional[str] = None
     extra_params: Optional[dict[str, Any]] = None
+    _metadata: Optional[dict[str, Any]] = None
 
 
 @dataclass
@@ -112,7 +114,7 @@ class ChatCompletionHandler:
         start_time = time.time()
         request_id = f"req_{uuid.uuid4().hex[:8]}"
 
-        # 🚀 使用智能日志记录API请求 (AIRouter功能集成)
+        # [BOOST] 使用智能日志记录API请求 (AIRouter功能集成)
         enhanced_logger = get_enhanced_logger(__name__)
         log_api_request(
             enhanced_logger,
@@ -159,7 +161,9 @@ class ChatCompletionHandler:
                 e, request.model, time.time() - start_time
             )
 
-    async def handle_stream_request(self, request: ChatCompletionRequest):
+    async def handle_stream_request(
+        self, request: ChatCompletionRequest
+    ) -> StreamingResponse:
         """处理流式请求"""
         request_id = str(uuid.uuid4())
         start_time = time.time()
@@ -203,7 +207,7 @@ class ChatCompletionHandler:
         routing_result: RoutingResult,
         start_time: float,
         request_id: str,
-    ):
+    ) -> AsyncGenerator[str, None]:
         """执行流式请求并处理重试逻辑"""
         last_error = None
         failed_channels = set()
@@ -299,7 +303,9 @@ class ChatCompletionHandler:
         }
         return f"data: {json.dumps(error_data)}\n\n"
 
-    async def _error_stream_generator(self, error_type: str, message: str):
+    async def _error_stream_generator(
+        self, error_type: str, message: str
+    ) -> AsyncGenerator[str, None]:
         """错误流生成器"""
         yield self._create_stream_error(error_type, message)
 
@@ -412,7 +418,7 @@ class ChatCompletionHandler:
             if recommendations:
                 best_rec = recommendations[0]
                 logger.info(
-                    f"🎯 BEST RECOMMENDATION: [{request_id}] {best_rec.model_name} "
+                    f"[TARGET] BEST RECOMMENDATION: [{request_id}] {best_rec.model_name} "
                     f"(${best_rec.estimated_cost:.6f}, {best_rec.estimated_time:.1f}s) - {best_rec.reason}"
                 )
 
@@ -484,14 +490,16 @@ class ChatCompletionHandler:
             pricing_loader = get_static_pricing_loader()
 
             if provider == "siliconflow":
-                pricing_result = pricing_loader.get_siliconflow_pricing(model_name)
+                pricing_result = pricing_loader.get_model_pricing(provider, model_name)
                 if pricing_result:
                     return {
                         "input_price": pricing_result.input_price,
                         "output_price": pricing_result.output_price,
                     }
             elif provider == "doubao":
-                pricing_result = pricing_loader.get_doubao_pricing(model_name)
+                pricing_result = pricing_loader._query_doubao_pricing(
+                    model_name, 1000, 100
+                )
                 if pricing_result:
                     return {
                         "input_price": pricing_result.input_price,
@@ -581,7 +589,7 @@ class ChatCompletionHandler:
     ) -> Union[JSONResponse, StreamingResponse]:
         """执行请求并处理重试逻辑"""
         last_error = None
-        failed_channels = set()  # 智能渠道黑名单
+        failed_channels: set[int] = set()  # 智能渠道黑名单
 
         for attempt_num, routing_score in enumerate(routing_result.candidates, 1):
             channel = routing_score.channel
@@ -669,17 +677,23 @@ class ChatCompletionHandler:
                 request._metadata = metadata
 
                 if request.stream:
-                    return self._handle_streaming_request(
-                        request, channel_info, routing_score, attempt_num, metadata
+                    return cast(
+                        Union[JSONResponse, StreamingResponse],
+                        self._handle_streaming_request(
+                            request, channel_info, routing_score, attempt_num, metadata
+                        ),
                     )
                 else:
-                    return await self._handle_regular_request(
-                        request,
-                        channel_info,
-                        routing_score,
-                        attempt_num,
-                        start_time,
-                        metadata,
+                    return cast(
+                        Union[JSONResponse, StreamingResponse],
+                        await self._handle_regular_request(
+                            request,
+                            channel_info,
+                            routing_score,
+                            attempt_num,
+                            start_time,
+                            metadata,
+                        ),
                     )
 
             except httpx.HTTPStatusError as e:
@@ -715,7 +729,7 @@ class ChatCompletionHandler:
         routing_score: RoutingScore,
         attempt_num: int,
         metadata: RequestMetadata,
-    ):
+    ) -> StreamingResponse:
         """处理流式请求"""
         logger.info(
             f"STREAMING: [{metadata.request_id}] Starting streaming response for channel '{channel_info.channel.name}'"
@@ -755,7 +769,7 @@ class ChatCompletionHandler:
         latency = time.time() - start_time
         self.router.update_channel_health(channel_info.channel.id, True, latency)
 
-        # 🚀 使用智能日志记录成功响应 (AIRouter功能集成)
+        # [BOOST] 使用智能日志记录成功响应 (AIRouter功能集成)
         log_channel_operation(
             get_enhanced_logger(__name__),
             operation="request",
@@ -837,7 +851,7 @@ class ChatCompletionHandler:
             "success",
         )
 
-        # 🚀 思维链清理处理 (AIRouter功能集成)
+        # [BOOST] 思维链清理处理 (AIRouter功能集成)
         cleaned_response_json = self._clean_response_content(response_json)
 
         # 使用新的响应汇总格式
@@ -872,14 +886,14 @@ class ChatCompletionHandler:
 
     def _prepare_channel_request_info(
         self,
-        channel,
-        provider,
+        channel: Any,
+        provider: Any,
         request: Optional[ChatCompletionRequest],
         matched_model: Optional[str],
     ) -> ChannelRequestInfo:
         """准备渠道请求信息 - 使用适配器系统"""
         try:
-            # 🚀 使用适配器管理器准备请求
+            # [BOOST] 使用适配器管理器准备请求
             adapter_manager = get_adapter_manager()
 
             if request:
@@ -922,7 +936,7 @@ class ChatCompletionHandler:
                     matched_model=matched_model,
                 )
 
-                # 🎯 为OpenRouter启用成本优化
+                # [TARGET] 为OpenRouter启用成本优化
                 if adapter_result.get("adapter"):
                     routing_strategy = getattr(request, "routing_strategy", "balanced")
                     adapter_result["request_data"] = (
@@ -968,7 +982,7 @@ class ChatCompletionHandler:
                 )
 
         except Exception as e:
-            logger.warning(f"⚠️ 适配器准备失败，使用回退方式: {e}")
+            logger.warning(f"[WARNING] 适配器准备失败，使用回退方式: {e}")
             # 回退到原始逻辑
             base_url = (channel.base_url or provider.base_url).rstrip("/")
             if not base_url.endswith("/v1"):
@@ -1035,20 +1049,22 @@ class ChatCompletionHandler:
 
     def _invalidate_channel_cache(
         self, channel_id: str, channel_name: str, reason: str
-    ):
+    ) -> None:
         """统一的缓存失效方法"""
         try:
             cache = get_request_cache()
             cache.invalidate_channel(channel_id)
             logger.info(
-                f"🗑️  CACHE INVALIDATED: Cleared cached selections for channel '{channel_name}' due to {reason}"
+                f"[DELETE]  CACHE INVALIDATED: Cleared cached selections for channel '{channel_name}' due to {reason}"
             )
         except Exception as e:
             logger.warning(
                 f"CACHE INVALIDATION FAILED for channel '{channel_name}': {e}"
             )
 
-    def _invalidate_model_cache(self, channel_id: str, model_name: str, reason: str):
+    def _invalidate_model_cache(
+        self, channel_id: str, model_name: str, reason: str
+    ) -> None:
         """使指定模型在指定渠道的缓存失效"""
         try:
             cache = get_request_cache()
@@ -1058,11 +1074,11 @@ class ChatCompletionHandler:
             )
             if invalidated_count > 0:
                 logger.info(
-                    f"🗑️  MODEL CACHE INVALIDATED: Cleared {invalidated_count} cache entries for {model_name}@{channel_id} due to {reason}"
+                    f"[DELETE]  MODEL CACHE INVALIDATED: Cleared {invalidated_count} cache entries for {model_name}@{channel_id} due to {reason}"
                 )
             else:
                 logger.debug(
-                    f"🗑️  MODEL CACHE: No cache entries found for {model_name}@{channel_id}"
+                    f"[DELETE]  MODEL CACHE: No cache entries found for {model_name}@{channel_id}"
                 )
         except Exception as e:
             logger.warning(
@@ -1216,15 +1232,15 @@ class ChatCompletionHandler:
         self,
         request_id: str,
         request: ChatCompletionRequest,
-        channel,
+        channel: Any,
         model_used: str,
         input_tokens: int,
         output_tokens: int,
         cost_info: dict,
         response_time_ms: float,
         status: str = "success",
-        error_message: str = None,
-    ):
+        error_message: Optional[str] = None,
+    ) -> None:
         """异步记录使用情况到JSONL文件"""
         try:
             tracker = get_usage_tracker()
@@ -1278,7 +1294,7 @@ class ChatCompletionHandler:
     def _handle_request_error(
         self,
         error: httpx.RequestError,
-        channel,
+        channel: Any,
         attempt_num: int,
         total_candidates: list,
     ) -> None:
@@ -1575,7 +1591,7 @@ class ChatCompletionHandler:
                     if isinstance(message, dict) and "content" in message:
                         original_content = message.get("content", "")
                         if isinstance(original_content, str) and original_content:
-                            # 🚀 应用思维链清理 (AIRouter集成功能)
+                            # [BOOST] 应用思维链清理 (AIRouter集成功能)
                             # 检查是否启用思维链清理 (默认启用以支持推理模型)
                             from core.utils.null_safety import safe
 
@@ -1599,7 +1615,7 @@ class ChatCompletionHandler:
                             if len(cleaned_content) < len(original_content):
                                 reduction = len(original_content) - len(cleaned_content)
                                 logger.info(
-                                    f"🧹 THINKING CHAINS CLEANED: Reduced content by {reduction} characters"
+                                    f"[CLEANUP] THINKING CHAINS CLEANED: Reduced content by {reduction} characters"
                                 )
 
                 # 处理delta内容 (流式响应)
@@ -1727,7 +1743,7 @@ class ChatCompletionHandler:
         input_cost_per_token = 0.0
         output_cost_per_token = 0.0
 
-        # 🔥 优先使用模型级别的定价信息（从缓存中获取）
+        # [HOT] 优先使用模型级别的定价信息（从缓存中获取）
         if model_name:
             try:
                 # 导入配置加载器来访问模型缓存
@@ -1782,7 +1798,7 @@ class ChatCompletionHandler:
                     f"COST: Error accessing model pricing for '{model_name}': {e}"
                 )
 
-        # 🔥 如果没有找到模型级别定价，使用渠道级别配置
+        # [HOT] 如果没有找到模型级别定价，使用渠道级别配置
         if input_cost_per_token == 0.0 and output_cost_per_token == 0.0:
             # 检查是否是明确的免费模型（:free 后缀）
             if model_name and (
@@ -2118,7 +2134,7 @@ class ChatCompletionHandler:
             yield aggregator.create_sse_summary_event(final_metadata)
             yield "data: [DONE]\\n\\n"
 
-    def _extract_user_identifier(self, request) -> str:
+    def _extract_user_identifier(self, request: Any) -> str:
         """从请求中提取用户标识符"""
         # 这里可以从请求头或其他地方提取API key和User-Agent
         # 暂时使用简化版本，实际应该从FastAPI的Request对象中获取

@@ -3,6 +3,8 @@ Model Group Channel mapping data model
 模型组渠道映射数据模型
 """
 
+from decimal import Decimal
+
 from sqlalchemy import (
     DECIMAL,
     JSON,
@@ -12,7 +14,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, relationship
 from sqlalchemy.sql import func
 
 from .base import Base
@@ -28,13 +30,21 @@ class ModelGroupChannel(Base):
     )
     channel_id = Column(Integer, ForeignKey("channels.id"), primary_key=True)
     priority = Column(Integer, default=1)  # 在该模型组中的优先级
-    weight = Column(DECIMAL(3, 2), default=1.0)  # 负载均衡权重
+    weight: Mapped[Decimal] = Column(
+        DECIMAL(3, 2), default=Decimal("1.0")
+    )  # 负载均衡权重
     daily_limit = Column(Integer, default=1000)  # 在此模型组中的每日限额
 
     # 性能评分和能力配置
-    speed_score = Column(DECIMAL(3, 2), default=1.0)  # 速度评分 (0.0-1.0)
-    quality_score = Column(DECIMAL(3, 2), default=1.0)  # 质量评分 (0.0-1.0)
-    reliability_score = Column(DECIMAL(3, 2), default=1.0)  # 可靠性评分 (0.0-1.0)
+    speed_score: Mapped[Decimal] = Column(
+        DECIMAL(3, 2), default=Decimal("1.0")
+    )  # 速度评分 (0.0-1.0)
+    quality_score: Mapped[Decimal] = Column(
+        DECIMAL(3, 2), default=Decimal("1.0")
+    )  # 质量评分 (0.0-1.0)
+    reliability_score: Mapped[Decimal] = Column(
+        DECIMAL(3, 2), default=Decimal("1.0")
+    )  # 可靠性评分 (0.0-1.0)
     capabilities = Column(JSON)  # 渠道特定能力覆盖
     overrides = Column(JSON)  # 模型组特定配置覆盖
 
@@ -49,5 +59,5 @@ class ModelGroupChannel(Base):
     )
     channel = relationship("Channel", back_populates="model_group_channels")
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<ModelGroupChannel(group_id={self.model_group_id}, channel_id={self.channel_id})>"

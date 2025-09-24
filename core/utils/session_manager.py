@@ -24,7 +24,7 @@ class UserSession:
     models_used: dict[str, int] = field(default_factory=dict)
     channels_used: dict[str, int] = field(default_factory=dict)
 
-    def add_request(self, cost: float, model: str, channel: str):
+    def add_request(self, cost: float, model: str, channel: str) -> None:
         """添加请求记录"""
         self.total_requests += 1
         self.total_cost += cost
@@ -103,7 +103,7 @@ class SessionManager:
                 # 会话已过期，删除并创建新的
                 del self.sessions[user_identifier]
                 logger.info(
-                    f"🧹 SESSION EXPIRED: {user_identifier} (requests: {session.total_requests}, cost: {session.get_formatted_cost()})"
+                    f"[CLEANUP] SESSION EXPIRED: {user_identifier} (requests: {session.total_requests}, cost: {session.get_formatted_cost()})"
                 )
 
         # 创建新会话
@@ -128,7 +128,7 @@ class SessionManager:
         session.add_request(cost, model, channel)
 
         logger.debug(
-            f"📊 SESSION UPDATE: {user_identifier} - requests: {session.total_requests}, cost: {session.get_formatted_cost()}"
+            f"[STATS] SESSION UPDATE: {user_identifier} - requests: {session.total_requests}, cost: {session.get_formatted_cost()}"
         )
 
         return session
@@ -158,7 +158,7 @@ class SessionManager:
             "average_cost": session.total_cost / max(session.total_requests, 1),
         }
 
-    def _maybe_cleanup(self):
+    def _maybe_cleanup(self) -> None:
         """按需清理过期会话"""
         now = time.time()
         if (now - self._last_cleanup) > self.cleanup_interval:
@@ -171,13 +171,13 @@ class SessionManager:
             for user_id in expired_sessions:
                 session = self.sessions[user_id]
                 logger.info(
-                    f"🧹 CLEANUP SESSION: {user_id} (requests: {session.total_requests}, cost: {session.get_formatted_cost()})"
+                    f"[CLEANUP] CLEANUP SESSION: {user_id} (requests: {session.total_requests}, cost: {session.get_formatted_cost()})"
                 )
                 del self.sessions[user_id]
 
             if expired_sessions:
                 logger.info(
-                    f"🧹 CLEANUP COMPLETE: Removed {len(expired_sessions)} expired sessions"
+                    f"[CLEANUP] CLEANUP COMPLETE: Removed {len(expired_sessions)} expired sessions"
                 )
 
             self._last_cleanup = now

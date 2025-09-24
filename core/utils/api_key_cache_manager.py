@@ -9,7 +9,7 @@ import json
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from .model_analyzer import get_model_analyzer
 
@@ -149,17 +149,17 @@ class ApiKeyCacheManager:
             self._update_mapping(channel_id, api_key_hash, cache_key)
 
             logger.info(
-                f"✅ Saved API key level cache for {channel_id} (key: {api_key_hash[:8]}...): {len(analyzed_models)} models"
+                f"[PASS] Saved API key level cache for {channel_id} (key: {api_key_hash[:8]}...): {len(analyzed_models)} models"
             )
             logger.info(
-                f"   📊 Models with parameter info: {cache_data['analysis_metadata']['models_with_params']}"
+                f"   [STATS] Models with parameter info: {cache_data['analysis_metadata']['models_with_params']}"
             )
             logger.info(
                 f"   💰 Models with pricing info: {cache_data['analysis_metadata']['models_with_pricing']}"
             )
 
         except Exception as e:
-            logger.error(f"❌ Failed to save API key cache for {channel_id}: {e}")
+            logger.error(f"[FAIL] Failed to save API key cache for {channel_id}: {e}")
 
     def _extract_pricing_info(
         self, model_detail: dict[str, Any]
@@ -243,10 +243,10 @@ class ApiKeyCacheManager:
             self._memory_cache[cache_key] = cache_data
             self._cache_ttl[cache_key] = datetime.now() + self._ttl_duration
 
-            return cache_data
+            return cast(Optional[dict[str, Any]], cache_data)
 
         except Exception as e:
-            logger.error(f"❌ Failed to load API key cache for {channel_id}: {e}")
+            logger.error(f"[FAIL] Failed to load API key cache for {channel_id}: {e}")
             return None
 
     def get_channel_api_keys(self, channel_id: str) -> list[str]:
@@ -279,7 +279,7 @@ class ApiKeyCacheManager:
             if cache_file.exists():
                 try:
                     with open(cache_file, encoding="utf-8") as f:
-                        return json.load(f)
+                        return cast(Optional[dict[str, Any]], json.load(f))
                 except Exception as e:
                     logger.warning(f"无法加载缓存 {cache_key}: {e}")
                     continue
@@ -299,10 +299,10 @@ class ApiKeyCacheManager:
         if cache_file.exists():
             try:
                 cache_file.unlink()
-                logger.info(f"✅ Cleared API key cache for {channel_id}")
+                logger.info(f"[PASS] Cleared API key cache for {channel_id}")
                 return True
             except Exception as e:
-                logger.error(f"❌ Failed to clear API key cache: {e}")
+                logger.error(f"[FAIL] Failed to clear API key cache: {e}")
                 return False
 
         return True

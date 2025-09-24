@@ -3,6 +3,8 @@ Statistics data model
 统计数据模型
 """
 
+from decimal import Decimal
+
 from sqlalchemy import (
     DECIMAL,
     JSON,
@@ -12,7 +14,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, relationship
 from sqlalchemy.sql import func
 
 from .base import Base
@@ -37,23 +39,39 @@ class ChannelStats(Base):
 
     # 性能统计
     total_tokens = Column(Integer, default=0)
-    total_cost = Column(DECIMAL(10, 4), default=0)
+    total_cost: Mapped[Decimal] = Column(DECIMAL(10, 4), default=Decimal("0"))
     avg_latency_ms = Column(Integer, default=0)
     min_latency_ms = Column(Integer, default=0)
     max_latency_ms = Column(Integer, default=0)
     avg_ttft_ms = Column(Integer, default=0)  # 平均首字延迟
-    avg_throughput_tps = Column(DECIMAL(6, 2), default=0)  # 平均吞吐量
+    avg_throughput_tps: Mapped[Decimal] = Column(
+        DECIMAL(6, 2), default=Decimal("0")
+    )  # 平均吞吐量
 
     # 质量统计
-    success_rate = Column(DECIMAL(5, 4), default=0.0)  # 成功率 (0.0-1.0)
-    error_rate = Column(DECIMAL(5, 4), default=0.0)  # 错误率
-    timeout_rate = Column(DECIMAL(5, 4), default=0.0)  # 超时率
+    success_rate: Mapped[Decimal] = Column(
+        DECIMAL(5, 4), default=Decimal("0.0")
+    )  # 成功率 (0.0-1.0)
+    error_rate: Mapped[Decimal] = Column(
+        DECIMAL(5, 4), default=Decimal("0.0")
+    )  # 错误率
+    timeout_rate: Mapped[Decimal] = Column(
+        DECIMAL(5, 4), default=Decimal("0.0")
+    )  # 超时率
 
     # 评分计算 (0.0-1.0)
-    speed_score = Column(DECIMAL(3, 2), default=1.0)  # 速度评分
-    reliability_score = Column(DECIMAL(3, 2), default=1.0)  # 可靠性评分
-    cost_efficiency = Column(DECIMAL(3, 2), default=1.0)  # 性价比评分
-    overall_health_score = Column(DECIMAL(3, 2), default=1.0)  # 综合健康评分
+    speed_score: Mapped[Decimal] = Column(
+        DECIMAL(3, 2), default=Decimal("1.0")
+    )  # 速度评分
+    reliability_score: Mapped[Decimal] = Column(
+        DECIMAL(3, 2), default=Decimal("1.0")
+    )  # 可靠性评分
+    cost_efficiency: Mapped[Decimal] = Column(
+        DECIMAL(3, 2), default=Decimal("1.0")
+    )  # 性价比评分
+    overall_health_score: Mapped[Decimal] = Column(
+        DECIMAL(3, 2), default=Decimal("1.0")
+    )  # 综合健康评分
 
     # 详细错误统计
     error_breakdown = Column(JSON)  # 错误类型分解统计
@@ -63,5 +81,5 @@ class ChannelStats(Base):
     # 关系
     channel = relationship("Channel", back_populates="channel_stats")
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<ChannelStats(channel_id={self.channel_id}, date={self.date})>"

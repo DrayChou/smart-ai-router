@@ -55,14 +55,14 @@ class ErrorHandler:
 
         if isinstance(exception, BaseRouterException):
             error_code = exception.error_code.value
-            self.error_stats["error_by_code"][error_code] = (
-                self.error_stats["error_by_code"].get(error_code, 0) + 1
-            )
+            error_by_code = self.error_stats["error_by_code"]
+            if isinstance(error_by_code, dict):
+                error_by_code[error_code] = error_by_code.get(error_code, 0) + 1
 
         exception_type = type(exception).__name__
-        self.error_stats["error_by_type"][exception_type] = (
-            self.error_stats["error_by_type"].get(exception_type, 0) + 1
-        )
+        error_by_type = self.error_stats["error_by_type"]
+        if isinstance(error_by_type, dict):
+            error_by_type[exception_type] = error_by_type.get(exception_type, 0) + 1
 
     def _log_error(
         self, exception: Exception, context: Optional[dict[str, Any]] = None
@@ -71,6 +71,11 @@ class ErrorHandler:
         if isinstance(exception, BaseRouterException):
             error_dict = exception.to_dict()
             if context:
+                # Ensure context is a dictionary and update it
+                if "context" not in error_dict or not isinstance(
+                    error_dict["context"], dict
+                ):
+                    error_dict["context"] = {}
                 error_dict["context"].update(context)
 
             logger.error(

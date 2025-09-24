@@ -65,7 +65,12 @@ def create_admin_router(config_loader: YAMLConfigLoader) -> APIRouter:
             new_router = get_router()
 
             if clear_cache:
-                new_config_loader.model_cache.clear()
+                # Clear model cache if available
+                if (
+                    hasattr(new_config_loader, "model_cache")
+                    and new_config_loader.model_cache
+                ):
+                    new_config_loader.model_cache.clear()
                 new_router.clear_cache()
 
             return {
@@ -125,7 +130,14 @@ def create_admin_router(config_loader: YAMLConfigLoader) -> APIRouter:
             free_channels = []
             paid_channels = []
 
-            for channel_name, channel in config_loader.config.channels.items():
+            # Get channels properly
+            channels = config_loader.get_enabled_channels()
+            for channel in channels:
+                channel_name = channel.name
+                if hasattr(channel, "tags") and "free" in channel.tags:
+                    free_channels.append(channel_name)
+                else:
+                    paid_channels.append(channel_name)
                 if hasattr(channel, "tags") and "free" in channel.tags:
                     free_channels.append(channel_name)
                 else:
@@ -133,7 +145,12 @@ def create_admin_router(config_loader: YAMLConfigLoader) -> APIRouter:
 
             # 获取成本追踪器数据
             cost_tracker = get_cost_tracker()
-            session_cost = cost_tracker.get_session_total() if cost_tracker else 0.0
+            session_summary = (
+                cost_tracker.get_session_summary()
+                if cost_tracker
+                else {"total_cost": 0.0}
+            )
+            session_cost = session_summary.get("total_cost", 0.0)
 
             optimization_tips = [
                 f"发现 {len(free_channels)} 个免费渠道，优先使用可节省成本",

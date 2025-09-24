@@ -109,7 +109,7 @@ class PersistentLogHandler:
 
     async def _flush_buffer(self) -> None:
         """异步刷新缓冲区到文件"""
-        entries_to_write = []
+        entries_to_write: list[str] = []
 
         with self._buffer_lock:
             while self._buffer and len(entries_to_write) < self.batch_size:
@@ -359,7 +359,7 @@ class SmartAILogger:
         level: str,
         message: str,
         logger_name: str = "smart-ai-router",
-        **extra_data,
+        **extra_data: Any,
     ) -> None:
         """记录日志"""
         try:
@@ -396,23 +396,23 @@ class SmartAILogger:
         except Exception as e:
             print(f"Failed to log message: {e}", file=sys.stderr)
 
-    def debug(self, message: str, **extra_data) -> None:
+    def debug(self, message: str, **extra_data: Any) -> None:
         """记录调试日志"""
         self.log("DEBUG", message, **extra_data)
 
-    def info(self, message: str, **extra_data) -> None:
+    def info(self, message: str, **extra_data: Any) -> None:
         """记录信息日志"""
         self.log("INFO", message, **extra_data)
 
-    def warning(self, message: str, **extra_data) -> None:
+    def warning(self, message: str, **extra_data: Any) -> None:
         """记录警告日志"""
         self.log("WARNING", message, **extra_data)
 
-    def error(self, message: str, **extra_data) -> None:
+    def error(self, message: str, **extra_data: Any) -> None:
         """记录错误日志"""
         self.log("ERROR", message, **extra_data)
 
-    def critical(self, message: str, **extra_data) -> None:
+    def critical(self, message: str, **extra_data: Any) -> None:
         """记录严重错误日志"""
         self.log("CRITICAL", message, **extra_data)
 
@@ -455,7 +455,7 @@ def setup_logging(
     return _global_logger
 
 
-def get_logger(name: str = None):
+def get_logger(name: str = None) -> Union[structlog.stdlib.BoundLogger, logging.Logger]:
     """
     获取日志记录器 - 兼容现有代码
 

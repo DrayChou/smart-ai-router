@@ -3,6 +3,8 @@ Speed-optimized routing strategy
 速度优化路由策略
 """
 
+from typing import Any
+
 from core.models.channel import Channel
 from core.router.base import BaseRoutingStrategy, RoutingRequest, RoutingScore
 
@@ -27,7 +29,7 @@ class SpeedOptimizedStrategy(BaseRoutingStrategy):
             )
 
             # 获取速度相关指标
-            performance_scores = channel.performance_scores or {}
+            performance_scores: dict[str, Any] = channel.performance_scores or {}
             speed_score = float(performance_scores.get("speed_score", 0.5))
 
             # 考虑健康度和最近成功情况

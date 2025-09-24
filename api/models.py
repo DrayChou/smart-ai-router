@@ -4,7 +4,7 @@ Models API endpoints
 """
 
 import time
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter
 from pydantic import BaseModel
@@ -94,7 +94,9 @@ def create_models_router(config_loader: YAMLConfigLoader) -> APIRouter:
     async def list_models() -> ModelsResponse:
         """返回所有可用的模型，包含详细信息"""
         all_models = set()
-        model_channels_map = {}  # 记录模型对应的所有渠道信息
+        model_channels_map: dict[str, list[dict[str, Any]]] = (
+            {}
+        )  # 记录模型对应的所有渠道信息
 
         # 1. 从路由器获取配置模型
         configured_models = json_router.get_available_models()

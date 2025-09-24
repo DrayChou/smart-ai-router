@@ -8,7 +8,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ class ChannelAlert:
 class ChannelMonitor:
     """渠道监控器"""
 
-    def __init__(self, alerts_file: str = "logs/channel_alerts.jsonl"):
+    def __init__(self, alerts_file: str = "logs/channel_alerts.jsonl") -> None:
         self.alerts_file = Path(alerts_file)
         self.alerts_file.parent.mkdir(exist_ok=True)
 
@@ -51,7 +51,7 @@ class ChannelMonitor:
         error_type: str,
         error_message: str,
         details: Optional[dict] = None,
-    ):
+    ) -> None:
         """记录渠道错误"""
         current_time = datetime.utcnow()
 
@@ -77,7 +77,7 @@ class ChannelMonitor:
 
     def record_quota_exhausted(
         self, channel_id: str, channel_name: str, details: Optional[dict] = None
-    ):
+    ) -> None:
         """记录配额用完"""
         message = f"渠道 {channel_name} 配额已用完"
         self._send_alert(channel_id, channel_name, "quota_exhausted", message, details)
@@ -88,7 +88,7 @@ class ChannelMonitor:
         channel_name: str,
         remaining_balance: float,
         details: Optional[dict] = None,
-    ):
+    ) -> None:
         """记录余额不足"""
         message = f"渠道 {channel_name} 余额不足，剩余: ${remaining_balance:.4f}"
         alert_details = {"remaining_balance": remaining_balance}
@@ -100,7 +100,7 @@ class ChannelMonitor:
 
     def record_api_key_invalid(
         self, channel_id: str, channel_name: str, details: Optional[dict] = None
-    ):
+    ) -> None:
         """记录API密钥无效"""
         message = f"渠道 {channel_name} API密钥无效或已过期"
         self._send_alert(channel_id, channel_name, "api_key_invalid", message, details)
@@ -133,7 +133,7 @@ class ChannelMonitor:
         alert_type: str,
         message: str,
         details: Optional[dict] = None,
-    ):
+    ) -> None:
         """发送告警"""
         try:
             alert = ChannelAlert(
@@ -163,7 +163,7 @@ class ChannelMonitor:
         except Exception as e:
             logger.error(f"发送告警失败: {e}")
 
-    def _write_alert_to_file(self, alert: ChannelAlert):
+    def _write_alert_to_file(self, alert: ChannelAlert) -> None:
         """写入告警到文件"""
         try:
             alert_dict = {
@@ -183,7 +183,7 @@ class ChannelMonitor:
         except Exception as e:
             logger.error(f"写入告警文件失败: {e}")
 
-    def _send_console_notification(self, alert: ChannelAlert):
+    def _send_console_notification(self, alert: ChannelAlert) -> None:
         """发送控制台通知"""
         print(f"\n{'='*60}")
         print("🚨 渠道告警通知")
@@ -236,7 +236,7 @@ class ChannelMonitor:
 
         return alerts
 
-    def clear_channel_notifications(self, channel_id: str):
+    def clear_channel_notifications(self, channel_id: str) -> None:
         """清除渠道的通知状态（允许重新发送告警）"""
         self._notified_channels.discard(channel_id)
         if channel_id in self._error_counts:
@@ -246,7 +246,7 @@ class ChannelMonitor:
 
         logger.info(f"已清除渠道 {channel_id} 的通知状态")
 
-    def clear_all_notifications(self):
+    def clear_all_notifications(self) -> None:
         """清除所有通知状态"""
         self._notified_channels.clear()
         self._error_counts.clear()
@@ -254,7 +254,7 @@ class ChannelMonitor:
 
         logger.info("已清除所有渠道的通知状态")
 
-    def get_channel_status(self) -> dict[str, dict]:
+    def get_channel_status(self) -> dict[str, Any]:
         """获取渠道状态概览"""
         return {
             "notified_channels": list(self._notified_channels),
@@ -279,7 +279,7 @@ def get_channel_monitor() -> ChannelMonitor:
 
 def check_api_error_and_alert(
     channel_id: str, channel_name: str, status_code: int, error_message: str
-):
+) -> None:
     """检查API错误并发送相应告警"""
     monitor = get_channel_monitor()
 

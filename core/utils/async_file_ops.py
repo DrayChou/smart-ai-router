@@ -9,7 +9,7 @@ import logging
 import time
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, cast
 
 import aiofiles
 import aiofiles.os
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class DateTimeEncoder(json.JSONEncoder):
     """自定义JSON编码器，支持datetime对象序列化"""
 
-    def default(self, obj):
+    def default(self, obj) -> Any:
         if isinstance(obj, (datetime, date)):
             return obj.isoformat()
         elif hasattr(obj, "__dict__"):
@@ -33,15 +33,15 @@ class DateTimeEncoder(json.JSONEncoder):
 class AsyncFileManager:
     """异步文件管理器"""
 
-    def __init__(self):
-        self._file_locks = {}  # 文件锁，防止并发写入冲突
+    def __init__(self) -> None:
+        self._file_locks: dict[str, asyncio.Lock] = {}  # 文件锁，防止并发写入冲突
 
     def _get_file_lock(self, file_path: Union[str, Path]) -> asyncio.Lock:
         """获取文件锁"""
         file_key = str(file_path)
         if file_key not in self._file_locks:
             self._file_locks[file_key] = asyncio.Lock()
-        return self._file_locks[file_key]
+        return cast(asyncio.Lock, self._file_locks[file_key])
 
     async def read_json(self, file_path: Union[str, Path], default: Any = None) -> Any:
         """异步读取JSON文件"""
@@ -297,7 +297,7 @@ class AsyncFileManager:
             path = Path(file_path)
             if await aiofiles.os.path.exists(path):
                 await aiofiles.os.remove(path)
-                logger.debug(f"🗑️ ASYNC DELETE: {path.name}")
+                logger.debug(f"[DELETE] ASYNC DELETE: {path.name}")
                 return True
             return False
         except Exception as e:
@@ -337,7 +337,7 @@ class AsyncFileManager:
     ) -> dict[str, Any]:
         """批量异步读取JSON文件"""
 
-        async def read_single(path):
+        async def read_single(path) -> tuple[str, Any]:
             return str(path), await self.read_json(path, default)
 
         results = await asyncio.gather(*[read_single(path) for path in file_paths])
@@ -348,7 +348,7 @@ class AsyncFileManager:
     ) -> dict[str, bool]:
         """批量异步写入JSON文件"""
 
-        async def write_single(path, data):
+        async def write_single(path, data) -> tuple[str, bool]:
             return str(path), await self.write_json(path, data, **kwargs)
 
         results = await asyncio.gather(

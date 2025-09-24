@@ -45,7 +45,7 @@ class OpenRouterAdapter(OpenAIAdapter):
         # 添加OpenRouter特有的extra_body参数
         extra_body = {}
 
-        # 🔥 核心功能：价格优先排序
+        # [HOT] 核心功能：价格优先排序
         # 当用户的路由策略包含成本优化时，自动启用价格排序
         routing_strategy = getattr(request, "routing_strategy", "balanced")
         if (
@@ -54,7 +54,7 @@ class OpenRouterAdapter(OpenAIAdapter):
         ):
             extra_body["provider"] = {"sort": "price"}
             logger.info(
-                f"🎯 OPENROUTER: Enabled price-priority sorting for cost-optimized routing ({routing_strategy})"
+                f"[TARGET] OPENROUTER: Enabled price-priority sorting for cost-optimized routing ({routing_strategy})"
             )
 
         # 支持用户手动指定排序方式
@@ -63,7 +63,7 @@ class OpenRouterAdapter(OpenAIAdapter):
                 sort_method = request.extra_params.pop("openrouter_sort")
                 extra_body["provider"] = {"sort": sort_method}
                 logger.info(
-                    f"🎯 OPENROUTER: Manual sort method specified: {sort_method}"
+                    f"[TARGET] OPENROUTER: Manual sort method specified: {sort_method}"
                 )
 
             # 支持其他OpenRouter特定参数
@@ -110,7 +110,7 @@ class OpenRouterAdapter(OpenAIAdapter):
         # 优先使用请求中指定的URL
         if hasattr(request, "extra_params") and request.extra_params:
             if "site_url" in request.extra_params:
-                return request.extra_params["site_url"]
+                return str(request.extra_params["site_url"])
 
         # 默认使用Smart AI Router的标识
         return "https://github.com/smart-ai-router/smart-ai-router"
@@ -120,7 +120,7 @@ class OpenRouterAdapter(OpenAIAdapter):
         # 优先使用请求中指定的标题
         if hasattr(request, "extra_params") and request.extra_params:
             if "site_title" in request.extra_params:
-                return request.extra_params["site_title"]
+                return str(request.extra_params["site_title"])
 
         # 默认使用Smart AI Router的标识
         return "Smart AI Router - Personal AI Gateway"
@@ -301,4 +301,4 @@ class OpenRouterAdapter(OpenAIAdapter):
             return "model_unavailable"
 
         # 回退到父类处理
-        return super().get_error_type(status_code, error_message)
+        return str(super().get_error_type(status_code, error_message))

@@ -118,7 +118,7 @@ class BaseRoutingStrategy(ABC):
 
             # 检查能力要求
             if request.required_capabilities:
-                channel_caps = channel.capabilities or {}
+                channel_caps: dict[str, Any] = channel.capabilities or {}
                 for cap in request.required_capabilities:
                     if not channel_caps.get(cap, False):
                         break

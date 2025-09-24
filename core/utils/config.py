@@ -73,7 +73,7 @@ def _replace_env_vars(obj: Any) -> Any:
 
         value = os.getenv(env_var, default_value)
         if value is None:
-            print(f"⚠️  环境变量 {env_var} 未设置，使用占位符")
+            print(f"[WARNING]  环境变量 {env_var} 未设置，使用占位符")
             return obj
         return value
     else:

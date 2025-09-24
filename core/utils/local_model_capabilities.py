@@ -588,7 +588,7 @@ class LocalModelCapabilityDetector:
             score += 0.2
 
         # 渠道配置的优先级
-        score += channel.get("priority", 1) * 0.1
+        score += float(channel.get("priority", 1)) * 0.1
 
         return score
 

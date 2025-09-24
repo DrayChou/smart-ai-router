@@ -5,7 +5,7 @@
 
 import threading
 from functools import wraps
-from typing import Any, Callable, Optional, TypeVar
+from typing import Any, Callable, Optional, TypeVar, cast
 
 T = TypeVar("T")
 
@@ -16,30 +16,30 @@ class ThreadSafeSingleton:
     _instances: dict[type, Any] = {}
     _lock = threading.RLock()
 
-    def __new__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            with cls._lock:
+    def __new__(cls, *args: Any, **kwargs: Any) -> "ThreadSafeSingleton":
+        if cls not in ThreadSafeSingleton._instances:
+            with ThreadSafeSingleton._lock:
                 # 双重检查锁定
-                if cls not in cls._instances:
+                if cls not in ThreadSafeSingleton._instances:
                     instance = super().__new__(cls)
-                    cls._instances[cls] = instance
-        return cls._instances[cls]
+                    ThreadSafeSingleton._instances[cls] = instance
+        return cast("ThreadSafeSingleton", ThreadSafeSingleton._instances[cls])
 
     @classmethod
     def get_instance(cls: type[T]) -> T:
         """获取单例实例"""
-        if cls not in cls._instances:
-            with cls._lock:
-                if cls not in cls._instances:
-                    cls._instances[cls] = cls()
-        return cls._instances[cls]
+        if cls not in ThreadSafeSingleton._instances:
+            with ThreadSafeSingleton._lock:
+                if cls not in ThreadSafeSingleton._instances:
+                    ThreadSafeSingleton._instances[cls] = cls()
+        return cast(T, ThreadSafeSingleton._instances[cls])
 
     @classmethod
-    def clear_instance(cls):
+    def clear_instance(cls) -> None:
         """清除单例实例（主要用于测试）"""
-        with cls._lock:
-            if cls in cls._instances:
-                del cls._instances[cls]
+        with ThreadSafeSingleton._lock:
+            if cls in ThreadSafeSingleton._instances:
+                del ThreadSafeSingleton._instances[cls]
 
 
 class SingletonFactory:
@@ -82,7 +82,7 @@ class SingletonFactory:
         return name in cls._instances
 
 
-def singleton_factory(name: str):
+def singleton_factory(name: str) -> Callable[[Callable[[], T]], Callable[[], T]]:
     """装饰器：将函数注册为单例工厂"""
 
     def decorator(func: Callable[[], T]) -> Callable[[], T]:
@@ -90,7 +90,7 @@ def singleton_factory(name: str):
 
         @wraps(func)
         def wrapper() -> T:
-            return SingletonFactory.get(name)
+            return cast(T, SingletonFactory.get(name))
 
         return wrapper
 
@@ -100,7 +100,7 @@ def singleton_factory(name: str):
 class LazyInit:
     """延迟初始化包装器"""
 
-    def __init__(self, factory: Callable[[], T]):
+    def __init__(self, factory: Callable[[], T]) -> None:
         self._factory = factory
         self._instance: Optional[T] = None
         self._lock = threading.RLock()
@@ -127,7 +127,7 @@ class LazyInit:
 class ThreadSafeContainer:
     """线程安全的容器，用于替代全局变量"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._data: dict[str, Any] = {}
         self._lock = threading.RLock()
 
@@ -162,7 +162,7 @@ class ThreadSafeContainer:
         with self._lock:
             self._data.clear()
 
-    def keys(self):
+    def keys(self) -> list[str]:
         """获取所有键"""
         with self._lock:
             return list(self._data.keys())

@@ -6,7 +6,7 @@
 import logging
 import os
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 import yaml
 
@@ -23,7 +23,7 @@ class ConfigService:
 
         logger.info(f"配置服务初始化完成，配置文件: {self.config_path}")
 
-    def get_config(self, key: str = None, default: Any = None) -> Any:
+    def get_config(self, key: Optional[str] = None, default: Any = None) -> Any:
         """获取配置值 - 支持点号分隔的嵌套键"""
         config = self._load_config()
 
@@ -44,18 +44,18 @@ class ConfigService:
 
     def get_providers(self) -> dict[str, Any]:
         """获取所有提供商配置"""
-        return self.get_config("providers", {})
+        return cast(dict[str, Any], self.get_config("providers", {}))
 
     def get_provider_config(self, provider_name: str) -> dict[str, Any]:
         """获取指定提供商配置"""
         providers = self.get_providers()
-        return providers.get(provider_name, {})
+        return cast(dict[str, Any], providers.get(provider_name, {}))
 
-    def get_channels(self, provider_name: str = None) -> list[dict[str, Any]]:
+    def get_channels(self, provider_name: Optional[str] = None) -> list[dict[str, Any]]:
         """获取渠道配置"""
         if provider_name:
             provider_config = self.get_provider_config(provider_name)
-            return provider_config.get("channels", [])
+            return cast(list[dict[str, Any]], provider_config.get("channels", []))
 
         # 获取所有渠道
         all_channels = []
@@ -71,16 +71,16 @@ class ConfigService:
 
     def get_routing_strategies(self) -> dict[str, Any]:
         """获取路由策略配置"""
-        return self.get_config("routing_strategies", {})
+        return cast(dict[str, Any], self.get_config("routing_strategies", {}))
 
     def is_provider_enabled(self, provider_name: str) -> bool:
         """检查提供商是否启用"""
         provider_config = self.get_provider_config(provider_name)
-        return provider_config.get("enabled", False)
+        return cast(bool, provider_config.get("enabled", False))
 
     def get_system_config(self) -> dict[str, Any]:
         """获取系统配置"""
-        return self.get_config("system", {})
+        return cast(dict[str, Any], self.get_config("system", {}))
 
     def get_database_url(self) -> str:
         """获取数据库URL - 优先使用环境变量"""
@@ -90,7 +90,9 @@ class ConfigService:
             return db_url
 
         # 配置文件次之
-        return self.get_config("system.database_url", "sqlite:///smart-ai-router.db")
+        return cast(
+            str, self.get_config("system.database_url", "sqlite:///smart-ai-router.db")
+        )
 
     def get_log_level(self) -> str:
         """获取日志级别"""
@@ -99,7 +101,7 @@ class ConfigService:
         if log_level:
             return log_level.upper()
 
-        return self.get_config("system.log_level", "INFO").upper()
+        return cast(str, self.get_config("system.log_level", "INFO")).upper()
 
     def reload_config(self) -> None:
         """重新加载配置"""

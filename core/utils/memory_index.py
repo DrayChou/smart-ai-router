@@ -43,7 +43,7 @@ class IndexStats:
 class MemoryModelIndex:
     """内存模型索引 - 高性能标签查询"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._lock = threading.RLock()
 
         # 核心索引结构
@@ -68,7 +68,7 @@ class MemoryModelIndex:
         self._incremental_updates_count = 0
 
         logger.info(
-            "🚀 MemoryModelIndex initialized - ready for high-performance tag queries"
+            "[BOOST] MemoryModelIndex initialized - ready for high-performance tag queries"
         )
 
     def build_index_from_cache(
@@ -129,9 +129,11 @@ class MemoryModelIndex:
 
                     if channel_id and tags:
                         self._channel_tag_map[channel_id] = set(tags)
-                        logger.info(f"✅ CHANNEL TAGS MAPPED: {channel_id} -> {tags}")
+                        logger.info(
+                            f"[PASS] CHANNEL TAGS MAPPED: {channel_id} -> {tags}"
+                        )
                     elif channel_id:
-                        # 🚀 自动推断渠道标签（基于渠道名称）
+                        # [BOOST] 自动推断渠道标签（基于渠道名称）
                         inferred_tags = self._infer_channel_tags(channel_id)
                         if inferred_tags:
                             self._channel_tag_map[channel_id] = inferred_tags
@@ -140,14 +142,14 @@ class MemoryModelIndex:
                             )
                         else:
                             logger.warning(
-                                f"⚠️ CHANNEL NO TAGS: {channel_id} has no tags"
+                                f"[WARNING] CHANNEL NO TAGS: {channel_id} has no tags"
                             )
 
                 logger.info(
                     f"🏷️ CHANNEL TAG MAP BUILT: {len(self._channel_tag_map)} channels with tags"
                 )
             else:
-                logger.warning("⚠️ NO CHANNEL CONFIGS PROVIDED for tag mapping")
+                logger.warning("[WARNING] NO CHANNEL CONFIGS PROVIDED for tag mapping")
 
             logger.info(
                 f"🔨 INDEX BUILD: Processing {len(model_cache)} cache entries..."
@@ -156,8 +158,8 @@ class MemoryModelIndex:
             total_models = 0
             processed_channels = set()
 
-            # 🚀 多Provider免费策略：收集所有模型的定价信息
-            global_model_pricing = (
+            # [BOOST] 多Provider免费策略：收集所有模型的定价信息
+            global_model_pricing: dict[str, list[dict[str, Any]]] = (
                 {}
             )  # {model_name: [{'provider': provider, 'is_free': bool, 'channel_id': str}]}
 
@@ -177,10 +179,10 @@ class MemoryModelIndex:
                 models_data = cache_data.get("models_data", {})  # 模型详细规格数据
                 models_pricing = cache_data.get(
                     "models_pricing", {}
-                )  # 🚀 新增：模型定价数据
+                )  # [BOOST] 新增：模型定价数据
                 provider = cache_data.get("provider", "unknown")
 
-                # 🚀 收集定价信息用于多Provider免费策略
+                # [BOOST] 收集定价信息用于多Provider免费策略
                 for model_name in models:
                     if model_name not in global_model_pricing:
                         global_model_pricing[model_name] = []
@@ -205,7 +207,7 @@ class MemoryModelIndex:
                     # 生成基础标签
                     tags = self._generate_model_tags(model_name, provider)
 
-                    # 🚀 多Provider免费策略：检查是否有任何Provider提供免费
+                    # [BOOST] 多Provider免费策略：检查是否有任何Provider提供免费
                     if model_name in global_model_pricing:
                         provider_infos = global_model_pricing[model_name]
                         has_free_provider = any(
@@ -218,7 +220,7 @@ class MemoryModelIndex:
                                 f"🆓 模型 {model_name} 标记为免费 (跨Provider检测)"
                             )
 
-                    # 🚀 动态价格检测：检查当前渠道的定价信息
+                    # [BOOST] 动态价格检测：检查当前渠道的定价信息
                     if model_name in models_pricing:
                         pricing_info = models_pricing[model_name]
                         is_free_by_pricing = pricing_info.get("is_free", False)
@@ -234,7 +236,7 @@ class MemoryModelIndex:
                                 f"🆓 模型 {model_name} 标记为免费 (当前渠道 {channel_id} 定价为0)"
                             )
 
-                    # 🚀 渠道级别价格检测：检查渠道配置的cost_per_token
+                    # [BOOST] 渠道级别价格检测：检查渠道配置的cost_per_token
                     try:
                         channel_cost = cache_data.get("cost_per_token", {})
                         if isinstance(channel_cost, dict):
@@ -248,7 +250,7 @@ class MemoryModelIndex:
                     except Exception as e:
                         logger.debug(f"渠道价格检测失败 {channel_id}: {e}")
 
-                    # 🚀 合并渠道级别的标签
+                    # [BOOST] 合并渠道级别的标签
                     channel_tags = self._get_channel_tags(channel_id)
                     if channel_tags:
                         tags = tags.union(channel_tags)
@@ -261,7 +263,7 @@ class MemoryModelIndex:
                     # 获取模型详细规格
                     model_specs = models_data.get(model_name, {}) if models_data else {}
 
-                    # 🚀 确保包含关键规格信息
+                    # [BOOST] 确保包含关键规格信息
                     if not model_specs:
                         # 尝试从其他位置获取规格信息
                         model_specs = self._ensure_model_specs(model_name, cache_data)
@@ -308,7 +310,7 @@ class MemoryModelIndex:
             self._last_build_hash = cache_hash
             self._build_count += 1
 
-            # 🚀 统计多Provider免费策略的效果
+            # [BOOST] 统计多Provider免费策略的效果
             free_models_count = len(self._tag_to_models.get("free", set()))
             multi_provider_free = 0
 
@@ -321,7 +323,7 @@ class MemoryModelIndex:
                         multi_provider_free += 1
 
             logger.info(
-                f"✅ INDEX BUILT: {total_models} models, {len(processed_channels)} channels, "
+                f"[PASS] INDEX BUILT: {total_models} models, {len(processed_channels)} channels, "
                 f"{len(self._tag_to_models)} tags in {build_time_ms:.1f}ms"
             )
             logger.info(
@@ -413,7 +415,7 @@ class MemoryModelIndex:
 
             return None
 
-    def set_health_score(self, channel_id: str, health_score: float):
+    def set_health_score(self, channel_id: str, health_score: float) -> None:
         """设置健康评分（更新所有该渠道下的模型）"""
         current_time = time.time()
 
@@ -441,16 +443,16 @@ class MemoryModelIndex:
 
     def needs_rebuild(self, model_cache: dict[str, dict]) -> bool:
         """检查是否需要重建索引"""
-        # 🚀 修复：只有在索引为空时才强制重建
+        # [BOOST] 修复：只有在索引为空时才强制重建
         if self._stats.total_models == 0:
             logger.debug("INDEX REBUILD: Index is empty, needs rebuild")
             return True
 
-        # 🚀 修复：更智能的缓存大小检查
+        # [BOOST] 修复：更智能的缓存大小检查
         current_cache_size = len(model_cache)
         cached_channels = self._stats.total_channels
 
-        # 🚀 容忍缓存迁移造成的大小变化（从legacy格式到API Key格式）
+        # [BOOST] 容忍缓存迁移造成的大小变化（从legacy格式到API Key格式）
         if current_cache_size < cached_channels:
             # 如果缓存减少超过30%，可能是迁移导致的清理，需要重建
             reduction_ratio = current_cache_size / cached_channels
@@ -460,7 +462,7 @@ class MemoryModelIndex:
                 )
                 return True
         elif current_cache_size > cached_channels:
-            # 🚀 缓存增加了，仅当增加超过50%时才重建（更宽松）
+            # [BOOST] 缓存增加了，仅当增加超过50%时才重建（更宽松）
             growth_ratio = current_cache_size / cached_channels
             if growth_ratio > 1.5:  # 增长超过50%才重建
                 logger.debug(
@@ -468,7 +470,7 @@ class MemoryModelIndex:
                 )
                 return True
 
-        # 🚀 更稳定的哈希检查：基于模型总数而非缓存键结构
+        # [BOOST] 更稳定的哈希检查：基于模型总数而非缓存键结构
         try:
             total_models_in_cache = sum(
                 len(cache_data.get("models", []))
@@ -513,7 +515,7 @@ class MemoryModelIndex:
 
     def _generate_model_tags(self, model_name: str, provider: str) -> set[str]:
         """为模型生成标签集合"""
-        tags = set()
+        tags: set[str] = set()
 
         if not model_name:
             return tags
@@ -720,7 +722,7 @@ class MemoryModelIndex:
 
     def add_incremental_model(
         self, channel_id: str, model_name: str, provider: str = "unknown"
-    ):
+    ) -> None:
         """增量添加单个模型（避免全量重建）"""
         with self._lock:
             tags = self._generate_model_tags(model_name, provider)
@@ -744,10 +746,10 @@ class MemoryModelIndex:
 
             self._incremental_updates_count += 1
             logger.debug(
-                f"📈 INDEX INCREMENT: Added {model_name} to channel {channel_id}"
+                f"[PROGRESS] INDEX INCREMENT: Added {model_name} to channel {channel_id}"
             )
 
-    def remove_channel_models(self, channel_id: str):
+    def remove_channel_models(self, channel_id: str) -> None:
         """移除某个渠道的所有模型"""
         with self._lock:
             models_to_remove = list(self._channel_to_models.get(channel_id, set()))
@@ -772,7 +774,7 @@ class MemoryModelIndex:
                 del self._channel_to_models[channel_id]
 
             logger.debug(
-                f"🗑️ INDEX REMOVE: Removed {len(models_to_remove)} models from channel {channel_id}"
+                f"[DELETE] INDEX REMOVE: Removed {len(models_to_remove)} models from channel {channel_id}"
             )
 
     def get_build_stats(self) -> dict[str, Any]:
@@ -800,7 +802,7 @@ def get_memory_index() -> MemoryModelIndex:
     return _memory_index
 
 
-def reset_memory_index():
+def reset_memory_index() -> None:
     """重置全局内存索引实例（用于修复后的重新构建）"""
     global _memory_index
     _memory_index = None

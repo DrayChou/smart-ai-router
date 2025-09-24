@@ -142,7 +142,7 @@ def get_provider_registry() -> ProviderRegistry:
     return provider_registry
 
 
-def register_adapter(adapter_class_name: str, adapter_class: type[BaseAdapter]):
+def register_adapter(adapter_class_name: str, adapter_class: type[BaseAdapter]) -> None:
     """
     注册适配器的便捷函数
 

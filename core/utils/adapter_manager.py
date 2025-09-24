@@ -145,7 +145,7 @@ class AdapterManager:
             }
 
         except Exception as e:
-            logger.error(f"❌ 适配器准备请求失败: {e}")
+            logger.error(f"[FAIL] 适配器准备请求失败: {e}")
             # 回退到基础准备方式
             return self._prepare_fallback_request(
                 channel, provider, request, matched_model
@@ -197,7 +197,7 @@ class AdapterManager:
         if not isinstance(adapter, OpenRouterAdapter):
             return request_data
 
-        # 🔥 核心功能：为成本优化策略自动启用价格排序
+        # [HOT] 核心功能：为成本优化策略自动启用价格排序
         if (
             routing_strategy in ["cost_first", "free_first"]
             or "cost" in routing_strategy.lower()
@@ -207,7 +207,7 @@ class AdapterManager:
 
             request_data["extra_body"]["provider"] = {"sort": "price"}
             logger.info(
-                f"🎯 COST OPTIMIZATION: 为 {routing_strategy} 策略启用OpenRouter价格排序"
+                f"[TARGET] COST OPTIMIZATION: 为 {routing_strategy} 策略启用OpenRouter价格排序"
             )
 
         return request_data

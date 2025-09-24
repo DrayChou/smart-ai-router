@@ -155,7 +155,7 @@ class ErrorClassifier:
 class ModelChannelBlacklistManager:
     """模型-渠道级别黑名单管理器"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._blacklist: dict[str, ModelChannelBlacklistEntry] = {}
         self._lock = asyncio.Lock()
         self._channel_failure_counts: dict[str, int] = {}  # 渠道级别失败计数
@@ -274,7 +274,7 @@ class ModelChannelBlacklistManager:
         if entry.is_expired():
             del self._blacklist[key]
             logger.info(
-                f"✅ BLACKLIST EXPIRED: {model_name}@{channel_id} is now available again"
+                f"[PASS] BLACKLIST EXPIRED: {model_name}@{channel_id} is now available again"
             )
             return False, None
 
@@ -325,7 +325,7 @@ class ModelChannelBlacklistManager:
             if key in self._blacklist:
                 del self._blacklist[key]
                 logger.info(
-                    f"✅ BLACKLIST REMOVED: {model_name}@{channel_id} manually recovered"
+                    f"[PASS] BLACKLIST REMOVED: {model_name}@{channel_id} manually recovered"
                 )
                 return True
 
@@ -340,7 +340,7 @@ class ModelChannelBlacklistManager:
         temporary_count = total_entries - permanent_count
 
         # 按渠道分组
-        by_channel = {}
+        by_channel: dict[str, list[dict[str, Any]]] = {}
         for entry in self._blacklist.values():
             if entry.channel_id not in by_channel:
                 by_channel[entry.channel_id] = []
@@ -354,7 +354,7 @@ class ModelChannelBlacklistManager:
             )
 
         # 按错误类型分组
-        by_error_type = {}
+        by_error_type: dict[str, list[dict[str, Any]]] = {}
         for entry in self._blacklist.values():
             error_type = entry.error_type.value
             by_error_type[error_type] = by_error_type.get(error_type, 0) + 1
@@ -404,7 +404,7 @@ class ModelChannelBlacklistManager:
             entry = self._blacklist[key]
             del self._blacklist[key]
             logger.debug(
-                f"🧹 CLEANUP: Removed expired blacklist entry for {entry.model_name}@{entry.channel_id}"
+                f"[CLEANUP] CLEANUP: Removed expired blacklist entry for {entry.model_name}@{entry.channel_id}"
             )
 
         return len(expired_keys)

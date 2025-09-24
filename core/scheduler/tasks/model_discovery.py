@@ -10,7 +10,7 @@ import logging
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 import httpx
 
@@ -163,7 +163,7 @@ class ModelDiscoveryTask:
         """从配置文件获取渠道的模型列表作为回退"""
         try:
             # 从配置的模型列表中获取
-            configured_models = channel.get("configured_models", [])
+            configured_models = cast(list[str], channel.get("configured_models", []))
             logger.info(
                 f"渠道 {channel.get('id')} 回退检查: configured_models={configured_models}, model_name={channel.get('model_name')}"
             )
@@ -231,10 +231,10 @@ class ModelDiscoveryTask:
         for url in candidate_urls:
             if self._test_url_connectivity(url):
                 logger.info(f"渠道 {channel.get('id')} 选择可用 URL: {url}")
-                return url
+                return str(url)
 
         # 如果都不可用，使用第一个并发出警告
-        selected_url = candidate_urls[0]
+        selected_url = str(candidate_urls[0])
         logger.warning(
             f"渠道 {channel.get('id')} 所有URL都不可达，使用第一个: {selected_url}"
         )
@@ -393,7 +393,7 @@ class ModelDiscoveryTask:
                                 else:
                                     models.append(str(model))
 
-                    # 🚀 提取模型定价信息用于多Provider免费策略
+                    # [BOOST] 提取模型定价信息用于多Provider免费策略
                     models_pricing = self._extract_models_pricing(
                         models_data, data, provider
                     )
@@ -405,7 +405,7 @@ class ModelDiscoveryTask:
                         "models_url": models_url,
                         "models": models,
                         "models_data": models_data,  # 添加详细的模型数据
-                        "models_pricing": models_pricing,  # 🚀 新增：每个模型的定价信息
+                        "models_pricing": models_pricing,  # [BOOST] 新增：每个模型的定价信息
                         "model_count": len(models),
                         "last_updated": datetime.now().isoformat(),
                         "status": "success",
@@ -521,10 +521,12 @@ class ModelDiscoveryTask:
                         self.api_key_level_cache_manager.save_api_key_models(
                             channel_id, api_key, result, provider
                         )
-                        logger.debug(f"✅ Saved API key level cache for {channel_id}")
+                        logger.debug(
+                            f"[PASS] Saved API key level cache for {channel_id}"
+                        )
                     except Exception as e:
                         logger.warning(
-                            f"⚠️ Failed to save API key level cache for {channel_id}: {e}"
+                            f"[WARNING] Failed to save API key level cache for {channel_id}: {e}"
                         )
 
                     # 兼容性：仍然保存到旧的渠道缓存
@@ -533,11 +535,11 @@ class ModelDiscoveryTask:
                             channel_id, result
                         )
                         logger.debug(
-                            f"✅ Also saved to legacy channel cache for {channel_id}"
+                            f"[PASS] Also saved to legacy channel cache for {channel_id}"
                         )
                     except Exception as e:
                         logger.warning(
-                            f"⚠️ Failed to save legacy channel cache for {channel_id}: {e}"
+                            f"[WARNING] Failed to save legacy channel cache for {channel_id}: {e}"
                         )
                 else:
                     failed_count += 1
@@ -614,7 +616,7 @@ class ModelDiscoveryTask:
 
     async def run_discovery_task(
         self, channels: list[dict[str, Any]], original_config_data: dict[str, Any]
-    ):
+    ) -> dict[str, Any]:
         """运行完整的模型发现任务"""
         logger.info("启动模型发现任务")
 

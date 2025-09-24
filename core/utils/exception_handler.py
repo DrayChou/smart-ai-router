@@ -6,9 +6,11 @@
 import logging
 from enum import Enum
 from functools import wraps
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Optional, TypeVar, Union
 
 logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
 
 
 class ErrorSeverity(Enum):
@@ -142,7 +144,7 @@ def safe_execute(
     reraise_exceptions: tuple = (),
     log_level: int = logging.ERROR,
     include_traceback: bool = True,
-):
+) -> Callable[[Callable], Callable]:
     """
     安全执行装饰器 - 统一异常处理
 
@@ -154,9 +156,9 @@ def safe_execute(
         include_traceback: 是否包含堆栈跟踪
     """
 
-    def decorator(func: Callable):
+    def decorator(func: Callable) -> Callable:
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
                 return func(*args, **kwargs)
             except reraise_exceptions:
@@ -174,7 +176,7 @@ def safe_execute(
                 return default_return
 
         @wraps(func)
-        async def async_wrapper(*args, **kwargs):
+        async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
                 return await func(*args, **kwargs)
             except reraise_exceptions:
@@ -207,7 +209,7 @@ def _log_smart_router_exception(
     operation_name: str,
     log_level: int,
     include_traceback: bool,
-):
+) -> None:
     """记录Smart Router自定义异常"""
     context_str = ""
     if exception.context:
@@ -230,7 +232,7 @@ def _log_smart_router_exception(
 
 def _log_generic_exception(
     exception: Exception, operation_name: str, log_level: int, include_traceback: bool
-):
+) -> None:
     """记录通用异常"""
     message = f"[SYSTEM] {operation_name} failed: {exception}"
 
@@ -240,11 +242,11 @@ def _log_generic_exception(
         logger.log(log_level, message)
 
 
-def handle_http_errors(func: Callable):
+def handle_http_errors(func: Callable) -> Callable:
     """HTTP相关错误处理装饰器"""
 
     @wraps(func)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
         try:
             return func(*args, **kwargs)
         except Exception as e:
@@ -265,7 +267,7 @@ def handle_http_errors(func: Callable):
                 raise ExternalAPIError(f"HTTP error: {e}", cause=e) from e
 
     @wraps(func)
-    async def async_wrapper(*args, **kwargs):
+    async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
         try:
             return await func(*args, **kwargs)
         except Exception as e:
@@ -318,12 +320,12 @@ def log_and_continue(
     operation_name: str,
     log_level: int = logging.WARNING,
     include_traceback: bool = False,
-):
+) -> Callable:
     """记录异常但继续执行的装饰器"""
 
-    def decorator(func: Callable):
+    def decorator(func: Callable) -> Callable:
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
                 return func(*args, **kwargs)
             except Exception as e:
@@ -335,7 +337,7 @@ def log_and_continue(
                 # 继续执行，不抛出异常
 
         @wraps(func)
-        async def async_wrapper(*args, **kwargs):
+        async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
                 return await func(*args, **kwargs)
             except Exception as e:

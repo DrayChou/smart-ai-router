@@ -7,7 +7,7 @@ import json
 import logging
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
+from typing import Optional, cast
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ def _extract_capabilities_from_data(raw_data: dict) -> list[str]:
 
 def _extract_context_length(raw_data: dict) -> int:
     """从OpenRouter原始数据中提取上下文长度"""
-    return raw_data.get("context_length", 0)
+    return cast(int, raw_data.get("context_length", 0))
 
 
 def _models_match(model_name_1: str, model_name_2: str) -> bool:
@@ -142,7 +142,7 @@ def get_model_capabilities_from_openrouter(model_name: str) -> tuple[list[str], 
             return capabilities, context_length
 
     # 如果OpenRouter数据不可用，只提供基础文本能力
-    logger.debug(f"⚠️ 未找到 {model_name} 的OpenRouter数据，使用默认能力")
+    logger.debug(f"[WARNING] 未找到 {model_name} 的OpenRouter数据，使用默认能力")
     return capabilities, context_length
 
 

@@ -77,7 +77,7 @@ class BaseFormatConverter(ABC):
 class OpenRouterConverter(BaseFormatConverter):
     """OpenRouter格式转换器"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("openrouter")
 
     def convert_to_unified(self, source_data: dict[str, Any]) -> UnifiedPricingFile:
@@ -169,7 +169,7 @@ class OpenRouterConverter(BaseFormatConverter):
 class SiliconFlowConverter(BaseFormatConverter):
     """SiliconFlow格式转换器"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("siliconflow")
         self.exchange_rate = 0.14  # 人民币到美元汇率
 
@@ -309,13 +309,15 @@ class FormatConverterFactory:
         return cls._converters[platform]()
 
     @classmethod
-    def register_converter(cls, platform: str, converter_class: type):
+    def register_converter(cls, platform: str, converter_class: type) -> None:
         """注册新的转换器"""
         cls._converters[platform] = converter_class
         logger.info(f"注册转换器: {platform} -> {converter_class.__name__}")
 
 
-def convert_platform_to_unified(source_file: Path, platform: str, output_file: Path):
+def convert_platform_to_unified(
+    source_file: Path, platform: str, output_file: Path
+) -> UnifiedPricingFile:
     """将平台特定格式转换为统一格式"""
     logger.info(f"开始转换 {platform} 格式: {source_file} -> {output_file}")
 

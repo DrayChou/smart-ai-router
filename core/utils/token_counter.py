@@ -3,7 +3,7 @@ Unified token counting and cost calculation utilities
 """
 
 import logging
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 logger = logging.getLogger(__name__)
 
@@ -171,7 +171,7 @@ class TokenCounter:
     ) -> float:
         """传统成本计算方法（保持向后兼容）"""
         result = cls.calculate_cost(prompt_tokens, completion_tokens, pricing)
-        return result["actual_cost"]
+        return cast(float, result["actual_cost"])
 
     @classmethod
     def get_cost_per_1k_tokens(
@@ -287,7 +287,7 @@ class CostTracker:
 
     def get_cost_by_channel(self) -> dict[str, float]:
         """按渠道统计成本"""
-        channel_costs = {}
+        channel_costs: dict[str, float] = {}
         for record in self.session_costs:
             channel_id = record["channel_id"]
             channel_costs[channel_id] = (

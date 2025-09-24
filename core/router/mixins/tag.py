@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+from typing import cast
 
 from core.config_models import Channel
 from core.exceptions import TagNotFoundError
@@ -15,6 +16,27 @@ logger = logging.getLogger(__name__)
 
 class TagRoutingMixin:
     """Provides helpers for tag-oriented routing queries."""
+
+    def __init__(self):
+        self.config_loader = None
+        self.config = None
+        self._available_models_cache = None
+
+    def _calculate_free_score(self, channel: Channel, model_name: str) -> float:
+        """Calculate free score for a channel and model."""
+        # Placeholder implementation
+        return 0.5
+
+    def _extract_tags_from_model_name(self, model_name: str) -> list[str]:
+        """Extract tags from model name."""
+        if not model_name:
+            return []
+
+        separators = r"[/:@\-_,]"
+        parts = re.split(separators, model_name.lower())
+        return [
+            part.strip() for part in parts if part.strip() and len(part.strip()) > 1
+        ]
 
     def _handle_tag_queries(
         self, request: RoutingRequest
@@ -306,7 +328,7 @@ class TagRoutingMixin:
 
         if matched_models:
             logger.info(
-                "🎯 TOTAL MATCHED MODELS: %s models found: %s%s",
+                "[TARGET] TOTAL MATCHED MODELS: %s models found: %s%s",
                 len(matched_models),
                 matched_models[:5],
                 "..." if len(matched_models) > 5 else "",
@@ -506,7 +528,7 @@ class TagRoutingMixin:
                 resolved_name,
                 channel.id,
             )
-            return resolved_name
+            return str(resolved_name)
 
         model_lower = model_name.lower()
         for alias_key, alias_value in channel.model_aliases.items():
@@ -517,7 +539,7 @@ class TagRoutingMixin:
                     alias_value,
                     channel.id,
                 )
-                return alias_value
+                return str(alias_value)
 
         if "/" in model_name:
             _, base_name = model_name.rsplit("/", 1)
@@ -529,7 +551,7 @@ class TagRoutingMixin:
                     resolved_name,
                     channel.id,
                 )
-                return resolved_name
+                return str(resolved_name)
 
         return model_name
 
@@ -654,7 +676,7 @@ class TagRoutingMixin:
 
     def get_available_models(self) -> list[str]:
         if self._available_models_cache is not None:
-            return self._available_models_cache
+            return cast(list[str], self._available_models_cache)
 
         models = set()
         all_tags = set()

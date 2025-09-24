@@ -14,6 +14,10 @@ logger = logging.getLogger(__name__)
 class CandidateDiscoveryMixin(ParameterComparisonMixin, TagRoutingMixin):
     """Combines parameter and tag based routing to produce channel candidates."""
 
+    def __init__(self):
+        super().__init__()
+        self.config_loader = None
+
     def _get_candidate_channels(
         self, request: RoutingRequest
     ) -> list[ChannelCandidate]:

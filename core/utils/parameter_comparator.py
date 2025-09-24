@@ -24,7 +24,7 @@ class ParameterComparison:
 class ParameterComparator:
     """参数量比较处理器"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         # 支持的比较操作符模式
         self.comparison_patterns = [
             r"^(.+?)->(\d+(?:\.\d+)?[bBmMkK]?)$",  # qwen3->8b (大于)
@@ -86,13 +86,13 @@ class ParameterComparator:
                     )
 
             logger.warning(
-                f"❌ PARSE FAILED: Could not parse parameter comparison '{query}'"
+                f"[FAIL] PARSE FAILED: Could not parse parameter comparison '{query}'"
             )
             return None
 
         except Exception as e:
             logger.error(
-                f"❌ PARSE ERROR: Failed to parse parameter comparison '{query}': {e}"
+                f"[FAIL] PARSE ERROR: Failed to parse parameter comparison '{query}': {e}"
             )
             return None
 
@@ -114,7 +114,7 @@ class ParameterComparator:
             match = re.match(r"^(\d+(?:\.\d+)?)([bkmgt]?)$", param_str)
             if not match:
                 logger.warning(
-                    f"❌ PARAM FORMAT: Invalid parameter format '{param_str}'"
+                    f"[FAIL] PARAM FORMAT: Invalid parameter format '{param_str}'"
                 )
                 return None
 
@@ -133,7 +133,9 @@ class ParameterComparator:
             elif unit == "g":  # 十亿(G) - 同B
                 converted = value
             else:
-                logger.warning(f"❌ UNIT ERROR: Unknown unit '{unit}' in '{param_str}'")
+                logger.warning(
+                    f"[FAIL] UNIT ERROR: Unknown unit '{unit}' in '{param_str}'"
+                )
                 return None
 
             logger.debug(f"🔢 CONVERSION: '{param_str}' -> {converted:.6f}B")
@@ -141,7 +143,7 @@ class ParameterComparator:
 
         except Exception as e:
             logger.error(
-                f"❌ CONVERSION ERROR: Failed to parse parameter size '{param_str}': {e}"
+                f"[FAIL] CONVERSION ERROR: Failed to parse parameter size '{param_str}': {e}"
             )
             return None
 
@@ -306,7 +308,7 @@ class ParameterComparator:
                         comparison_matched += 1
                         matching_models.append((channel_id, model_name, model_params))
                         logger.debug(
-                            f"✅ MATCH: {model_name} ({model_params}B) in {channel_id}"
+                            f"[PASS] MATCH: {model_name} ({model_params}B) in {channel_id}"
                         )
 
             # 按参数量排序（大的在前）
@@ -317,13 +319,15 @@ class ParameterComparator:
                 f"param_extracted={param_extracted}, final_matched={comparison_matched}"
             )
             logger.info(
-                f"✅ COMPARISON RESULT: Found {len(matching_models)} models matching '{comparison.raw_query}'"
+                f"[PASS] COMPARISON RESULT: Found {len(matching_models)} models matching '{comparison.raw_query}'"
             )
 
             return matching_models
 
         except Exception as e:
-            logger.error(f"❌ FILTER ERROR: Failed to filter models by comparison: {e}")
+            logger.error(
+                f"[FAIL] FILTER ERROR: Failed to filter models by comparison: {e}"
+            )
             return []
 
     def _model_matches_prefix(self, model_name: str, prefix: str) -> bool:
@@ -376,12 +380,12 @@ class ParameterComparator:
             elif operator == "<=":
                 return model_params <= target_params
             else:
-                logger.warning(f"❌ UNKNOWN OPERATOR: '{operator}'")
+                logger.warning(f"[FAIL] UNKNOWN OPERATOR: '{operator}'")
                 return False
 
         except Exception as e:
             logger.error(
-                f"❌ COMPARISON ERROR: Failed to compare {model_params} {operator} {target_params}: {e}"
+                f"[FAIL] COMPARISON ERROR: Failed to compare {model_params} {operator} {target_params}: {e}"
             )
             return False
 

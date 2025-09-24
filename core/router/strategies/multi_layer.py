@@ -69,12 +69,12 @@ class MultiLayerRoutingStrategy(BaseRoutingStrategy):
     def _get_speed_score(self, channel: Channel) -> float:
         """获取速度评分"""
         # 从性能评分中获取速度评分，默认为健康度评分
-        performance_scores = channel.performance_scores or {}
+        performance_scores: dict[str, Any] = channel.performance_scores or {}
         return float(performance_scores.get("speed_score", channel.health_score or 0.8))
 
     def _get_quality_score(self, channel: Channel) -> float:
         """获取质量评分"""
-        performance_scores = channel.performance_scores or {}
+        performance_scores: dict[str, Any] = channel.performance_scores or {}
         return float(performance_scores.get("quality_score", 0.8))
 
     def _get_reliability_score(self, channel: Channel) -> float:
@@ -104,7 +104,9 @@ class MultiLayerRoutingStrategy(BaseRoutingStrategy):
         """计算综合评分"""
 
         # 根据模型组的路由策略计算评分
-        routing_strategy = request.model_group.routing_strategy or []
+        routing_strategy: list[dict[str, Any]] = (
+            request.model_group.routing_strategy or []
+        )
         if not routing_strategy:
             # 默认策略：平衡成本和质量
             routing_strategy = [

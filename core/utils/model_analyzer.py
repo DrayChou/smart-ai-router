@@ -20,7 +20,7 @@ class ModelSpecs:
     parameter_size_text: Optional[str] = None  # 原始参数文本，如 "7b", "270m"
     context_text: Optional[str] = None  # 原始上下文文本，如 "32k", "128k"
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """后处理，计算数值"""
         if self.parameter_size_text and not self.parameter_count:
             self.parameter_count = self._parse_parameter_size(self.parameter_size_text)

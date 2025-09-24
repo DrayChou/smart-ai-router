@@ -34,7 +34,7 @@ class CacheEntry:
         """检查是否过期"""
         return time.time() - self.created_at > self.ttl
 
-    def access(self):
+    def access(self) -> None:
         """记录访问"""
         self.access_count += 1
         self.last_accessed = time.time()
@@ -259,7 +259,7 @@ class SmartCache:
         logger.debug(f"缓存生成: {cache_type}:{key}")
         return data
 
-    def _load_persistent_cache(self):
+    def _load_persistent_cache(self) -> None:
         """加载持久化缓存（同步版本，为兼容性保留）"""
         try:
             if not self.persistent_cache_file.exists():
@@ -293,7 +293,7 @@ class SmartCache:
         except Exception as e:
             logger.warning(f"加载持久化缓存失败: {e}")
 
-    async def _load_persistent_cache_async(self):
+    async def _load_persistent_cache_async(self) -> None:
         """异步加载持久化缓存"""
         try:
             file_manager = get_async_file_manager()
@@ -328,7 +328,7 @@ class SmartCache:
         except Exception as e:
             logger.warning(f"异步加载持久化缓存失败: {e}")
 
-    async def _save_persistent_entry(self, cache_key: str, entry: CacheEntry):
+    async def _save_persistent_entry(self, cache_key: str, entry: CacheEntry) -> None:
         """异步保存单个缓存条目到持久化文件"""
         try:
             file_manager = get_async_file_manager()
@@ -356,7 +356,7 @@ class SmartCache:
         except Exception as e:
             logger.warning(f"异步保存持久化缓存失败: {e}")
 
-    async def save_all_persistent_cache(self):
+    async def save_all_persistent_cache(self) -> None:
         """异步保存所有持久化缓存条目"""
         try:
             file_manager = get_async_file_manager()
@@ -409,10 +409,10 @@ class SmartCache:
 
         return expired_count
 
-    def _start_cleanup_task(self):
+    def _start_cleanup_task(self) -> None:
         """启动定期清理任务"""
 
-        async def cleanup_loop():
+        async def cleanup_loop() -> None:
             while True:
                 try:
                     await asyncio.sleep(60)  # 每分钟清理一次
@@ -424,7 +424,7 @@ class SmartCache:
 
     def get_stats(self) -> dict[str, Any]:
         """获取缓存统计信息"""
-        stats = {
+        stats: dict[str, Any] = {
             "total_entries": len(self.memory_cache),
             "cache_types": {},
             "memory_usage_estimate": 0,
@@ -465,7 +465,9 @@ class SmartCache:
 
         return stats
 
-    async def _enforce_size_limit(self, cache_type: str, config: dict[str, Any]):
+    async def _enforce_size_limit(
+        self, cache_type: str, config: dict[str, Any]
+    ) -> None:
         """强制执行缓存大小限制"""
         max_size = config.get("max_size")
         if not max_size:
@@ -476,7 +478,7 @@ class SmartCache:
             # 需要清理，采用LRU策略
             await self._evict_lru_entries(cache_type, max_size // 4)  # 清理25%的空间
 
-    async def _evict_lru_entries(self, cache_type: str, evict_count: int):
+    async def _evict_lru_entries(self, cache_type: str, evict_count: int) -> None:
         """驱逐LRU缓存条目"""
         prefix = f"{cache_type}:"
 
@@ -500,7 +502,7 @@ class SmartCache:
         if evicted_count > 0:
             logger.debug(f"缓存LRU清理: {cache_type} 驱逐了 {evicted_count} 个条目")
 
-    async def preload_hot_queries(self, hot_patterns: list[str]):
+    async def preload_hot_queries(self, hot_patterns: list[str]) -> None:
         """预加载热点查询模式"""
         for pattern in hot_patterns:
             # 这里可以根据pattern预生成一些常用查询的缓存
@@ -513,7 +515,7 @@ class SmartCache:
 
     def get_cache_layer_stats(self) -> dict[str, Any]:
         """获取分层缓存统计信息"""
-        layer_stats = {
+        layer_stats: dict[str, dict[str, Any]] = {
             "L1_long_term": {"types": [], "total_entries": 0, "total_size_mb": 0},
             "L2_medium_term": {"types": [], "total_entries": 0, "total_size_mb": 0},
             "L3_short_term": {"types": [], "total_entries": 0, "total_size_mb": 0},
@@ -554,7 +556,7 @@ def get_smart_cache() -> SmartCache:
     return _global_cache
 
 
-async def close_global_cache():
+async def close_global_cache() -> None:
     """关闭全局缓存（用于清理）"""
     global _global_cache
     if _global_cache is not None:

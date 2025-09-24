@@ -51,7 +51,7 @@ class RequestMetadata:
     # 成本预览信息
     cost_preview: Optional[dict[str, Any]] = None
 
-    def finish_request(self, end_time: Optional[float] = None):
+    def finish_request(self, end_time: Optional[float] = None) -> None:
         """结束请求，计算最终指标"""
         self.end_time = end_time or time.time()
         self.latency = self.end_time - self.start_time
@@ -63,7 +63,7 @@ class RequestMetadata:
 class ResponseAggregator:
     """响应汇总器 - 统一处理不同类型的响应输出"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.active_requests: dict[str, RequestMetadata] = {}
 
     def create_request_metadata(
@@ -107,7 +107,7 @@ class ResponseAggregator:
         prompt_tokens: int,
         completion_tokens: int,
         total_tokens: int,
-    ):
+    ) -> None:
         """更新token信息"""
         if request_id in self.active_requests:
             metadata = self.active_requests[request_id]
@@ -121,7 +121,7 @@ class ResponseAggregator:
         request_cost: float,
         session_cost: float,
         session_requests: int,
-    ):
+    ) -> None:
         """更新成本信息"""
         if request_id in self.active_requests:
             metadata = self.active_requests[request_id]
@@ -134,7 +134,7 @@ class ResponseAggregator:
         request_id: str,
         ttfb: Optional[float] = None,
         tokens_per_second: Optional[float] = None,
-    ):
+    ) -> None:
         """更新性能信息"""
         if request_id in self.active_requests:
             metadata = self.active_requests[request_id]
@@ -143,7 +143,7 @@ class ResponseAggregator:
             if tokens_per_second is not None:
                 metadata.tokens_per_second = tokens_per_second
 
-    def set_error(self, request_id: str, error_code: str, error_message: str):
+    def set_error(self, request_id: str, error_code: str, error_message: str) -> None:
         """设置错误信息"""
         if request_id in self.active_requests:
             metadata = self.active_requests[request_id]

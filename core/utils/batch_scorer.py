@@ -9,7 +9,7 @@ import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from core.json_router import ChannelCandidate
 
@@ -64,7 +64,7 @@ class BatchScorer:
             "optimizations_applied": defaultdict(int),
         }
 
-        # 🚀 智能缓存配置
+        # [BOOST] 智能缓存配置
         self.min_cache_timeout = 60  # 1分钟最小缓存
         self.max_cache_timeout = 600  # 10分钟最大缓存
         self.adaptive_cache_timeout = self.cache_timeout  # 初始值
@@ -74,7 +74,7 @@ class BatchScorer:
         channel_ids = sorted([c.channel.id for c in channels])
         model_name = getattr(request, "model", "unknown")
 
-        # 🚀 添加请求上下文信息以提高缓存命中率
+        # [BOOST] 添加请求上下文信息以提高缓存命中率
         request_context = {
             "model": model_name,
             "channels": channel_ids,
@@ -94,14 +94,14 @@ class BatchScorer:
         if cache_key in self.cache:
             cached_time, cached_result = self.cache[cache_key]
 
-            # 🚀 使用自适应缓存超时
+            # [BOOST] 使用自适应缓存超时
             current_timeout = self.adaptive_cache_timeout
             if (time.time() - cached_time) < current_timeout:
                 logger.debug(
                     f"BATCH_SCORER: Cache hit for {cache_key} (timeout: {current_timeout}s)"
                 )
                 self.performance_stats["cache_hits"] += 1
-                return cached_result
+                return cast(Optional[BatchedScoreComponents], cached_result)
             else:
                 # 缓存过期，移除
                 del self.cache[cache_key]
@@ -113,7 +113,7 @@ class BatchScorer:
         """存储到缓存（更新统计信息）"""
         self.cache[cache_key] = (time.time(), result)
 
-        # 🚀 更新缓存统计和自适应超时
+        # [BOOST] 更新缓存统计和自适应超时
         self._update_cache_statistics()
 
     def _update_cache_statistics(self):
@@ -126,7 +126,7 @@ class BatchScorer:
             hit_rate = self.performance_stats["cache_hits"] / total
             self.performance_stats["cache_hit_rate"] = hit_rate
 
-            # 🚀 自适应调整缓存超时：命中率高则延长超时
+            # [BOOST] 自适应调整缓存超时：命中率高则延长超时
             if hit_rate > 0.7:  # 命中率超过70%
                 self.adaptive_cache_timeout = min(
                     self.max_cache_timeout, self.adaptive_cache_timeout * 1.2
@@ -146,7 +146,7 @@ class BatchScorer:
         """批量获取模型规格信息（内存索引优化版）"""
         model_specs = {}
 
-        # 🚀 性能优化：优先使用内存索引，避免文件I/O
+        # [BOOST] 性能优化：优先使用内存索引，避免文件I/O
         try:
             from core.utils.memory_index import get_memory_index
 
@@ -420,11 +420,11 @@ class BatchScorer:
         reliability_scores = {}
         local_scores = {}
 
-        # 🚀 批量获取运行时状态 - 优化健康评分获取
+        # [BOOST] 批量获取运行时状态 - 优化健康评分获取
         runtime_state = self.router.config_loader.runtime_state
         channel_stats = runtime_state.channel_stats
 
-        # 🚀 优化：优先使用内存索引的健康缓存，减少实时计算
+        # [BOOST] 优化：优先使用内存索引的健康缓存，减少实时计算
         health_scores_dict = {}
         health_cache_hits = 0
         health_cache_misses = 0
@@ -628,7 +628,7 @@ class BatchScorer:
         if is_slow:
             self.performance_stats["slow_requests"] += 1
             logger.warning(
-                f"⚠️ SLOW BATCH SCORING: {channel_count} channels took {elapsed_ms:.1f}ms (avg: {avg_time_per_channel:.1f}ms/channel)"
+                f"[WARNING] SLOW BATCH SCORING: {channel_count} channels took {elapsed_ms:.1f}ms (avg: {avg_time_per_channel:.1f}ms/channel)"
             )
 
         # 应用优化策略
@@ -716,7 +716,11 @@ class BatchScorer:
         if slow_rate > 0.1:
             recommendations.append("慢查询比例较高，考虑实施渠道预过滤或分批处理")
 
-        if stats["optimizations_applied"].get("large_batch_optimization", 0) > 5:
+        optimizations_applied = stats["optimizations_applied"]
+        if (
+            isinstance(optimizations_applied, dict)
+            and optimizations_applied.get("large_batch_optimization", 0) > 5
+        ):
             recommendations.append("大批量查询频繁，建议实施分层缓存策略")
 
         if len(recommendations) == 0:

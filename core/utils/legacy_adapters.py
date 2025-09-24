@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class CapabilityMapperAdapter:
     """capability_mapper.py的兼容适配器"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.registry = get_unified_model_registry()
 
     def predict_capabilities(self, model_name: str, provider: str) -> dict[str, bool]:
@@ -114,7 +114,7 @@ class CapabilityMapperAdapter:
 class ModelAnalyzerAdapter:
     """model_analyzer.py的兼容适配器"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.registry = get_unified_model_registry()
 
     def analyze_model(
@@ -248,7 +248,7 @@ class ModelAnalyzerAdapter:
 class LocalModelCapabilitiesAdapter:
     """local_model_capabilities.py的兼容适配器"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.registry = get_unified_model_registry()
 
     async def detect_model_capabilities(

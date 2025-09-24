@@ -178,7 +178,7 @@ class JSONRouter(CandidateDiscoveryMixin, ScoringMixin):
                 )
                 filtered_candidates = pre_filtered
 
-            logger.info("🎯 STEP 3: Scoring and ranking channels...")
+            logger.info("[TARGET] STEP 3: Scoring and ranking channels...")
             scored_channels = await self._score_channels(filtered_candidates, request)
             if not scored_channels:
                 logger.warning(
@@ -216,7 +216,7 @@ class JSONRouter(CandidateDiscoveryMixin, ScoringMixin):
                     )
                 except Exception as cache_error:
                     logger.warning(
-                        "⚠️  CACHE SAVE FAILED: %s, continuing without caching",
+                        "[WARNING]  CACHE SAVE FAILED: %s, continuing without caching",
                         cache_error,
                     )
 

@@ -39,5 +39,5 @@ class Provider(Base):
     # 关系
     channels = relationship("Channel", back_populates="provider")
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Provider(name='{self.name}', type='{self.type}')>"

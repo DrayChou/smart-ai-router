@@ -6,7 +6,7 @@ HTTP客户端连接池管理器
 
 import asyncio
 import logging
-from typing import Optional
+from typing import Any, Optional
 from urllib.parse import urlparse
 
 import httpx
@@ -17,17 +17,19 @@ logger = logging.getLogger(__name__)
 class HTTPStreamContext:
     """HTTP流式请求的异步上下文管理器"""
 
-    def __init__(self, stream_coroutine):
+    def __init__(self, stream_coroutine: Any) -> None:
         self.stream_coroutine = stream_coroutine
         self.stream_manager = None
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> Any:
         # 获取实际的流式上下文管理器
         self.stream_manager = await self.stream_coroutine
         # 进入流式上下文
-        return await self.stream_manager.__aenter__()
+        if self.stream_manager is not None:
+            return await self.stream_manager.__aenter__()
+        raise RuntimeError("Failed to get stream manager")
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         # 退出流式上下文
         if self.stream_manager:
             return await self.stream_manager.__aexit__(exc_type, exc_val, exc_tb)
@@ -36,7 +38,7 @@ class HTTPStreamContext:
 class HTTPClientPool:
     """HTTP客户端连接池"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.clients: dict[str, httpx.AsyncClient] = {}
         self.lock = asyncio.Lock()
 
@@ -79,20 +81,20 @@ class HTTPClientPool:
 
             return self.clients[base_url_key]
 
-    async def request(self, method: str, url: str, **kwargs) -> httpx.Response:
+    async def request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
         """使用连接池发送HTTP请求"""
         client = await self.get_client(url)
         return await client.request(method, url, **kwargs)
 
-    async def post(self, url: str, **kwargs) -> httpx.Response:
+    async def post(self, url: str, **kwargs: Any) -> httpx.Response:
         """POST请求"""
         return await self.request("POST", url, **kwargs)
 
-    async def get(self, url: str, **kwargs) -> httpx.Response:
+    async def get(self, url: str, **kwargs: Any) -> httpx.Response:
         """GET请求"""
         return await self.request("GET", url, **kwargs)
 
-    def stream(self, method: str, url: str, **kwargs):
+    def stream(self, method: str, url: str, **kwargs: Any) -> HTTPStreamContext:
         """流式请求 - 返回异步上下文管理器"""
 
         # 注意：这里不能用async def，因为需要返回一个可以用于async with的对象
@@ -103,7 +105,7 @@ class HTTPClientPool:
         # 返回一个自定义的异步上下文管理器
         return HTTPStreamContext(_stream_context())
 
-    async def close_all(self):
+    async def close_all(self) -> None:
         """关闭所有客户端连接"""
         async with self.lock:
             for base_url, client in self.clients.items():
@@ -114,7 +116,7 @@ class HTTPClientPool:
                     logger.warning(f"关闭客户端连接池失败 {base_url}: {e}")
             self.clients.clear()
 
-    async def cleanup_idle_clients(self, max_idle_time: float = 300.0):
+    async def cleanup_idle_clients(self, max_idle_time: float = 300.0) -> None:
         """清理空闲的客户端连接（可选的后台任务）"""
         # 这个功能对个人开发者来说可能不是必需的
         # 因为连接数量通常不会很大

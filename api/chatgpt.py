@@ -404,46 +404,11 @@ async def stream_chatgpt_response(
 
     try:
         # 使用chat_handler的流式处理
-        async for chunk in chat_handler.handle_stream_request(request):
-            # 处理不同类型的chunk
-            if isinstance(chunk, str):
-                # 如果是字符串，尝试解析为JSON
-                try:
-                    chunk_data = json.loads(chunk)
-                    if chunk_data.get("type") == "error":
-                        # 错误消息
-                        yield f"data: {json.dumps(chunk_data)}\n\n"
-                        return
-                except (json.JSONDecodeError, ValueError):
-                    # 如果不是JSON，当作普通处理
-                    continue
-            else:
-                # 如果是字典，处理流式响应
-                if chunk.get("choices"):
-                    for choice in chunk["choices"]:
-                        # 创建流式响应块
-                        chunk_response = {
-                            "id": response_id,
-                            "object": "chat.completion.chunk",
-                            "created": created_time,
-                            "model": original_request.model,
-                            "choices": [choice],
-                        }
-
-                        # 添加系统指纹
-                        if hasattr(chunk, "system_fingerprint"):
-                            chunk_response["system_fingerprint"] = (
-                                chunk.system_fingerprint
-                            )
-                        else:
-                            chunk_response["system_fingerprint"] = (
-                                f"fp_{uuid.uuid4().hex[:8]}"
-                            )
-
-                        yield f"data: {json.dumps(chunk_response)}\n\n"
-
+        response = await chat_handler.handle_stream_request(request)
+        return response
     except Exception as e:
         logger.error(f"Stream error: {e}")
+        # Create error response
         error_chunk = {
             "id": response_id,
             "object": "chat.completion.chunk",
@@ -458,9 +423,8 @@ async def stream_chatgpt_response(
             ],
         }
         yield f"data: {json.dumps(error_chunk)}\n\n"
-
-    # 发送结束标记
-    yield "data: [DONE]\n\n"
+        # 发送结束标记
+        yield "data: [DONE]\n\n"
 
 
 # --- 错误处理 ---

@@ -8,7 +8,7 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 logger = logging.getLogger(__name__)
 
@@ -263,26 +263,35 @@ class ConfigLoader:
 
     def get_server_config(self) -> dict[str, Any]:
         """获取服务器配置"""
-        return self.config_data.get(
-            "server", {"host": "0.0.0.0", "port": 7601, "debug": False}
+        return cast(
+            dict[str, Any],
+            self.config_data.get(
+                "server", {"host": "0.0.0.0", "port": 7601, "debug": False}
+            ),
         )
 
     def get_routing_config(self) -> dict[str, Any]:
         """获取路由配置"""
-        return self.config_data.get(
-            "routing",
-            {
-                "default_strategy": "auto:balanced",
-                "fallback_enabled": True,
-                "max_fallback_attempts": 3,
-            },
+        return cast(
+            dict[str, Any],
+            self.config_data.get(
+                "routing",
+                {
+                    "default_strategy": "auto:balanced",
+                    "fallback_enabled": True,
+                    "max_fallback_attempts": 3,
+                },
+            ),
         )
 
     def get_monitoring_config(self) -> dict[str, Any]:
         """获取监控配置"""
-        return self.config_data.get(
-            "monitoring",
-            {"enabled": True, "log_requests": True, "log_responses": False},
+        return cast(
+            dict[str, Any],
+            self.config_data.get(
+                "monitoring",
+                {"enabled": True, "log_requests": True, "log_responses": False},
+            ),
         )
 
 
@@ -290,10 +299,12 @@ def get_config_loader() -> ConfigLoader:
     """获取全局配置加载器实例"""
     from core.utils.thread_safe_singleton import get_or_create_global
 
-    def _create_config_loader():
+    def _create_config_loader() -> ConfigLoader:
         return ConfigLoader()
 
-    return get_or_create_global("_config_loader", _create_config_loader)
+    return cast(
+        ConfigLoader, get_or_create_global("_config_loader", _create_config_loader)
+    )
 
 
 def reload_config() -> ConfigLoader:

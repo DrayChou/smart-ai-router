@@ -6,7 +6,7 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Any, Optional
 
 import httpx
 
@@ -36,7 +36,7 @@ class RecoveryAttempt:
 class BlacklistRecoveryManager:
     """黑名单恢复管理器"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.config_loader = get_yaml_config_loader()
         self.blacklist_manager = get_model_blacklist_manager()
         self.recovery_history: list[RecoveryAttempt] = []
@@ -49,7 +49,7 @@ class BlacklistRecoveryManager:
         self._recovery_task: Optional[asyncio.Task] = None
         self._running = False
 
-    async def start_recovery_service(self):
+    async def start_recovery_service(self) -> None:
         """启动恢复服务"""
         if self._running:
             return
@@ -58,7 +58,7 @@ class BlacklistRecoveryManager:
         self._recovery_task = asyncio.create_task(self._recovery_loop())
         logger.info("🔄 Blacklist recovery service started")
 
-    async def stop_recovery_service(self):
+    async def stop_recovery_service(self) -> None:
         """停止恢复服务"""
         if not self._running:
             return
@@ -73,7 +73,7 @@ class BlacklistRecoveryManager:
 
         logger.info("🔄 Blacklist recovery service stopped")
 
-    async def _recovery_loop(self):
+    async def _recovery_loop(self) -> None:
         """恢复服务主循环"""
         while self._running:
             try:
@@ -85,7 +85,7 @@ class BlacklistRecoveryManager:
                 logger.error(f"Recovery loop error: {e}")
                 await asyncio.sleep(60)  # 出错后等待1分钟
 
-    async def _perform_recovery_check(self):
+    async def _perform_recovery_check(self) -> None:
         """执行恢复检查"""
         logger.debug("🔄 Starting blacklist recovery check")
 
@@ -117,7 +117,7 @@ class BlacklistRecoveryManager:
 
         if success_count > 0:
             logger.info(
-                f"✅ Recovery completed: {success_count} successful, {failed_count} failed"
+                f"[PASS] Recovery completed: {success_count} successful, {failed_count} failed"
             )
         else:
             logger.debug(f"🔄 Recovery completed: 0 successful, {failed_count} failed")
@@ -219,7 +219,7 @@ class BlacklistRecoveryManager:
                     channel_id, model_name
                 )
                 logger.info(
-                    f"✅ RECOVERY SUCCESS: {model_name}@{channel_id} is now available (response_time: {response_time:.3f}s)"
+                    f"[PASS] RECOVERY SUCCESS: {model_name}@{channel_id} is now available (response_time: {response_time:.3f}s)"
                 )
                 return True
             else:
@@ -321,7 +321,7 @@ class BlacklistRecoveryManager:
 
     async def _extend_blacklist(
         self, entry: ModelChannelBlacklistEntry, failed_attempts: int
-    ):
+    ) -> None:
         """延长黑名单时间"""
         # 根据失败次数指数增长等待时间
         base_duration = entry.backoff_duration
@@ -335,7 +335,7 @@ class BlacklistRecoveryManager:
             f"🔄 Extended blacklist for {entry.model_name}@{entry.channel_id} by {extended_duration}s"
         )
 
-    def get_recovery_stats(self) -> dict[str, any]:
+    def get_recovery_stats(self) -> dict[str, Any]:
         """获取恢复统计信息"""
         recent_attempts = [
             attempt
@@ -378,13 +378,13 @@ def get_blacklist_recovery_manager() -> BlacklistRecoveryManager:
     return _global_recovery_manager
 
 
-async def start_recovery_service():
+async def start_recovery_service() -> None:
     """启动恢复服务（用于应用启动时调用）"""
     recovery_manager = get_blacklist_recovery_manager()
     await recovery_manager.start_recovery_service()
 
 
-async def stop_recovery_service():
+async def stop_recovery_service() -> None:
     """停止恢复服务（用于应用关闭时调用）"""
     recovery_manager = get_blacklist_recovery_manager()
     await recovery_manager.stop_recovery_service()

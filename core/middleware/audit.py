@@ -3,7 +3,7 @@
 """
 
 import time
-from typing import Callable
+from typing import Callable, cast
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -38,11 +38,11 @@ class AuditMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # 跳过不需要审计的路径
         if request.url.path in self.skip_paths:
-            return await call_next(request)
+            return cast(Response, await call_next(request))
 
         # 如果审计日志器未初始化，直接通过
         if not self.audit_logger:
-            return await call_next(request)
+            return cast(Response, await call_next(request))
 
         # 记录请求开始时间
         start_time = time.time()
@@ -75,7 +75,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
             # 记录审计日志
             await self._audit_request(request, response, process_time)
 
-            return response
+            return cast(Response, response)
 
         except Exception as e:
             # 记录错误审计
@@ -276,12 +276,12 @@ class SecurityAuditMiddleware(BaseHTTPMiddleware):
         self.audit_logger = get_audit_logger()
 
         # 记录IP访问频率（简单实现）
-        self.ip_requests = {}
+        self.ip_requests: dict[str, list[float]] = {}
         self.max_requests_per_minute = 60
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         if not self.audit_logger:
-            return await call_next(request)
+            return cast(Response, await call_next(request))
 
         client_ip = self._get_client_ip(request)
 
@@ -293,7 +293,7 @@ class SecurityAuditMiddleware(BaseHTTPMiddleware):
             await self._check_security_violations(request)
 
             response = await call_next(request)
-            return response
+            return cast(Response, response)
 
         finally:
             self.audit_logger.clear_context()

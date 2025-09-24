@@ -30,7 +30,7 @@ _query_stats: dict[str, HotQuery] = {}
 _preload_tasks: dict[str, asyncio.Task] = {}
 
 
-def record_query_access(query_pattern: str, response_time_ms: float):
+def record_query_access(query_pattern: str, response_time_ms: float) -> None:
     """记录查询访问，用于热点检测"""
     current_time = time.time()
 
@@ -102,7 +102,7 @@ async def preload_query_result(query_pattern: str, preload_func: Callable) -> bo
             },
         )
 
-        logger.info(f"🔥 PRELOADED: {query_pattern} in {elapsed_ms:.1f}ms")
+        logger.info(f"[HOT] PRELOADED: {query_pattern} in {elapsed_ms:.1f}ms")
         return True
 
     except Exception as e:
@@ -110,7 +110,9 @@ async def preload_query_result(query_pattern: str, preload_func: Callable) -> bo
         return False
 
 
-async def batch_preload_hot_queries(router_instance, max_concurrent: int = 3):
+async def batch_preload_hot_queries(
+    router_instance: Any, max_concurrent: int = 3
+) -> None:
     """批量预加载热点查询"""
     hot_queries = get_hot_queries(min_frequency=5)  # 至少访问5次才预加载
 
@@ -118,7 +120,7 @@ async def batch_preload_hot_queries(router_instance, max_concurrent: int = 3):
         logger.info("No hot queries to preload")
         return
 
-    logger.info(f"🔥 PRELOADING: {len(hot_queries)} hot queries")
+    logger.info(f"[HOT] PRELOADING: {len(hot_queries)} hot queries")
 
     # 定义常见查询模式的预加载函数
     preload_functions = {
@@ -152,11 +154,11 @@ async def batch_preload_hot_queries(router_instance, max_concurrent: int = 3):
     # 统计结果
     successful = sum(1 for _, success in results if success)
     logger.info(
-        f"🔥 PRELOAD COMPLETE: {successful}/{len(results)} queries preloaded successfully"
+        f"[HOT] PRELOAD COMPLETE: {successful}/{len(results)} queries preloaded successfully"
     )
 
 
-async def _preload_tag_query(router_instance, tags: list[str]):
+async def _preload_tag_query(router_instance: Any, tags: list[str]) -> dict[str, Any]:
     """预加载标签查询（辅助函数）"""
     from ..json_router import RoutingRequest
 
@@ -191,7 +193,7 @@ def get_preload_stats() -> dict[str, Any]:
     }
 
 
-def cleanup_old_queries(max_age_days: int = 7):
+def cleanup_old_queries(max_age_days: int = 7) -> None:
     """清理过期的查询统计"""
     current_time = time.time()
     max_age_seconds = max_age_days * 24 * 3600
@@ -206,12 +208,14 @@ def cleanup_old_queries(max_age_days: int = 7):
 
     if expired_patterns:
         logger.info(
-            f"🧹 CLEANUP: Removed {len(expired_patterns)} expired query patterns"
+            f"[CLEANUP] CLEANUP: Removed {len(expired_patterns)} expired query patterns"
         )
 
 
 # 启动预加载任务的便捷函数
-async def start_preload_scheduler(router_instance, interval_minutes: int = 30):
+async def start_preload_scheduler(
+    router_instance: Any, interval_minutes: int = 30
+) -> None:
     """启动预加载调度器"""
     while True:
         try:
@@ -224,11 +228,11 @@ async def start_preload_scheduler(router_instance, interval_minutes: int = 30):
 
 
 # 简单的装饰器函数用于自动记录查询
-def track_query_performance(query_pattern: str):
+def track_query_performance(query_pattern: str) -> Callable[[Callable], Callable]:
     """装饰器：自动跟踪查询性能"""
 
-    def decorator(func):
-        async def wrapper(*args, **kwargs):
+    def decorator(func: Callable) -> Callable:
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
             start_time = time.time()
             try:
                 result = await func(*args, **kwargs)

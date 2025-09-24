@@ -4,7 +4,7 @@
 """
 
 import threading
-from typing import Callable, Optional, TypeVar
+from typing import Any, Callable, Optional, TypeVar, cast
 
 T = TypeVar("T")
 
@@ -12,9 +12,9 @@ T = TypeVar("T")
 class SingletonFactory:
     """线程安全的单例工厂"""
 
-    def __init__(self):
-        self._instances = {}
-        self._locks = {}
+    def __init__(self) -> None:
+        self._instances: dict[str, Any] = {}
+        self._locks: dict[str, threading.Lock] = {}
         self._main_lock = threading.Lock()
 
     def get_instance(
@@ -25,7 +25,7 @@ class SingletonFactory:
 
         # 检查是否已有实例
         if cls_name in self._instances:
-            return self._instances[cls_name]
+            return cast(T, self._instances[cls_name])
 
         # 获取或创建类专用锁
         if cls_name not in self._locks:
@@ -42,7 +42,7 @@ class SingletonFactory:
                     instance = cls()
                 self._instances[cls_name] = instance
 
-            return self._instances[cls_name]
+            return cast(T, self._instances[cls_name])
 
     def clear_instance(self, cls: type[T]) -> None:
         """清除指定类的实例"""

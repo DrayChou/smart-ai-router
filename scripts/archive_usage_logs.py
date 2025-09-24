@@ -22,9 +22,9 @@ def archive_logs(days_to_keep: int = 30):
 
     try:
         tracker.archive_old_logs(days_to_keep)
-        print("✅ 日志归档完成")
+        print("[PASS] 日志归档完成")
     except Exception as e:
-        print(f"❌ 日志归档失败: {e}")
+        print(f"[FAIL] 日志归档失败: {e}")
         return False
 
     return True
@@ -37,7 +37,7 @@ def generate_summary_report(target_date: date = None):
 
     tracker = get_usage_tracker()
 
-    print(f"\n📊 使用统计报告 - {target_date.isoformat()}")
+    print(f"\n[STATS] 使用统计报告 - {target_date.isoformat()}")
     print("=" * 50)
 
     # 每日统计
@@ -71,7 +71,7 @@ def generate_summary_report(target_date: date = None):
 
     # 热门模型
     if monthly_stats["models"]:
-        print("\n🔥 本月热门模型 (Top 5):")
+        print("\n[HOT] 本月热门模型 (Top 5):")
         sorted_models = sorted(
             monthly_stats["models"].items(),
             key=lambda x: x[1]["requests"],
@@ -120,7 +120,7 @@ def main():
         try:
             target_date = datetime.strptime(args.date, "%Y-%m-%d").date()
         except ValueError:
-            print("❌ 日期格式错误，请使用 YYYY-MM-DD 格式")
+            print("[FAIL] 日期格式错误，请使用 YYYY-MM-DD 格式")
             return
 
     success = True

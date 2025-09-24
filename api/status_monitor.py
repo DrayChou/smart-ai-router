@@ -71,7 +71,7 @@ def create_status_monitor_router(
     templates = Jinja2Templates(env=jinja_env)
 
     @api_router.get("/", response_class=HTMLResponse)
-    async def status_monitor_page(request: Request):
+    async def status_monitor_page(request: Request) -> HTMLResponse:
         """状态监控主页面"""
         return templates.TemplateResponse(
             "status_monitor.html",
@@ -79,7 +79,7 @@ def create_status_monitor_router(
         )
 
     @api_router.get("/api/channels")
-    async def get_channels_status():
+    async def get_channels_status() -> dict[str, Any]:
         """获取所有渠道状态"""
         channels = config_loader.get_enabled_channels()
         blacklist_manager = get_model_blacklist_manager()
@@ -138,7 +138,7 @@ def create_status_monitor_router(
         }
 
     @api_router.get("/api/channels/{channel_id}/models")
-    async def get_channel_models(channel_id: str):
+    async def get_channel_models(channel_id: str) -> dict[str, Any]:
         """获取指定渠道的模型列表"""
         channel_cache = config_loader.get_model_cache_by_channel(channel_id)
         models = channel_cache.get("models", [])
@@ -220,7 +220,9 @@ def create_status_monitor_router(
         }
 
     @api_router.post("/api/channels/{channel_id}/enable")
-    async def set_channel_enable(channel_id: str, enabled: bool = Query(True)):
+    async def set_channel_enable(
+        channel_id: str, enabled: bool = Query(True)
+    ) -> dict[str, Any]:
         """启用/禁用指定渠道（持久化到 YAML 并热加载）"""
         try:
             ok = config_loader.set_channel_enabled(channel_id, enabled)
@@ -236,7 +238,7 @@ def create_status_monitor_router(
     @api_router.post("/api/channels/{channel_id}/priority")
     async def set_channel_priority(
         channel_id: str, priority: int = Query(100, ge=0, le=1000)
-    ):
+    ) -> dict[str, Any]:
         """调整渠道优先级（持久化到 YAML 并热加载）"""
         try:
             ok = config_loader.set_channel_priority(channel_id, priority)
@@ -250,7 +252,7 @@ def create_status_monitor_router(
             return {"success": False, "error": str(e)}
 
     @api_router.post("/api/search")
-    async def search_models(search_request: ModelSearchRequest):
+    async def search_models(search_request: ModelSearchRequest) -> dict[str, Any]:
         """搜索模型并返回路由顺序"""
         try:
             # 使用路由器进行模型搜索
@@ -291,7 +293,7 @@ def create_status_monitor_router(
                     blacklist_manager.is_model_blacklisted(channel.id, model_name)
                 )
 
-                # 🎯 使用OpenRouter数据库作为通用模型能力参考
+                # [TARGET] 使用OpenRouter数据库作为通用模型能力参考
                 capabilities, context_length = get_model_capabilities_from_openrouter(
                     model_name
                 )
@@ -437,7 +439,9 @@ def create_status_monitor_router(
             }
 
     @api_router.get("/api/logs")
-    async def get_request_logs(limit: int = Query(100, ge=1, le=1000)):
+    async def get_request_logs(
+        limit: int = Query(100, ge=1, le=1000)
+    ) -> dict[str, Any]:
         """获取最近的请求日志"""
         recent_logs = request_logs[-limit:] if request_logs else []
         return {
@@ -448,7 +452,7 @@ def create_status_monitor_router(
         }
 
     @api_router.get("/api/blacklist")
-    async def get_blacklist_summary():
+    async def get_blacklist_summary() -> dict[str, Any]:
         """获取黑名单摘要信息"""
         blacklist_manager = get_model_blacklist_manager()
         stats = blacklist_manager.get_blacklist_stats()
@@ -465,7 +469,7 @@ def create_status_monitor_router(
         }
 
     @api_router.websocket("/ws")
-    async def websocket_endpoint(websocket: WebSocket):
+    async def websocket_endpoint(websocket: WebSocket) -> None:
         """WebSocket连接用于实时更新"""
         await websocket.accept()
         active_connections.append(websocket)
@@ -480,7 +484,7 @@ def create_status_monitor_router(
     return api_router
 
 
-def set_request_channel(channel_name: str):
+def set_request_channel(channel_name: str) -> None:
     """设置当前请求的渠道信息"""
     _request_context.channel_name = channel_name
 
@@ -498,7 +502,7 @@ def log_request(
     model: str = None,
     channel: str = None,
     error: str = None,
-):
+) -> None:
     """记录请求日志"""
     global request_logs
 

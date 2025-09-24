@@ -286,7 +286,8 @@ class AnthropicAdapter(BaseAdapter):
         # 从messages中查找system消息
         for msg in request.messages:
             if msg.get("role") == "system":
-                return msg.get("content", "")
+                content = msg.get("content", "")
+                return str(content) if content is not None else None
 
         return None
 

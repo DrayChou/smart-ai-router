@@ -6,7 +6,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from .model_analyzer import get_model_analyzer
 
@@ -90,17 +90,17 @@ class ChannelCacheManager:
                 json.dump(cache_data, f, indent=2, ensure_ascii=False)
 
             logger.info(
-                f"✅ Saved channel cache for {channel_id}: {len(analyzed_models)} models analyzed"
+                f"[PASS] Saved channel cache for {channel_id}: {len(analyzed_models)} models analyzed"
             )
             logger.info(
-                f"   📊 Models with parameter info: {cache_data['analysis_metadata']['models_with_params']}"
+                f"   [STATS] Models with parameter info: {cache_data['analysis_metadata']['models_with_params']}"
             )
             logger.info(
                 f"   📏 Models with context info: {cache_data['analysis_metadata']['models_with_context']}"
             )
 
         except Exception as e:
-            logger.error(f"❌ Failed to save channel cache for {channel_id}: {e}")
+            logger.error(f"[FAIL] Failed to save channel cache for {channel_id}: {e}")
 
     def load_channel_models(self, channel_id: str) -> Optional[dict[str, Any]]:
         """加载单个渠道的模型数据"""
@@ -111,9 +111,9 @@ class ChannelCacheManager:
 
         try:
             with open(channel_cache_file, encoding="utf-8") as f:
-                return json.load(f)
+                return cast(Optional[dict[str, Any]], json.load(f))
         except Exception as e:
-            logger.error(f"❌ Failed to load channel cache for {channel_id}: {e}")
+            logger.error(f"[FAIL] Failed to load channel cache for {channel_id}: {e}")
             return None
 
     def get_all_channel_ids(self) -> list[str]:
@@ -175,7 +175,9 @@ class ChannelCacheManager:
                     self.save_channel_models(channel_id, channel_data)
                     migrated_count += 1
 
-            logger.info(f"✅ Migration completed: {migrated_count} channels migrated")
+            logger.info(
+                f"[PASS] Migration completed: {migrated_count} channels migrated"
+            )
 
             # 备份旧文件
             backup_path = old_cache_path.with_suffix(".json.backup")
@@ -183,7 +185,7 @@ class ChannelCacheManager:
             logger.info(f"📦 Old cache backed up to: {backup_path}")
 
         except Exception as e:
-            logger.error(f"❌ Migration failed: {e}")
+            logger.error(f"[FAIL] Migration failed: {e}")
 
     def search_models_by_specs(
         self,
@@ -241,9 +243,9 @@ class ChannelCacheManager:
             if file_path.exists():
                 try:
                     file_path.unlink()
-                    logger.info(f"🗑️ Removed old cache file: {filename}")
+                    logger.info(f"[DELETE] Removed old cache file: {filename}")
                 except Exception as e:
-                    logger.warning(f"⚠️ Failed to remove {filename}: {e}")
+                    logger.warning(f"[WARNING] Failed to remove {filename}: {e}")
 
 
 # 全局缓存管理器实例

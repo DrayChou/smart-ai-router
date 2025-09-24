@@ -54,7 +54,7 @@ class ChatRequest(BaseModel):
     class Config:
         extra = "allow"  # 允许额外字段
 
-    def dict(self, **kwargs):
+    def dict(self, **kwargs: Any) -> dict[str, Any]:
         """重写dict方法，确保兼容性"""
         result = super().dict(**kwargs)
 

@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 def main():
     """主迁移函数"""
     logger.info(
-        "🚀 Starting cache migration from old format to channel-separated format"
+        "[BOOST] Starting cache migration from old format to channel-separated format"
     )
 
     try:
@@ -38,8 +38,8 @@ def main():
         # 显示迁移后的摘要
         summary = cache_manager.get_channel_summary()
 
-        logger.info("✅ Migration completed successfully!")
-        logger.info("📊 Migration Summary:")
+        logger.info("[PASS] Migration completed successfully!")
+        logger.info("[STATS] Migration Summary:")
         logger.info(f"   • Total channels: {summary['total_channels']}")
         logger.info(f"   • Total models: {summary['total_models']}")
         logger.info(f"   • Models with parameter info: {summary['models_with_params']}")
@@ -58,7 +58,7 @@ def main():
         logger.info("🎉 All done! The new cache structure is ready for use.")
 
     except Exception as e:
-        logger.error(f"❌ Migration failed: {e}", exc_info=True)
+        logger.error(f"[FAIL] Migration failed: {e}", exc_info=True)
         sys.exit(1)
 
 

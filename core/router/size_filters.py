@@ -86,7 +86,7 @@ def apply_size_filters(
     for candidate in candidates:
         channel = candidate.channel
         model_name = candidate.matched_model or channel.model_name
-        model_analysis = analyzer.get_model_analysis(channel.id, model_name)
+        model_analysis = analyzer.analyze_model(model_name)
 
         if not model_analysis:
             # Try to pull from discovery cache as fallback

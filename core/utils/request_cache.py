@@ -90,7 +90,7 @@ class CachedModelSelection:
 
         return True
 
-    def mark_used(self):
+    def mark_used(self) -> None:
         """标记为已使用"""
         self.request_count += 1
         self.last_used_at = datetime.now()
@@ -127,7 +127,10 @@ class RequestModelCache:
         # 最后清理时间（同步清理机制）
         self._last_cleanup = datetime.now()
 
-    def _maybe_cleanup(self):
+        # 清理任务（异步）
+        self._cleanup_task = None
+
+    def _maybe_cleanup(self) -> None:
         """按需清理过期缓存（同步机制，避免异步任务复杂性）"""
         now = datetime.now()
         if (now - self._last_cleanup).total_seconds() > self.cleanup_interval:
@@ -156,7 +159,9 @@ class RequestModelCache:
                 # 缓存失效，删除并返回None
                 del self._cache[cache_key]
                 self._stats["invalidations"] += 1
-                logger.info(f"❌ CACHE INVALIDATED: {cache_key} (expired or unhealthy)")
+                logger.info(
+                    f"[FAIL] CACHE INVALIDATED: {cache_key} (expired or unhealthy)"
+                )
                 return None
 
             # 缓存命中
@@ -165,7 +170,7 @@ class RequestModelCache:
 
             age_seconds = (datetime.now() - cached_result.created_at).total_seconds()
             logger.debug(
-                f"✅ CACHE HIT: {cache_key} "
+                f"[PASS] CACHE HIT: {cache_key} "
                 f"(model: {fingerprint.model}, age: {age_seconds:.1f}s, uses: {cached_result.request_count})"
             )
 
@@ -218,7 +223,7 @@ class RequestModelCache:
 
             return cache_key
 
-    def invalidate_channel(self, channel_id: str):
+    def invalidate_channel(self, channel_id: str) -> None:
         """使特定渠道相关的缓存失效"""
         invalidated_keys = []
 
@@ -232,7 +237,7 @@ class RequestModelCache:
         if invalidated_keys:
             self._stats["invalidations"] += len(invalidated_keys)
             logger.info(
-                f"🗑️  INVALIDATED {len(invalidated_keys)} cache entries for channel: {channel_id}"
+                f"[DELETE]  INVALIDATED {len(invalidated_keys)} cache entries for channel: {channel_id}"
             )
 
     def invalidate_model_channel_combination(
@@ -275,12 +280,12 @@ class RequestModelCache:
         if invalidated_count > 0:
             self._stats["invalidations"] += invalidated_count
             logger.info(
-                f"🗑️  INVALIDATED {invalidated_count} cache entries for model-channel combination: {model_name}@{channel_id}"
+                f"[DELETE]  INVALIDATED {invalidated_count} cache entries for model-channel combination: {model_name}@{channel_id}"
             )
 
         return invalidated_count
 
-    def invalidate_model(self, model_name: str):
+    def invalidate_model(self, model_name: str) -> None:
         """使特定模型相关的缓存失效（基于cache_key前缀匹配）"""
         # 注意：由于cache_key是Hash，无法直接按模型名匹配
         # 这里采用保守策略：清空所有缓存
@@ -288,10 +293,10 @@ class RequestModelCache:
         self._cache.clear()
         self._stats["invalidations"] += cleared_count
         logger.warning(
-            f"🗑️  CLEARED ALL CACHE due to model update: {model_name} ({cleared_count} entries)"
+            f"[DELETE]  CLEARED ALL CACHE due to model update: {model_name} ({cleared_count} entries)"
         )
 
-    def _cleanup_expired_sync(self):
+    def _cleanup_expired_sync(self) -> None:
         """清理过期缓存（内部同步方法）"""
         expired_keys = []
         datetime.now()
@@ -307,10 +312,10 @@ class RequestModelCache:
             self._stats["cleanup_runs"] += 1
             self._stats["invalidations"] += len(expired_keys)
             logger.debug(
-                f"🧹 CLEANUP: Removed {len(expired_keys)} expired cache entries"
+                f"[CLEANUP] CLEANUP: Removed {len(expired_keys)} expired cache entries"
             )
 
-    def _evict_lru_sync(self):
+    def _evict_lru_sync(self) -> None:
         """LRU淘汰策略（内部同步方法）"""
         if not self._cache:
             return
@@ -323,7 +328,7 @@ class RequestModelCache:
 
         if lru_key:
             del self._cache[lru_key]
-            logger.debug(f"🗑️  LRU EVICTED: {lru_key}")
+            logger.debug(f"[DELETE]  LRU EVICTED: {lru_key}")
 
     def get_stats(self) -> dict[str, Any]:
         """获取缓存统计信息"""
@@ -343,13 +348,13 @@ class RequestModelCache:
             "default_ttl_seconds": self.default_ttl,
         }
 
-    def clear_all(self):
+    def clear_all(self) -> None:
         """清空所有缓存"""
         cleared_count = len(self._cache)
         self._cache.clear()
-        logger.info(f"🗑️  CLEARED ALL CACHE: {cleared_count} entries removed")
+        logger.info(f"[DELETE]  CLEARED ALL CACHE: {cleared_count} entries removed")
 
-    def __del__(self):
+    def __del__(self) -> None:
         """清理资源"""
         if self._cleanup_task and not self._cleanup_task.done():
             self._cleanup_task.cancel()

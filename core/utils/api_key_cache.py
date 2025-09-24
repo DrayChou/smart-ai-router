@@ -229,7 +229,7 @@ class ApiKeyCacheManager:
                 # 无法迁移，保持原格式（兼容性）
                 new_cache[cache_key] = cache_data
                 kept_count += 1
-                # 🚀 优化：减少重复警告，只在调试模式显示
+                # [BOOST] 优化：减少重复警告，只在调试模式显示
                 logger.debug(
                     f"Cannot migrate cache key {cache_key}: no channel config or API key"
                 )

@@ -59,7 +59,7 @@ class ConfigurationException(BaseRouterException):
         message: Optional[str] = None,
         config_path: Optional[str] = None,
         **kwargs: Any,
-    ):
+    ) -> None:
         details = kwargs.get("details", {})
         if config_path:
             details["config_path"] = config_path
@@ -76,8 +76,8 @@ class RoutingException(BaseRouterException):
         message: Optional[str] = None,
         model: Optional[str] = None,
         tags: Optional[list[str]] = None,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         details = kwargs.get("details", {})
         if model:
             details["model"] = model
@@ -85,6 +85,19 @@ class RoutingException(BaseRouterException):
             details["tags"] = tags
 
         super().__init__(error_code, message, details, **kwargs)
+
+    @property
+    def status_code(self) -> int:
+        """获取HTTP状态码"""
+        # 默认状态码映射
+        status_mapping = {
+            ErrorCode.TAG_NOT_FOUND: 404,
+            ErrorCode.PARAMETER_COMPARISON_FAILED: 400,
+            ErrorCode.CHANNEL_NOT_FOUND: 404,
+            ErrorCode.MODEL_NOT_FOUND: 404,
+            ErrorCode.CONFIG_INVALID: 500,
+        }
+        return status_mapping.get(self.error_code, 500)
 
 
 class ChannelException(BaseRouterException):
@@ -96,8 +109,8 @@ class ChannelException(BaseRouterException):
         message: Optional[str] = None,
         channel_id: Optional[str] = None,
         channel_name: Optional[str] = None,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         details = kwargs.get("details", {})
         if channel_id:
             details["channel_id"] = channel_id
@@ -116,8 +129,8 @@ class ModelException(BaseRouterException):
         message: Optional[str] = None,
         model_name: Optional[str] = None,
         provider: Optional[str] = None,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         details = kwargs.get("details", {})
         if model_name:
             details["model_name"] = model_name
@@ -136,8 +149,8 @@ class NetworkException(BaseRouterException):
         message: Optional[str] = None,
         url: Optional[str] = None,
         status_code: Optional[int] = None,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         details = kwargs.get("details", {})
         if url:
             details["url"] = url
@@ -155,8 +168,8 @@ class AuthenticationException(BaseRouterException):
         error_code: ErrorCode,
         message: Optional[str] = None,
         token: Optional[str] = None,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         details = kwargs.get("details", {})
         if token:
             # 只保存token的前几位用于调试，不泄露完整token

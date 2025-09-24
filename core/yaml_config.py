@@ -90,14 +90,14 @@ class YAMLConfigLoader:
         instance._migration_in_progress = False
 
         try:
-            # 🚀 使用异步配置加载器替代同步加载
+            # [BOOST] 使用异步配置加载器替代同步加载
             logger.info("开始异步配置加载...")
             instance.config = await load_config_async(instance.config_path)
 
             # 创建渠道映射
             instance.channels_map = {ch.id: ch for ch in instance.config.channels}
 
-            # 🚀 异步加载模型缓存（如果有的话）
+            # [BOOST] 异步加载模型缓存（如果有的话）
             await instance._load_model_cache_async()
 
             elapsed = asyncio.get_event_loop().time() - start_time
@@ -113,7 +113,7 @@ class YAMLConfigLoader:
             # 如果异步加载失败，回退到同步加载
             return cls(config_path)
 
-    async def _load_model_cache_async(self):
+    async def _load_model_cache_async(self) -> None:
         """异步加载模型缓存"""
         try:
             cache_file = (
@@ -140,7 +140,7 @@ class YAMLConfigLoader:
                     # 标记迁移正在进行
                     self._migration_in_progress = True
 
-                    # 🚀 启动后台迁移任务（不阻塞启动）
+                    # [BOOST] 启动后台迁移任务（不阻塞启动）
                     asyncio.create_task(self._async_cache_migration(raw_cache))
                 else:
                     self.model_cache = raw_cache
@@ -153,7 +153,7 @@ class YAMLConfigLoader:
             logger.error(f"异步加载模型缓存失败: {e}")
             # 不抛出异常，允许系统继续运行
 
-    async def _async_cache_migration(self, raw_cache: dict[str, dict]):
+    async def _async_cache_migration(self, raw_cache: dict[str, dict]) -> None:
         """异步缓存迁移任务"""
         try:
             logger.info("开始后台缓存迁移...")
@@ -327,7 +327,7 @@ class YAMLConfigLoader:
     def _schedule_cache_migration(self, raw_cache: dict[str, Any]) -> None:
         """Schedule cache migration regardless of event loop availability."""
 
-        async def _runner():
+        async def _runner() -> None:
             await self._migrate_cache_background(raw_cache)
 
         try:
@@ -337,7 +337,7 @@ class YAMLConfigLoader:
                 "No event loop available for background migration, spawning worker thread"
             )
 
-            def _thread_target():
+            def _thread_target() -> None:
                 try:
                     asyncio.run(_runner())
                 except Exception as exc:
@@ -352,7 +352,7 @@ class YAMLConfigLoader:
         else:
             loop.create_task(_runner())
 
-    def _load_model_cache_from_disk(self):
+    def _load_model_cache_from_disk(self) -> None:
         """从磁盘加载模型发现任务的缓存（同步版本，为兼容性保留）"""
         try:
             # 直接从缓存文件加载
@@ -372,13 +372,13 @@ class YAMLConfigLoader:
                         logger.info(
                             "CACHE MIGRATION: Detected legacy cache format, using as-is and scheduling background migration"
                         )
-                        # 🚀 优化：先使用现有缓存，避免阻塞启动
+                        # [BOOST] 优化：先使用现有缓存，避免阻塞启动
                         self.model_cache = raw_cache  # 临时使用原始缓存
 
                         # 标记迁移正在进行
                         self._migration_in_progress = True
 
-                        # 🚀 启动后台迁移任务（不阻塞启动）
+                        # [BOOST] 启动后台迁移任务（不阻塞启动）
                         self._schedule_cache_migration(raw_cache)
                     else:
                         self.model_cache = raw_cache
@@ -402,7 +402,7 @@ class YAMLConfigLoader:
                         f"{stats['api_key_coverage']}% coverage"
                     )
 
-                    # 🚀 立即构建内存索引（启动时预加载）
+                    # [BOOST] 立即构建内存索引（启动时预加载）
                     self._build_memory_index()
             else:
                 logger.warning("Model cache file not found")
@@ -446,7 +446,7 @@ class YAMLConfigLoader:
         """根据标签获取渠道"""
         return [ch for ch in self.get_enabled_channels() if tag in ch.tags]
 
-    def _build_memory_index(self):
+    def _build_memory_index(self) -> None:
         """构建内存索引（启动时预加载）"""
         try:
             if not self.model_cache:
@@ -508,7 +508,7 @@ class YAMLConfigLoader:
             }
         return channels_map
 
-    def _save_migrated_cache(self):
+    def _save_migrated_cache(self) -> None:
         """保存迁移后的缓存（同步版本，为兼容性保留）"""
         try:
             cache_file = (
@@ -520,7 +520,7 @@ class YAMLConfigLoader:
         except Exception as e:
             logger.error(f"Failed to save migrated cache: {e}")
 
-    async def _save_migrated_cache_async(self):
+    async def _save_migrated_cache_async(self) -> None:
         """异步保存迁移后的缓存"""
         try:
             cache_file = (
@@ -538,7 +538,7 @@ class YAMLConfigLoader:
         except Exception as e:
             logger.error(f"Failed to save migrated cache async: {e}")
 
-    async def _migrate_cache_background(self, raw_cache: dict[str, Any]):
+    async def _migrate_cache_background(self, raw_cache: dict[str, Any]) -> None:
         """后台迁移缓存格式（不阻塞主线程）"""
         try:
             logger.info("BACKGROUND MIGRATION: Starting cache migration in background")
@@ -553,15 +553,15 @@ class YAMLConfigLoader:
                 migrated_cache, self._get_channels_for_migration()
             )
 
-            # 🚀 先保存已清理的缓存到磁盘，但不立即更新内存缓存
+            # [BOOST] 先保存已清理的缓存到磁盘，但不立即更新内存缓存
             self.model_cache = cleaned_cache  # 临时设置以便保存
             await self._save_migrated_cache_async()
 
-            # 🚀 标记迁移完成状态
+            # [BOOST] 标记迁移完成状态
             self._migration_completed = True
             self._migration_in_progress = False
 
-            # 🚀 重建内存索引以使用新缓存（一次性操作）
+            # [BOOST] 重建内存索引以使用新缓存（一次性操作）
             self._build_memory_index()
 
             logger.info("BACKGROUND MIGRATION: Cache migration completed successfully")
@@ -570,10 +570,10 @@ class YAMLConfigLoader:
             logger.error(
                 f"BACKGROUND MIGRATION: Failed to migrate cache in background: {e}"
             )
-            # 🚀 迁移失败时重置状态，允许重试
+            # [BOOST] 迁移失败时重置状态，允许重试
             self._migration_in_progress = False
 
-    async def _load_model_cache_from_disk_async(self):
+    async def _load_model_cache_from_disk_async(self) -> None:
         """异步从磁盘加载模型发现任务的缓存"""
         try:
             file_manager = get_async_file_manager()
@@ -612,7 +612,7 @@ class YAMLConfigLoader:
                     f"{stats['api_key_coverage']}% coverage"
                 )
 
-                # 🚀 立即构建内存索引（启动时预加载）
+                # [BOOST] 立即构建内存索引（启动时预加载）
                 self._build_memory_index()
             else:
                 logger.warning("Model cache file not found")
@@ -716,7 +716,7 @@ class YAMLConfigLoader:
                 return channel
         return None
 
-    def update_model_cache(self, new_cache: dict[str, dict]):
+    def update_model_cache(self, new_cache: dict[str, dict]) -> None:
         """更新模型缓存（支持API Key级别缓存）"""
         # 检查是否需要迁移新的缓存数据
         if self._needs_cache_migration(new_cache):
@@ -851,7 +851,7 @@ class YAMLConfigLoader:
                 "interval_hours": self.config.tasks.model_discovery.interval_hours,
                 "run_on_startup": self.config.tasks.model_discovery.run_on_startup,
             },
-            # 🗑️ Removed pricing_discovery - was generating unused cache files
+            # [DELETE] Removed pricing_discovery - was generating unused cache files
             "health_check": {
                 "enabled": self.config.tasks.health_check.enabled,
                 "interval_minutes": self.config.tasks.health_check.interval_minutes,
