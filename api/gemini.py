@@ -416,8 +416,8 @@ async def stream_gemini_response(
 
     try:
         # 使用chat_handler的流式处理
-        response = await chat_handler.handle_stream_request(request)
-        return response
+        async for chunk in chat_handler.handle_stream_request(request):
+            yield chunk
     except Exception as e:
         logger.error(f"Stream error: {e}")
         error_chunk = {
