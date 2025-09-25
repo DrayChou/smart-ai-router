@@ -94,7 +94,7 @@ class TestDataModels:
             assert ModelInfo is not None
             
             # 尝试检查类属性
-            if hasattr(ModelInfo, '__annotations__'):
+            if hasattr(ModelInfo, "__annotations__"):
                 annotations = ModelInfo.__annotations__
                 assert isinstance(annotations, dict)
         except ImportError:
@@ -148,7 +148,7 @@ class TestUtilityModules:
             assert estimator is not None
             
             # 测试简单文本估算
-            if hasattr(estimator, 'estimate'):
+            if hasattr(estimator, "estimate"):
                 tokens = estimator.estimate("Hello world")
                 assert isinstance(tokens, (int, float))
                 assert tokens >= 0
@@ -186,7 +186,7 @@ class TestRouterComponents:
             assert router is not None
             
             # 检查基础方法存在
-            assert hasattr(router, '__class__')
+            assert hasattr(router, "__class__")
         except ImportError:
             pytest.skip("BaseRouter not available")
         except Exception as e:
@@ -230,7 +230,7 @@ class TestProviderSystem:
             assert BaseProvider is not None
             
             # 检查是否有必要的方法
-            expected_methods = ['__init__']
+            expected_methods = ["__init__"]
             for method in expected_methods:
                 if hasattr(BaseProvider, method):
                     assert callable(getattr(BaseProvider, method))

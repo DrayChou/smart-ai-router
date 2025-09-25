@@ -156,7 +156,7 @@ class TestMainModule:
             import main
             assert main is not None
             # 检查主要函数存在
-            assert hasattr(main, 'create_app') or hasattr(main, 'main')
+            assert hasattr(main, "create_app") or hasattr(main, "main")
         except ImportError:
             pytest.skip("Main module import failed")
 
@@ -172,7 +172,7 @@ class TestConfigFiles:
         if config_dir.exists():
             for json_file in config_dir.glob("*.json"):
                 try:
-                    with open(json_file, 'r', encoding='utf-8') as f:
+                    with open(json_file, "r", encoding="utf-8") as f:
                         data = json.load(f)
                         assert isinstance(data, (dict, list))
                 except Exception as e:
