@@ -1,9 +1,10 @@
 """日志系统测试"""
 
-import pytest
-from pathlib import Path
-import sys
 import json
+import sys
+from pathlib import Path
+
+import pytest
 
 # 添加项目根目录到 Python 路径
 project_root = Path(__file__).parent.parent
@@ -16,7 +17,7 @@ class TestLoggerImports:
     def test_logger_import(self):
         """测试日志模块导入"""
         try:
-            from core.utils.logger import SmartAILogger, setup_logging, get_logger
+            from core.utils.logger import SmartAILogger, get_logger, setup_logging
             assert SmartAILogger is not None
             assert setup_logging is not None
             assert get_logger is not None
@@ -108,7 +109,7 @@ class TestSmartAILogger:
         """测试日志器创建"""
         try:
             from core.utils.logger import SmartAILogger
-            
+
             # 不使用 tempfile，直接使用内存测试
             logger = SmartAILogger()
             assert logger is not None
@@ -119,7 +120,7 @@ class TestSmartAILogger:
         """测试基础日志记录"""
         try:
             from core.utils.logger import SmartAILogger
-            
+
             # 不创建日志文件，只测试方法调用
             logger = SmartAILogger()
             
@@ -164,8 +165,8 @@ class TestGlobalLogger:
     def test_setup_logging(self):
         """测试全局日志设置"""
         try:
-            from core.utils.logger import setup_logging, get_smart_logger
-            
+            from core.utils.logger import get_smart_logger, setup_logging
+
             # 不创建临时文件，只测试功能
             logger = setup_logging()
             assert logger is not None
@@ -196,7 +197,7 @@ async def test_async_shutdown():
     """测试异步关闭"""
     try:
         from core.utils.logger import setup_logging, shutdown_logging
-        
+
         # 不创建临时文件
         logger = setup_logging()
         logger.info("Test message before shutdown")

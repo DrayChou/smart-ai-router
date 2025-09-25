@@ -1,8 +1,9 @@
 """简单功能测试 - 测试实际代码执行"""
 
-import pytest
-from pathlib import Path
 import sys
+from pathlib import Path
+
+import pytest
 
 # 添加项目根目录到 Python 路径
 project_root = Path(__file__).parent.parent
@@ -16,7 +17,7 @@ class TestBasicFunctions:
         """测试配置加载功能"""
         try:
             from core.utils.config import get_config
-            
+
             # 尝试获取配置（即使失败也不应该崩溃）
             config = get_config()
             # 配置应该是字典或None
@@ -32,7 +33,7 @@ class TestBasicFunctions:
         """测试token生成"""
         try:
             from core.utils.auth import generate_token
-            
+
             # 测试token生成
             token = generate_token("test_user")
             assert isinstance(token, str)
@@ -48,7 +49,7 @@ class TestBasicFunctions:
         """测试JSON路由器创建"""
         try:
             from core.json_router import JSONRouter
-            
+
             # 尝试创建路由器实例
             router = JSONRouter()
             assert router is not None
@@ -67,7 +68,7 @@ class TestDataModels:
         """测试聊天请求创建"""
         try:
             from core.models.chat_request import ChatRequest
-            
+
             # 尝试创建请求对象
             request_data = {
                 "model": "test-model",
@@ -89,7 +90,7 @@ class TestDataModels:
         """测试模型信息结构"""
         try:
             from core.models.model_info import ModelInfo
-            
+
             # 测试模型信息类存在
             assert ModelInfo is not None
             
@@ -108,7 +109,7 @@ class TestServiceModules:
         """测试缓存服务创建"""
         try:
             from core.services.cache_service import CacheService
-            
+
             # 尝试创建缓存服务
             cache_service = CacheService()
             assert cache_service is not None
@@ -123,7 +124,7 @@ class TestServiceModules:
         """测试配置服务创建"""
         try:
             from core.services.config_service import ConfigService
-            
+
             # 尝试创建配置服务
             config_service = ConfigService()
             assert config_service is not None
@@ -142,7 +143,7 @@ class TestUtilityModules:
         """测试token估算功能"""
         try:
             from core.utils.token_estimator import TokenEstimator
-            
+
             # 创建估算器
             estimator = TokenEstimator()
             assert estimator is not None
@@ -162,7 +163,7 @@ class TestUtilityModules:
         """测试文本处理功能"""
         try:
             from core.utils.text_processor import TextProcessor
-            
+
             # 创建处理器
             processor = TextProcessor()
             assert processor is not None
@@ -180,7 +181,7 @@ class TestRouterComponents:
         """测试基础路由器功能"""
         try:
             from core.router.base import BaseRouter
-            
+
             # 创建路由器实例
             router = BaseRouter()
             assert router is not None
@@ -197,7 +198,7 @@ class TestRouterComponents:
         """测试路由策略"""
         try:
             from core.router.strategies.cost_optimized import CostOptimizedStrategy
-            
+
             # 测试策略类存在
             assert CostOptimizedStrategy is not None
         except ImportError:
@@ -211,7 +212,7 @@ class TestProviderSystem:
         """测试提供者注册表"""
         try:
             from core.providers.registry import ProviderRegistry
-            
+
             # 创建注册表
             registry = ProviderRegistry()
             assert registry is not None
@@ -225,7 +226,7 @@ class TestProviderSystem:
         """测试基础提供者"""
         try:
             from core.providers.base import BaseProvider
-            
+
             # 测试基础提供者类存在
             assert BaseProvider is not None
             
